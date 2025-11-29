@@ -6,13 +6,13 @@ import { usePostHog } from "posthog-js/react";
 interface ImageComparisonProps {
   originalImageUrl: string;
   processedImageUrl: string | null;
-  originalFileName: string;
+  processedFileName: string | null;
 }
 
 export function ImageComparison({
   originalImageUrl,
   processedImageUrl,
-  originalFileName,
+  processedFileName,
 }: ImageComparisonProps) {
   const posthog = usePostHog();
 
@@ -61,7 +61,7 @@ export function ImageComparison({
           <div className="p-4 border-t-2 border-black bg-white">
             <a
               href={processedImageUrl}
-              download={`shaken-${originalFileName}`}
+              download={processedFileName}
               onClick={handleDownload}
             >
               <Button

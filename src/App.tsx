@@ -12,6 +12,7 @@ import {
   applyCrush,
   DEFAULT_OPTIONS,
 } from "./lib/pipeline";
+import { generateCameraLikeFilename } from "./lib/utils";
 
 const INITIAL_STEPS: PipelineStepState[] = [
   {
@@ -46,6 +47,9 @@ function App() {
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(
     null
   );
+  const [processedFileName, setProcessedFileName] = useState<string | null>(
+    null
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [steps, setSteps] = useState<PipelineStepState[]>(INITIAL_STEPS);
 
@@ -66,6 +70,7 @@ function App() {
     setOriginalImage(file);
     setOriginalImageUrl(URL.createObjectURL(file));
     setProcessedImageUrl(null);
+    setProcessedFileName(null);
 
     // Reset steps
     setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
@@ -125,8 +130,10 @@ function App() {
       await new Promise((r) => setTimeout(r, 500));
 
       const resultDataUrl = await applyCrush(canvas, DEFAULT_OPTIONS.crush);
+      const generatedFileName = generateCameraLikeFilename();
 
       setProcessedImageUrl(resultDataUrl);
+      setProcessedFileName(generatedFileName);
       updateStep("crush", { status: "done", progress: 100 });
     } catch (error) {
       console.error("Pipeline failed", error);
@@ -147,6 +154,7 @@ function App() {
     setOriginalImage(null);
     setOriginalImageUrl(null);
     setProcessedImageUrl(null);
+    setProcessedFileName(null);
     setSteps(INITIAL_STEPS);
   };
 
@@ -184,7 +192,7 @@ function App() {
               <ImageComparison
                 originalImageUrl={originalImageUrl!}
                 processedImageUrl={processedImageUrl}
-                originalFileName={originalImage.name}
+                processedFileName={processedFileName}
               />
             </div>
           )}
