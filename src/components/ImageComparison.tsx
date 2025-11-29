@@ -1,6 +1,7 @@
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Download } from "lucide-react";
+import { usePostHog } from "posthog-js/react";
 
 interface ImageComparisonProps {
   originalImageUrl: string;
@@ -13,6 +14,15 @@ export function ImageComparison({
   processedImageUrl,
   originalFileName,
 }: ImageComparisonProps) {
+  const posthog = usePostHog();
+
+  const handleDownload = () => {
+    posthog?.capture("action_clicked", {
+      action: "download_processed",
+      component: "image_comparison",
+    });
+  };
+
   return (
     <div className="grid md:grid-cols-2 gap-6">
       {/* Original */}
@@ -49,7 +59,11 @@ export function ImageComparison({
         </div>
         {processedImageUrl && (
           <div className="p-4 border-t-2 border-black bg-white">
-            <a href={processedImageUrl} download={`shaken-${originalFileName}`}>
+            <a
+              href={processedImageUrl}
+              download={`shaken-${originalFileName}`}
+              onClick={handleDownload}
+            >
               <Button
                 className="w-full font-bold border-2 border-black shadow-none hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] rounded-none"
                 size="lg"

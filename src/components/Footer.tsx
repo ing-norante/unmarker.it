@@ -1,8 +1,17 @@
+import { usePostHog } from "posthog-js/react";
 import ReactLogo from "@/assets/react.svg";
 import ViteLogo from "@/assets/vite.svg";
 import CanvasLogo from "@/assets/canvas.svg";
 
 export function Footer() {
+  const posthog = usePostHog();
+
+  const handleGithubClick = () => {
+    posthog?.capture("action_clicked", {
+      action: "github_author",
+      component: "footer",
+    });
+  };
   return (
     <footer className="mt-12 border-t-4 border-black pt-6 pb-4">
       <div className="max-w-7xl mx-auto">
@@ -48,6 +57,7 @@ export function Footer() {
               href="https://github.com/ing-norante/"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleGithubClick}
               className="font-black text-sm bg-black text-white px-3 py-1 hover:bg-yellow-300 hover:text-black transition-colors border-2 border-black"
             >
               ing.norante

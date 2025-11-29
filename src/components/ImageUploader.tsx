@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { Upload, FileImage } from "lucide-react";
+import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 
@@ -14,6 +15,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   className,
   disabled = false,
 }) => {
+  const posthog = usePostHog();
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDragOver = useCallback(
@@ -53,10 +55,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       if (disabled) return;
       const files = e.target.files;
       if (files && files.length > 0) {
+        posthog?.capture("action_clicked", {
+          action: "upload_image",
+          component: "uploader",
+        });
         onImageSelect(files[0]);
       }
     },
-    [onImageSelect, disabled]
+    [onImageSelect, disabled, posthog]
   );
 
   return (
@@ -70,9 +76,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onClick={() =>
-        !disabled && document.getElementById("file-upload")?.click()
-      }
+      onClick={() => {
+        if (!disabled) {
+          posthog?.capture("action_clicked", {
+            action: "upload_image",
+            component: "uploader",
+          });
+          document.getElementById("file-upload")?.click();
+        }
+      }}
     >
       <input
         id="file-upload"
