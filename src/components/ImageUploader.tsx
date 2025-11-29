@@ -95,7 +95,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             {isDragging ? "Drop it!" : "Upload Image"}
           </p>
           <p className="text-sm text-muted-foreground">
-            Drag & drop or click to select
+            Drop an image, hit process, and get a fresh JPEG that’s been shaken,
+            stirred, and crushed. Designed to disrupt invisible watermark
+            signals while keeping your image visually intact. No accounts, no
+            cloud, no nonsense.
           </p>
         </div>
       </div>

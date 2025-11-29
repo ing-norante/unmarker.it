@@ -9,7 +9,7 @@ export const DEFAULT_OPTIONS: ProcessingOptions = {
     noiseAmplitude: 5,
   },
   crush: {
-    quality: 0.8,
+    quality: 0.85,
   },
 };
 

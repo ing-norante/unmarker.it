@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { ImageUploader } from "./components/ImageUploader";
 import { PipelineSteps } from "./components/PipelineSteps";
-import { Button } from "./components/ui/button";
-import { Card } from "./components/ui/card";
+import { Header } from "./components/Header";
+import { ActionBar } from "./components/ActionBar";
+import { ImageComparison } from "./components/ImageComparison";
+import { Footer } from "./components/Footer";
 import type { PipelineStepState, PipelineStepId } from "./lib/types";
 import {
   applyShake,
@@ -10,27 +12,29 @@ import {
   applyCrush,
   DEFAULT_OPTIONS,
 } from "./lib/pipeline";
-import { Download, RefreshCcw, Zap } from "lucide-react";
 
 const INITIAL_STEPS: PipelineStepState[] = [
   {
     id: "shake",
     label: "Shake (Geometry)",
-    description: "Micro-rotation & zoom",
+    description:
+      "We apply a tiny random rotation (±0.5°) and a subtle zoom-in. This breaks the pixel grid alignment many invisible watermarks depend on.",
     status: "idle",
     progress: 0,
   },
   {
     id: "stir",
     label: "Stir (Noise)",
-    description: "Subtle RGB perturbation",
+    description:
+      "We inject low-amplitude RGB noise across the image to disturb the statistical patterns used by watermark detectors.",
     status: "idle",
     progress: 0,
   },
   {
     id: "crush",
     label: "Crush (Quantization)",
-    description: "JPEG compression",
+    description:
+      "We recompress the image as JPEG to crush remaining high-frequency watermark signals.",
     status: "idle",
     progress: 0,
   },
@@ -53,7 +57,7 @@ function App() {
       if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
       if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
     };
-  }, []);
+  }, [originalImageUrl, processedImageUrl]);
 
   const handleImageSelect = (file: File) => {
     if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
@@ -147,40 +151,15 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 md:p-8 font-sans selection:bg-yellow-300 selection:text-black">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Panel: Info & Status */}
-        <div className="lg:col-span-4 space-y-8">
-          <header className="space-y-4">
-            <h1 className="text-6xl font-black tracking-tighter border-b-8 border-black pb-2 uppercase">
-              Perturba
-              <br />
-              Pix
-            </h1>
-            <p className="text-xl font-medium leading-relaxed border-l-4 border-black pl-4">
-              Shake off invisible AI watermarks. <br />
-              <span className="bg-yellow-300 px-1 font-bold">
-                100% Client-side.
-              </span>
-            </p>
-          </header>
-
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold uppercase border-b-4 border-black inline-block mb-4">
-              Pipeline
-            </h2>
-            <PipelineSteps steps={steps} />
-          </div>
-
-          {isProcessing && (
-            <div className="p-4 border-2 border-black bg-black text-white font-mono animate-pulse">
-              PROCESSING IN PROGRESS...
-            </div>
-          )}
+    <div className="min-h-screen bg-background text-foreground p-4 md:p-4 font-sans selection:bg-yellow-300 selection:text-black flex flex-col">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1">
+        {/* Header - First on mobile, part of left panel on desktop */}
+        <div className="lg:col-span-4 order-1 lg:order-1">
+          <Header />
         </div>
 
-        {/* Right Panel: Workspace */}
-        <div className="lg:col-span-8 space-y-6">
+        {/* Right Panel: Workspace - Second on mobile, right on desktop */}
+        <div className="lg:col-span-8 lg:row-span-2 space-y-6 order-2 lg:order-2">
           {/* Upload Area */}
           {!originalImage && (
             <div className="h-full flex flex-col justify-center">
@@ -194,91 +173,42 @@ function App() {
           {/* Preview Area */}
           {originalImage && (
             <div className="grid gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Action Bar */}
-              <div className="flex justify-between items-center p-4 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                <div className="font-bold truncate max-w-[200px]">
-                  {originalImage.name}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={reset}
-                    disabled={isProcessing}
-                    className="border-2 border-black rounded-none hover:bg-red-100"
-                  >
-                    <RefreshCcw className="w-4 h-4 mr-2" /> Reset
-                  </Button>
-                  <Button
-                    onClick={processPipeline}
-                    disabled={isProcessing || !!processedImageUrl}
-                    variant="neobrutalist"
-                    className={processedImageUrl ? "opacity-50" : ""}
-                  >
-                    <Zap className="w-4 h-4 mr-2" />
-                    {isProcessing ? "Processing..." : "Shake It"}
-                  </Button>
-                </div>
-              </div>
+              <ActionBar
+                fileName={originalImage.name}
+                isProcessing={isProcessing}
+                hasProcessedImage={!!processedImageUrl}
+                onReset={reset}
+                onProcess={processPipeline}
+              />
 
-              {/* Images Comparison */}
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Original */}
-                <Card className="neobrutalist-card overflow-hidden bg-white">
-                  <div className="bg-yellow-300 border-b-2 border-black p-2 text-center font-bold uppercase text-sm">
-                    Original
-                  </div>
-                  <div className="aspect-square relative flex items-center justify-center p-4 bg-gray-100/50">
-                    <img
-                      src={originalImageUrl!}
-                      alt="Original"
-                      className="max-w-full max-h-full object-contain shadow-md"
-                    />
-                  </div>
-                </Card>
-
-                {/* Processed */}
-                <Card className="neobrutalist-card overflow-hidden bg-white">
-                  <div className="bg-green-300 border-b-2 border-black p-2 text-center font-bold uppercase text-sm">
-                    {processedImageUrl ? "Processed Result" : "Preview"}
-                  </div>
-                  <div className="aspect-square relative flex items-center justify-center p-4 bg-gray-100/50">
-                    {processedImageUrl ? (
-                      <img
-                        src={processedImageUrl}
-                        alt="Processed"
-                        className="max-w-full max-h-full object-contain shadow-md"
-                      />
-                    ) : (
-                      <div className="text-center text-muted-foreground p-8 border-2 border-dashed border-gray-300">
-                        <p>Result will appear here</p>
-                      </div>
-                    )}
-                  </div>
-                  {processedImageUrl && (
-                    <div className="p-4 border-t-2 border-black bg-white">
-                      <a
-                        href={processedImageUrl}
-                        download={`shaken-${originalImage.name}`}
-                      >
-                        <Button
-                          className="w-full font-bold border-2 border-black shadow-none hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] rounded-none"
-                          size="lg"
-                        >
-                          <Download className="w-4 h-4 mr-2" /> Download
-                          Processed JPEG
-                        </Button>
-                      </a>
-                    </div>
-                  )}
-                </Card>
-              </div>
+              <ImageComparison
+                originalImageUrl={originalImageUrl!}
+                processedImageUrl={processedImageUrl}
+                originalFileName={originalImage.name}
+              />
             </div>
           )}
 
           {/* Hidden Canvas for processing */}
           <canvas ref={canvasRef} className="hidden" />
         </div>
+
+        {/* Pipeline - Third on mobile, part of left panel on desktop */}
+        <div className="lg:col-span-4 lg:row-start-2 space-y-2 order-3 lg:order-1">
+          <h2 className="text-2xl font-bold uppercase border-b-4 border-black inline-block mb-4">
+            Pipeline
+          </h2>
+          <PipelineSteps steps={steps} />
+
+          {isProcessing && (
+            <div className="p-4 border-2 border-black bg-black text-white font-mono animate-pulse mt-6">
+              PROCESSING IN PROGRESS...
+            </div>
+          )}
+        </div>
       </div>
+
+      <Footer />
     </div>
   );
 }
