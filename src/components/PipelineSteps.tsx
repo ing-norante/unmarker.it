@@ -1,9 +1,9 @@
 import React from 'react';
-import { PipelineStepState } from '@/lib/types';
-import { Progress } from './ui/progress';
-import { Badge } from './ui/badge';
+import type { PipelineStepState } from '@/lib/types';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 import { Check, Loader2, X } from 'lucide-react';
-import { Card, CardContent } from './ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface PipelineStepsProps {

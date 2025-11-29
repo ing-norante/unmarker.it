@@ -1,6 +1,6 @@
-export type PipelineStepId = 'shake' | 'stir' | 'crush';
+export type PipelineStepId = "shake" | "stir" | "crush";
 
-export type PipelineStepStatus = 'idle' | 'running' | 'done' | 'error';
+export type PipelineStepStatus = "idle" | "running" | "done" | "error";
 
 export interface PipelineStepState {
   id: PipelineStepId;
@@ -23,4 +23,3 @@ export interface ProcessingOptions {
     quality: number; // 0–1
   };
 }
-

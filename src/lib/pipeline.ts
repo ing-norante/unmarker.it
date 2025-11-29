@@ -1,4 +1,4 @@
-import { ProcessingOptions } from './types';
+import type { ProcessingOptions } from "./types";
 
 export const DEFAULT_OPTIONS: ProcessingOptions = {
   shake: {
@@ -13,13 +13,14 @@ export const DEFAULT_OPTIONS: ProcessingOptions = {
   },
 };
 
-const randomRange = (min: number, max: number) => Math.random() * (max - min) + min;
+const randomRange = (min: number, max: number) =>
+  Math.random() * (max - min) + min;
 const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 export async function applyShake(
   ctx: CanvasRenderingContext2D,
   image: HTMLImageElement,
-  options: ProcessingOptions['shake'] = DEFAULT_OPTIONS.shake
+  options: ProcessingOptions["shake"] = DEFAULT_OPTIONS.shake
 ) {
   const { width, height } = ctx.canvas;
   const { rotationRange, scaleRange } = options!;
@@ -29,7 +30,7 @@ export async function applyShake(
   const angleRad = (angleDeg * Math.PI) / 180;
 
   // Fill background white
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = "#FFFFFF";
   ctx.fillRect(0, 0, width, height);
 
   ctx.save();
@@ -39,7 +40,7 @@ export async function applyShake(
   ctx.translate(-width / 2, -height / 2);
 
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(image, 0, 0, width, height);
   ctx.restore();
 
@@ -48,7 +49,7 @@ export async function applyShake(
 
 export async function applyStir(
   ctx: CanvasRenderingContext2D,
-  options: ProcessingOptions['stir'] = DEFAULT_OPTIONS.stir
+  options: ProcessingOptions["stir"] = DEFAULT_OPTIONS.stir
 ) {
   const { width, height } = ctx.canvas;
   const { noiseAmplitude } = options!;
@@ -73,8 +74,8 @@ export async function applyStir(
 
 export async function applyCrush(
   canvas: HTMLCanvasElement,
-  options: ProcessingOptions['crush'] = DEFAULT_OPTIONS.crush
+  options: ProcessingOptions["crush"] = DEFAULT_OPTIONS.crush
 ): Promise<string> {
   const { quality } = options!;
-  return canvas.toDataURL('image/jpeg', quality);
+  return canvas.toDataURL("image/jpeg", quality);
 }
