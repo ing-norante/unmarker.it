@@ -1,75 +1,82 @@
-# React + TypeScript + Vite
+# Unmarker.it
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A 100% client-side AI watermark disruptor. Process images entirely in your browser with no uploads, no tracking, and no servers.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Unmarker.it uses a three-step pipeline to disrupt invisible AI watermarks embedded in images:
 
-## React Compiler
+1. **Shake (Geometry)** - Applies subtle random rotation and scaling to break pixel grid alignment
+2. **Stir (Noise)** - Injects Gaussian noise to disturb statistical patterns used by watermark detectors
+3. **Crush (Quantization)** - Recompresses the image as JPEG to eliminate high-frequency watermark signals
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+All processing happens locally in your browser using HTML5 Canvas. Your images never leave your device.
 
-Note: This will impact Vite dev & build performances.
+## Tech Stack
 
-## Expanding the ESLint configuration
+- **React 19** - UI framework with React Compiler enabled
+- **TypeScript** - Type-safe development
+- **Vite** - Fast build tool and dev server
+- **Tailwind CSS** - Utility-first styling
+- **Radix UI** - Accessible component primitives
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting Started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Prerequisites
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Node.js 18+
+- pnpm (recommended) or npm
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Installation
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start development server
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Preview production build
+pnpm preview
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## How It Works
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+The pipeline uses sophisticated mathematical operations to disrupt watermark patterns:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- **Gaussian Noise Generation**: Uses Box-Muller transform for natural noise distribution
+- **Sub-pixel Precision**: Affine transformations with explicit transformation matrices
+- **Optimized Processing**: Batch random number generation and TypedArray operations for performance
+
+## Project Structure
+
 ```
+src/
+├── components/       # React components
+│   ├── ui/          # Reusable UI components
+│   └── ...          # Feature components
+├── lib/
+│   ├── pipeline.ts  # Core image processing pipeline
+│   ├── types.ts     # TypeScript type definitions
+│   └── utils.ts     # Utility functions
+└── App.tsx          # Main application component
+```
+
+## Development
+
+The project uses ESLint for code quality. Run the linter with:
+
+```bash
+pnpm lint
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).

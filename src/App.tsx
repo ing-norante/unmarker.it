@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { ImageUploader } from "./components/ImageUploader";
-import { PipelineSteps } from "./components/PipelineSteps";
-import { Header } from "./components/Header";
-import { ActionBar } from "./components/ActionBar";
-import { ImageComparison } from "./components/ImageComparison";
-import { Footer } from "./components/Footer";
+import { ImageUploader } from "@/components/ImageUploader";
+import { PipelineSteps } from "@/components/PipelineSteps";
+import { Header } from "@/components/Header";
+import { ActionBar } from "@/components/ActionBar";
+import { ImageComparison } from "@/components/ImageComparison";
+import { Footer } from "@/components/Footer";
 import type { PipelineStepState, PipelineStepId } from "./lib/types";
 import {
   applyShake,
@@ -45,10 +45,10 @@ function App() {
   const [originalImage, setOriginalImage] = useState<File | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(
-    null
+    null,
   );
   const [processedFileName, setProcessedFileName] = useState<string | null>(
-    null
+    null,
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [steps, setSteps] = useState<PipelineStepState[]>(INITIAL_STEPS);
@@ -78,10 +78,10 @@ function App() {
 
   const updateStep = (
     id: PipelineStepId,
-    update: Partial<PipelineStepState>
+    update: Partial<PipelineStepState>,
   ) => {
     setSteps((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...update } : s))
+      prev.map((s) => (s.id === id ? { ...s, ...update } : s)),
     );
   };
 
@@ -142,8 +142,8 @@ function App() {
         prev.map((s) =>
           s.status === "running"
             ? { ...s, status: "error", error: "Failed" }
-            : s
-        )
+            : s,
+        ),
       );
     } finally {
       setIsProcessing(false);
@@ -159,63 +159,64 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 md:p-4 font-sans selection:bg-yellow-300 selection:text-black flex flex-col">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1">
-        {/* Header - First on mobile, part of left panel on desktop */}
-        <div className="lg:col-span-4 order-1 lg:order-1">
-          <Header />
-        </div>
+    <div className="text-foreground flex min-h-screen flex-col font-sans selection:bg-yellow-300 selection:text-black">
+      <div className="bg-secondary-background z-0 bg-[linear-gradient(to_right,#80808033_1px,transparent_1px),linear-gradient(to_bottom,#80808033_1px,transparent_1px)] bg-size-[70px_70px] p-4 md:p-4">
+        <div className="mx-auto grid max-w-7xl flex-1 grid-cols-1 gap-8 lg:grid-cols-12">
+          {/* Header - First on mobile, part of left panel on desktop */}
+          <div className="order-1 lg:order-1 lg:col-span-4">
+            <Header />
+          </div>
 
-        {/* Right Panel: Workspace - Second on mobile, right on desktop */}
-        <div className="lg:col-span-8 lg:row-span-2 space-y-6 order-2 lg:order-2">
-          {/* Upload Area */}
-          {!originalImage && (
-            <div className="h-full flex flex-col justify-center">
-              <ImageUploader
-                onImageSelect={handleImageSelect}
-                className="h-96"
-              />
-            </div>
-          )}
+          {/* Right Panel: Workspace - Second on mobile, right on desktop */}
+          <div className="order-2 space-y-6 lg:order-2 lg:col-span-8 lg:row-span-2">
+            {/* Upload Area */}
+            {!originalImage && (
+              <div className="flex h-full flex-col justify-center">
+                <ImageUploader
+                  onImageSelect={handleImageSelect}
+                  className="h-96"
+                />
+              </div>
+            )}
 
-          {/* Preview Area */}
-          {originalImage && (
-            <div className="grid gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <ActionBar
-                fileName={originalImage.name}
-                isProcessing={isProcessing}
-                hasProcessedImage={!!processedImageUrl}
-                onReset={reset}
-                onProcess={processPipeline}
-              />
+            {/* Preview Area */}
+            {originalImage && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 grid gap-6 duration-500">
+                <ActionBar
+                  fileName={originalImage.name}
+                  isProcessing={isProcessing}
+                  hasProcessedImage={!!processedImageUrl}
+                  onReset={reset}
+                  onProcess={processPipeline}
+                />
 
-              <ImageComparison
-                originalImageUrl={originalImageUrl!}
-                processedImageUrl={processedImageUrl}
-                processedFileName={processedFileName}
-              />
-            </div>
-          )}
+                <ImageComparison
+                  originalImageUrl={originalImageUrl!}
+                  processedImageUrl={processedImageUrl}
+                  processedFileName={processedFileName}
+                />
+              </div>
+            )}
 
-          {/* Hidden Canvas for processing */}
-          <canvas ref={canvasRef} className="hidden" />
-        </div>
+            {/* Hidden Canvas for processing */}
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
 
-        {/* Pipeline - Third on mobile, part of left panel on desktop */}
-        <div className="lg:col-span-4 lg:row-start-2 space-y-2 order-3 lg:order-1">
-          <h2 className="text-2xl font-bold uppercase border-b-4 border-black inline-block mb-4">
-            Pipeline
-          </h2>
-          <PipelineSteps steps={steps} />
+          {/* Pipeline - Third on mobile, part of left panel on desktop */}
+          <div className="order-3 space-y-2 lg:order-1 lg:col-span-4 lg:row-start-2">
+            <h2 className="mb-4 inline-block border-b-4 border-black text-2xl font-bold uppercase">
+              Pipeline
+            </h2>
+            <PipelineSteps steps={steps} />
 
-          {isProcessing && (
-            <div className="p-4 border-2 border-black bg-black text-white font-mono animate-pulse mt-6">
-              PROCESSING IN PROGRESS...
-            </div>
-          )}
+            {isProcessing && (
+              <div className="mt-6 animate-pulse border-2 border-black bg-black p-4 font-mono text-white">
+                PROCESSING IN PROGRESS...
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
       <Footer />
     </div>
   );

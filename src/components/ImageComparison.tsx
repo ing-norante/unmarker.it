@@ -24,51 +24,51 @@ export function ImageComparison({
   };
 
   return (
-    <div className="grid md:grid-cols-2 gap-6">
+    <div className="grid gap-6 md:grid-cols-2">
       {/* Original */}
       <Card className="neobrutalist-card overflow-hidden bg-white">
-        <div className="bg-yellow-300 border-b-2 border-black p-2 text-center font-bold uppercase text-sm">
+        <div className="border-b-2 border-black bg-yellow-300 p-2 text-center text-sm font-bold uppercase">
           Original
         </div>
-        <div className="aspect-square relative flex items-center justify-center p-4 bg-gray-100/50">
+        <div className="relative flex aspect-square items-center justify-center bg-gray-100/50 p-4">
           <img
             src={originalImageUrl}
             alt="Original"
-            className="max-w-full max-h-full object-contain shadow-md"
+            className="max-h-full max-w-full object-contain shadow-md"
           />
         </div>
       </Card>
 
       {/* Processed */}
       <Card className="neobrutalist-card overflow-hidden bg-white">
-        <div className="bg-green-300 border-b-2 border-black p-2 text-center font-bold uppercase text-sm">
+        <div className="border-b-2 border-black bg-green-300 p-2 text-center text-sm font-bold uppercase">
           {processedImageUrl ? "Processed Result" : "Preview"}
         </div>
-        <div className="aspect-square relative flex items-center justify-center p-4 bg-gray-100/50">
+        <div className="relative flex aspect-square items-center justify-center bg-gray-100/50 p-4">
           {processedImageUrl ? (
             <img
               src={processedImageUrl}
               alt="Processed"
-              className="max-w-full max-h-full object-contain shadow-md"
+              className="max-h-full max-w-full object-contain shadow-md"
             />
           ) : (
-            <div className="text-center text-muted-foreground p-8 border-2 border-dashed border-gray-300">
+            <div className="text-muted-foreground border-2 border-dashed border-gray-300 p-8 text-center">
               <p>Result will appear here</p>
             </div>
           )}
         </div>
         {processedImageUrl && (
-          <div className="p-4 border-t-2 border-black bg-white">
+          <div className="border-t-2 border-black bg-white p-4">
             <a
               href={processedImageUrl}
               download={processedFileName}
               onClick={handleDownload}
             >
               <Button
-                className="w-full font-bold border-2 border-black shadow-none hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] rounded-none"
+                className="w-full rounded-none border-2 border-black font-bold shadow-none hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                 size="lg"
               >
-                <Download className="w-4 h-4 mr-2" /> Download Processed JPEG
+                <Download className="mr-2 h-4 w-4" /> Download Processed JPEG
               </Button>
             </a>
           </div>

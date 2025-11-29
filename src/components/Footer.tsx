@@ -13,52 +13,54 @@ export function Footer() {
     });
   };
   return (
-    <footer className="mt-12 border-t-4 border-black pt-6 pb-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
-            <span className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+    <footer className="mt-0 border-t-4 border-black pt-6 pb-4">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+          <div className="flex flex-wrap items-center justify-center gap-6 md:justify-start">
+            <span className="text-sm font-medium tracking-wide">
               Built with
             </span>
-            <div className="flex items-center gap-4 flex-wrap justify-center md:justify-start">
+            <div className="flex flex-wrap items-center justify-center gap-4 md:justify-start">
               <a
                 href="https://react.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 border-2 border-black bg-white hover:bg-cyan-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                className="flex items-center gap-2 border-2 border-black bg-white px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-colors hover:bg-cyan-100 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
               >
-                <img src={ReactLogo} alt="React" className="w-5 h-5" />
-                <span className="font-bold text-sm">React</span>
+                <img src={ReactLogo} alt="React" className="h-5 w-5" />
+                <span className="text-sm font-bold">React</span>
               </a>
               <a
                 href="https://vite.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 border-2 border-black bg-white hover:bg-purple-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                className="flex items-center gap-2 border-2 border-black bg-white px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-colors hover:bg-purple-100 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
               >
-                <img src={ViteLogo} alt="Vite" className="w-5 h-5" />
-                <span className="font-bold text-sm">Vite</span>
+                <img src={ViteLogo} alt="Vite" className="h-5 w-5" />
+                <span className="text-sm font-bold">Vite</span>
               </a>
 
               <a
-                className="flex items-center gap-2 px-3 py-1.5 border-2 border-black bg-white hover:bg-yellow-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                className="flex items-center gap-2 border-2 border-black bg-white px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-colors hover:bg-yellow-100 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
                 href="https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <img src={CanvasLogo} alt="Canvas" className="w-5 h-5" />
-                <span className="font-bold text-sm">Canvas API</span>
+                <img src={CanvasLogo} alt="Canvas" className="h-5 w-5" />
+                <span className="text-sm font-bold">Canvas API</span>
               </a>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Crafted by</span>
+            <span className="text-sm font-medium tracking-wide">
+              Crafted by
+            </span>
             <a
               href="https://github.com/ing-norante/"
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleGithubClick}
-              className="font-black text-sm bg-black text-white px-3 py-1 hover:bg-yellow-300 hover:text-black transition-colors border-2 border-black"
+              className="border-2 border-black bg-black px-3 py-1 text-sm font-black text-white transition-colors hover:bg-yellow-300 hover:text-black"
             >
               ing.norante
             </a>

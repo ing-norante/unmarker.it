@@ -24,7 +24,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       if (disabled) return;
       setIsDragging(true);
     },
-    [disabled]
+    [disabled],
   );
 
   const handleDragLeave = useCallback(
@@ -33,7 +33,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       if (disabled) return;
       setIsDragging(false);
     },
-    [disabled]
+    [disabled],
   );
 
   const handleDrop = useCallback(
@@ -47,7 +47,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         onImageSelect(files[0]);
       }
     },
-    [onImageSelect, disabled]
+    [onImageSelect, disabled],
   );
 
   const handleFileChange = useCallback(
@@ -62,16 +62,16 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         onImageSelect(files[0]);
       }
     },
-    [onImageSelect, disabled, posthog]
+    [onImageSelect, disabled, posthog],
   );
 
   return (
     <Card
       className={cn(
-        "relative flex flex-col items-center justify-center p-10 transition-all cursor-pointer border-2 border-dashed border-black bg-white hover:bg-gray-50",
-        isDragging && "bg-accent border-solid scale-[0.99]",
-        disabled && "opacity-50 cursor-not-allowed hover:bg-white",
-        className
+        "relative flex cursor-pointer flex-col items-center justify-center border-2 border-dashed border-black bg-white p-10 transition-all hover:bg-gray-50",
+        isDragging && "bg-accent scale-[0.99] border-solid",
+        disabled && "cursor-not-allowed opacity-50 hover:bg-white",
+        className,
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -95,18 +95,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         disabled={disabled}
       />
       <div className="flex flex-col items-center gap-4 text-center">
-        <div className="p-4 border-2 border-black rounded-full bg-yellow-300 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <div className="rounded-full border-2 border-black bg-yellow-300 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           {isDragging ? (
-            <FileImage className="w-8 h-8" />
+            <FileImage className="h-8 w-8" />
           ) : (
-            <Upload className="w-8 h-8" />
+            <Upload className="h-8 w-8" />
           )}
         </div>
         <div className="space-y-1">
-          <p className="text-lg font-bold uppercase tracking-wide">
+          <p className="text-lg font-bold tracking-wide uppercase">
             {isDragging ? "Drop it!" : "Upload Image"}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Drop an image, hit process, and get a fresh JPEG that’s been shaken,
             stirred, and crushed. Designed to disrupt invisible watermark
             signals while keeping your image visually intact. No accounts, no
