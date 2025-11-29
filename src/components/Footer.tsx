@@ -2,6 +2,7 @@ import { usePostHog } from "posthog-js/react";
 import ReactLogo from "@/assets/react.svg";
 import ViteLogo from "@/assets/vite.svg";
 import CanvasLogo from "@/assets/canvas.svg";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Footer() {
   const posthog = usePostHog();
@@ -13,7 +14,7 @@ export function Footer() {
     });
   };
   return (
-    <footer className="mt-0 border-t-4 border-black pt-6 pb-4">
+    <footer className="border-foreground bg-background mt-0 border-t-4 pt-6 pb-4">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <div className="flex flex-wrap items-center justify-center gap-6 md:justify-start">
@@ -25,7 +26,7 @@ export function Footer() {
                 href="https://react.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 border-2 border-black bg-white px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-colors hover:bg-cyan-100 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                className="border-foreground bg-background flex items-center gap-2 border-2 px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(var(--neo-shadow),1)] transition-colors hover:bg-cyan-100 hover:shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] dark:hover:bg-cyan-900"
               >
                 <img src={ReactLogo} alt="React" className="h-5 w-5" />
                 <span className="text-sm font-bold">React</span>
@@ -34,21 +35,26 @@ export function Footer() {
                 href="https://vite.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 border-2 border-black bg-white px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-colors hover:bg-purple-100 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                className="border-foreground bg-background flex items-center gap-2 border-2 px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(var(--neo-shadow),1)] transition-colors hover:bg-purple-100 hover:shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] dark:hover:bg-purple-900"
               >
                 <img src={ViteLogo} alt="Vite" className="h-5 w-5" />
                 <span className="text-sm font-bold">Vite</span>
               </a>
 
               <a
-                className="flex items-center gap-2 border-2 border-black bg-white px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-colors hover:bg-yellow-100 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                className="border-foreground bg-background flex items-center gap-2 border-2 px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(var(--neo-shadow),1)] transition-colors hover:bg-yellow-100 hover:shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] dark:hover:bg-yellow-900"
                 href="https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <img src={CanvasLogo} alt="Canvas" className="h-5 w-5" />
+                <img
+                  src={CanvasLogo}
+                  alt="Canvas"
+                  className="h-5 w-5 dark:invert"
+                />
                 <span className="text-sm font-bold">Canvas API</span>
               </a>
+              <ThemeToggle />
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -60,7 +66,7 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleGithubClick}
-              className="border-2 border-black bg-black px-3 py-1 text-sm font-black text-white transition-colors hover:bg-yellow-300 hover:text-black"
+              className="border-foreground bg-foreground text-background hover:text-foreground border-2 px-3 py-1 text-sm font-black transition-colors hover:bg-yellow-300 dark:hover:bg-yellow-400 dark:hover:text-black"
             >
               ing.norante
             </a>

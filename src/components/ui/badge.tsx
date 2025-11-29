@@ -18,7 +18,7 @@ const badgeVariants = cva(
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         neobrutalist:
-          "border-2 border-black bg-yellow-300 text-black rounded-none uppercase font-bold",
+          "border-2 border-foreground bg-yellow-300 text-black rounded-none uppercase font-bold dark:bg-yellow-400",
       },
     },
     defaultVariants: {

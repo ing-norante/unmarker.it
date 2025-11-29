@@ -26,11 +26,11 @@ export function ImageComparison({
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {/* Original */}
-      <Card className="neobrutalist-card overflow-hidden bg-white">
-        <div className="border-b-2 border-black bg-yellow-300 p-2 text-center text-sm font-bold uppercase">
+      <Card className="neobrutalist-card bg-background overflow-hidden">
+        <div className="border-foreground border-b-2 bg-yellow-300 p-2 text-center text-sm font-bold text-black uppercase dark:bg-yellow-400">
           Original
         </div>
-        <div className="relative flex aspect-square items-center justify-center bg-gray-100/50 p-4">
+        <div className="bg-muted/50 relative flex aspect-square items-center justify-center p-4">
           <img
             src={originalImageUrl}
             alt="Original"
@@ -40,11 +40,11 @@ export function ImageComparison({
       </Card>
 
       {/* Processed */}
-      <Card className="neobrutalist-card overflow-hidden bg-white">
-        <div className="border-b-2 border-black bg-green-300 p-2 text-center text-sm font-bold uppercase">
+      <Card className="neobrutalist-card bg-background overflow-hidden">
+        <div className="border-foreground border-b-2 bg-green-300 p-2 text-center text-sm font-bold text-black uppercase dark:bg-green-400">
           {processedImageUrl ? "Processed Result" : "Preview"}
         </div>
-        <div className="relative flex aspect-square items-center justify-center bg-gray-100/50 p-4">
+        <div className="bg-muted/50 relative flex aspect-square items-center justify-center p-4">
           {processedImageUrl ? (
             <img
               src={processedImageUrl}
@@ -52,20 +52,20 @@ export function ImageComparison({
               className="max-h-full max-w-full object-contain shadow-md"
             />
           ) : (
-            <div className="text-muted-foreground border-2 border-dashed border-gray-300 p-8 text-center">
+            <div className="text-muted-foreground border-muted-foreground/30 border-2 border-dashed p-8 text-center">
               <p>Result will appear here</p>
             </div>
           )}
         </div>
         {processedImageUrl && (
-          <div className="border-t-2 border-black bg-white p-4">
+          <div className="border-foreground bg-background border-t-2 p-4">
             <a
               href={processedImageUrl}
               download={processedFileName}
               onClick={handleDownload}
             >
               <Button
-                className="w-full rounded-none border-2 border-black font-bold shadow-none hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                className="border-foreground w-full rounded-none border-2 font-bold shadow-none hover:shadow-[2px_2px_0px_0px_rgba(var(--neo-shadow),1)]"
                 size="lg"
               >
                 <Download className="mr-2 h-4 w-4" /> Download Processed JPEG

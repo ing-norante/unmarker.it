@@ -17,8 +17,10 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
         <Card
           key={step.id}
           className={cn(
-            "neobrutalist-card border-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]",
-            step.status === "running" ? "bg-white" : "bg-gray-50 opacity-80",
+            "neobrutalist-card border-2 shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)]",
+            step.status === "running"
+              ? "bg-background"
+              : "bg-background opacity-90",
           )}
         >
           <CardContent className="flex flex-col gap-3 p-4">
@@ -32,10 +34,14 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
               <Badge
                 variant="neobrutalist"
                 className={cn(
-                  step.status === "idle" && "bg-gray-200",
-                  step.status === "running" && "animate-pulse bg-yellow-300",
-                  step.status === "done" && "bg-green-400",
-                  step.status === "error" && "bg-red-400",
+                  step.status === "idle" &&
+                    "bg-background text-foreground border-foreground/50",
+                  step.status === "running" &&
+                    "animate-pulse bg-yellow-300 text-black dark:bg-yellow-400",
+                  step.status === "done" &&
+                    "bg-green-400 text-black dark:bg-green-500",
+                  step.status === "error" &&
+                    "bg-red-400 text-white dark:bg-red-500",
                 )}
               >
                 {step.status}
@@ -45,10 +51,10 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
             <div className="space-y-1">
               <Progress
                 value={step.progress}
-                className="h-3 border-2 border-black"
+                className="border-foreground h-3 border-2"
               />
               {step.description && (
-                <p className="font-mono text-xs font-medium tracking-wide">
+                <p className="text-foreground/70 font-mono text-xs font-medium tracking-wide">
                   {step.description}
                 </p>
               )}
@@ -64,7 +70,7 @@ const StepIcon = ({ status }: { status: PipelineStepState["status"] }) => {
   switch (status) {
     case "done":
       return (
-        <div className="rounded-full bg-black p-1 text-white">
+        <div className="bg-foreground text-background rounded-full p-1">
           <Check className="h-4 w-4" />
         </div>
       );
@@ -77,6 +83,8 @@ const StepIcon = ({ status }: { status: PipelineStepState["status"] }) => {
         </div>
       );
     default:
-      return <div className="h-6 w-6 rounded-full border-2 border-black" />;
+      return (
+        <div className="border-foreground h-6 w-6 rounded-full border-2" />
+      );
   }
 };

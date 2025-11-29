@@ -36,14 +36,14 @@ export function ActionBar({
   };
 
   return (
-    <div className="flex items-center justify-between border-2 border-black bg-white p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+    <div className="border-foreground bg-background flex items-center justify-between border-2 p-4 shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)]">
       <div className="max-w-[200px] truncate font-bold">{fileName}</div>
       <div className="flex gap-2">
         <Button
           variant="outline"
           onClick={handleReset}
           disabled={isProcessing}
-          className="rounded-none border-2 border-black hover:bg-red-100"
+          className="border-foreground rounded-none border-2 hover:bg-red-100 dark:hover:bg-red-900"
         >
           <RefreshCcw className="mr-2 h-4 w-4" /> Reset
         </Button>

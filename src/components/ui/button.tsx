@@ -20,7 +20,7 @@ const buttonVariants = cva(
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
         neobrutalist:
-          "bg-accent text-accent-foreground border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all hover:bg-accent/90 font-bold uppercase tracking-wider rounded-none",
+          "bg-accent text-accent-foreground border-2 border-foreground shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all hover:bg-accent/90 font-bold uppercase tracking-wider rounded-none",
       },
       size: {
         default: "h-10 px-4 py-2",

@@ -13,7 +13,7 @@ function Progress({
       data-slot="progress"
       className={cn(
         "bg-secondary relative h-4 w-full overflow-hidden rounded-full",
-        "rounded-none border-2 border-black bg-white", // Neobrutalist override
+        "border-foreground bg-background rounded-none border-2", // Neobrutalist override with dark mode support
         className,
       )}
       {...props}

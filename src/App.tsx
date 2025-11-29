@@ -160,7 +160,7 @@ function App() {
 
   return (
     <div className="text-foreground flex min-h-screen flex-col font-sans selection:bg-yellow-300 selection:text-black">
-      <div className="bg-secondary-background z-0 bg-[linear-gradient(to_right,#80808033_1px,transparent_1px),linear-gradient(to_bottom,#80808033_1px,transparent_1px)] bg-size-[70px_70px] p-4 md:p-4">
+      <div className="bg-background z-0 bg-[linear-gradient(to_right,#80808022_1px,transparent_1px),linear-gradient(to_bottom,#80808022_1px,transparent_1px)] bg-size-[70px_70px] p-4 md:p-4">
         <div className="mx-auto grid max-w-7xl flex-1 grid-cols-1 gap-8 lg:grid-cols-12">
           {/* Header - First on mobile, part of left panel on desktop */}
           <div className="order-1 lg:order-1 lg:col-span-4">
@@ -204,13 +204,13 @@ function App() {
 
           {/* Pipeline - Third on mobile, part of left panel on desktop */}
           <div className="order-3 space-y-2 lg:order-1 lg:col-span-4 lg:row-start-2">
-            <h2 className="mb-4 inline-block border-b-4 border-black text-2xl font-bold uppercase">
+            <h2 className="border-foreground mb-4 inline-block border-b-4 text-2xl font-bold uppercase">
               Pipeline
             </h2>
             <PipelineSteps steps={steps} />
 
             {isProcessing && (
-              <div className="mt-6 animate-pulse border-2 border-black bg-black p-4 font-mono text-white">
+              <div className="border-foreground bg-foreground text-background mt-6 animate-pulse border-2 p-4 font-mono">
                 PROCESSING IN PROGRESS...
               </div>
             )}
