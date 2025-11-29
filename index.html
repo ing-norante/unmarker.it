@@ -55,9 +55,10 @@
   <body>
     <script>
       // Dark mode initialization - runs before React to avoid FOUC
+      // Default to light mode unless explicitly set to dark
       (function() {
         const theme = localStorage.getItem('theme');
-        if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        if (theme === 'dark') {
           document.documentElement.classList.add('dark');
         }
       })();

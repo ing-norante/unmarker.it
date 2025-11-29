@@ -2,11 +2,11 @@ import { Moon, Sun } from "lucide-react";
 import { Button } from "./ui/button";
 import { useSyncExternalStore } from "react";
 
-type Theme = "light" | "dark" | "system";
+type Theme = "light" | "dark";
 
 function getTheme(): Theme {
-  if (typeof window === "undefined") return "system";
-  return (localStorage.getItem("theme") as Theme) || "system";
+  if (typeof window === "undefined") return "light";
+  return (localStorage.getItem("theme") as Theme) || "light";
 }
 
 function subscribe(callback: () => void) {
@@ -24,17 +24,13 @@ function getSnapshot() {
 }
 
 function getServerSnapshot(): Theme {
-  return "system";
+  return "light";
 }
 
 export function ThemeToggle() {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const isDark =
-    theme === "dark" ||
-    (theme === "system" &&
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const isDark = theme === "dark";
 
   const toggleTheme = () => {
     const newTheme = isDark ? "light" : "dark";
