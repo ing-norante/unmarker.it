@@ -11,6 +11,11 @@ function Progress({
   return (
     <ProgressPrimitive.Root
       data-slot="progress"
+      role="progressbar"
+      aria-valuenow={value || 0}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="Progress"
       className={cn(
         "bg-secondary relative h-4 w-full overflow-hidden rounded-full",
         "border-foreground bg-background rounded-none border-2", // Neobrutalist override with dark mode support

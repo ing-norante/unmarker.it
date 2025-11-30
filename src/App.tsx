@@ -161,7 +161,7 @@ function App() {
   return (
     <div className="text-foreground flex min-h-screen flex-col font-sans selection:bg-yellow-300 selection:text-black">
       <div className="bg-background z-0 bg-[linear-gradient(to_right,#80808022_1px,transparent_1px),linear-gradient(to_bottom,#80808022_1px,transparent_1px)] bg-size-[70px_70px] p-4 md:p-4">
-        <div className="mx-auto grid max-w-7xl flex-1 grid-cols-1 gap-8 lg:grid-cols-12">
+        <main role="main" className="mx-auto grid max-w-7xl flex-1 grid-cols-1 gap-8 lg:grid-cols-12">
           {/* Header - First on mobile, part of left panel on desktop */}
           <div className="order-1 lg:order-1 lg:col-span-4">
             <Header />
@@ -215,7 +215,7 @@ function App() {
               </div>
             )}
           </div>
-        </div>
+        </main>
       </div>
       <Footer />
     </div>
