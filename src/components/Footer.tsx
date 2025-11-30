@@ -9,7 +9,7 @@ export function Footer() {
 
   const handleGithubClick = () => {
     posthog?.capture("action_clicked", {
-      action: "github_author",
+      action: "github_repo_link",
       component: "footer",
     });
   };
@@ -62,7 +62,7 @@ export function Footer() {
               Crafted by
             </span>
             <a
-              href="https://github.com/ing-norante/"
+              href="https://github.com/ing-norante/unmarker.it"
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleGithubClick}
