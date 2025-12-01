@@ -24,7 +24,7 @@ export function ImageComparison({
   };
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="mx-auto max-w-80 md:max-w-none grid gap-6 md:grid-cols-2">
       {/* Original */}
       <Card className="neobrutalist-card bg-background overflow-hidden">
         <div className="border-foreground border-b-2 bg-yellow-300 p-2 text-center text-sm font-bold text-black uppercase dark:bg-yellow-400">
