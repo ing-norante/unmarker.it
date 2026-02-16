@@ -7,6 +7,13 @@ import { ThemeToggle } from "./ThemeToggle";
 export function Footer() {
   const posthog = usePostHog();
 
+  const handleFeatureBoardClick = () => {
+    posthog?.capture("action_clicked", {
+      action: "feature_board_link",
+      component: "footer",
+    });
+  };
+
   const handleGithubClick = () => {
     posthog?.capture("action_clicked", {
       action: "github_repo_link",
@@ -58,6 +65,15 @@ export function Footer() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <a
+              href="https://insigh.to/b/unmarkerit"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleFeatureBoardClick}
+              className="border-foreground bg-yellow-300 text-black hover:bg-yellow-400 border-2 px-3 py-1 text-sm font-black transition-colors"
+            >
+              Feature Board
+            </a>
             <span className="text-sm font-medium tracking-wide">
               Crafted by
             </span>
