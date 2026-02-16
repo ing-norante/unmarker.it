@@ -1,82 +1,94 @@
 # Unmarker.it
 
-A 100% client-side AI watermark disruptor. Process images entirely in your browser with no uploads, no tracking, and no servers.
+Client-side image post-processing tool built to disrupt invisible AI watermark signals in-browser.
 
-## Overview
+## Project Findings
 
-Unmarker.it uses a three-step pipeline to disrupt invisible AI watermarks embedded in images:
+This README is based on the current code in this repository.
 
-1. **Shake (Geometry)** - Applies subtle random rotation and scaling to break pixel grid alignment
-2. **Stir (Noise)** - Injects Gaussian noise to disturb statistical patterns used by watermark detectors
-3. **Crush (Quantization)** - Recompresses the image as JPEG to eliminate high-frequency watermark signals
+- Processing is fully local in the browser via Canvas (`src/lib/pipeline.ts` + hidden canvas in `src/App.tsx`)
+- Input accepts any `image/*`; output is always JPEG via `canvas.toDataURL("image/jpeg", quality)`
+- Pipeline steps:
+- `shake`: small random rotate/scale affine transform
+- `stir`: per-channel Gaussian noise (Box-Muller + typed arrays)
+- `crush`: JPEG recompression (default quality `0.85`)
+- UI stack is React 19 + TypeScript + Tailwind v4 + Radix primitives, built with Rolldown Vite
+- App includes PostHog event instrumentation in several components (`src/main.tsx`, `src/components/*`)
 
-All processing happens locally in your browser using HTML5 Canvas. Your images never leave your device.
+## Privacy Notes
 
-## Tech Stack
+- The app code does not upload image files to a backend.
+- Analytics events are instrumented through PostHog.
+- If `VITE_PUBLIC_POSTHOG_KEY` and `VITE_PUBLIC_POSTHOG_HOST` are configured, usage events may be sent to PostHog.
 
-- **React 19** - UI framework with React Compiler enabled
-- **TypeScript** - Type-safe development
-- **Vite** - Fast build tool and dev server
-- **Tailwind CSS** - Utility-first styling
-- **Radix UI** - Accessible component primitives
+## Verified Status
 
-## Getting Started
+Commands run successfully in this repo:
+
+```bash
+pnpm lint
+pnpm build
+```
+
+Current production build output (latest local run):
+
+- `dist/assets/index-*.js` ~414 kB (134 kB gzip)
+- `dist/assets/index-*.css` ~41 kB (8 kB gzip)
+
+## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- pnpm (recommended) or npm
+- pnpm
 
-### Installation
+### Install and Run
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Start development server
 pnpm dev
+```
 
-# Build for production
+### Build and Preview
+
+```bash
 pnpm build
-
-# Preview production build
 pnpm preview
 ```
 
-## How It Works
+## Environment Variables
 
-The pipeline uses sophisticated mathematical operations to disrupt watermark patterns:
+Optional analytics configuration:
 
-- **Gaussian Noise Generation**: Uses Box-Muller transform for natural noise distribution
-- **Sub-pixel Precision**: Affine transformations with explicit transformation matrices
-- **Optimized Processing**: Batch random number generation and TypedArray operations for performance
+```bash
+VITE_PUBLIC_POSTHOG_KEY=...
+VITE_PUBLIC_POSTHOG_HOST=...
+```
+
+Without these, image processing still works locally.
 
 ## Project Structure
 
-```
+```text
 src/
-├── components/       # React components
-│   ├── ui/          # Reusable UI components
-│   └── ...          # Feature components
-├── lib/
-│   ├── pipeline.ts  # Core image processing pipeline
-│   ├── types.ts     # TypeScript type definitions
-│   └── utils.ts     # Utility functions
-└── App.tsx          # Main application component
+  App.tsx                 # App state, orchestration, processing flow
+  lib/pipeline.ts         # Shake / Stir / Crush algorithms
+  lib/types.ts            # Pipeline and options types
+  lib/utils.ts            # Shared utils + output filename generator
+  components/
+    ImageUploader.tsx     # Drag/drop + file picker
+    ActionBar.tsx         # Reset/process controls
+    PipelineSteps.tsx     # Step state + progress UI
+    ImageComparison.tsx   # Before/after preview + download
+    Footer.tsx            # Links + theme toggle + analytics events
 ```
 
-## Development
+## Limitations
 
-The project uses ESLint for code quality. Run the linter with:
-
-```bash
-pnpm lint
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+- This is a heuristic perturbation pipeline, not a guaranteed watermark remover.
+- Output is always lossy JPEG (original format/metadata are not preserved).
+- No automated tests are present in the current repo.
 
 ## License
 
-This project is open source and available under the [MIT License](LICENSE).
+[MIT](LICENSE)

@@ -1,5 +1,5 @@
 import { Button } from "./ui/button";
-import { RefreshCcw, Zap } from "lucide-react";
+import { RefreshCcw, XCircle, Zap } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
 
 interface ActionBarProps {
@@ -7,6 +7,7 @@ interface ActionBarProps {
   isProcessing: boolean;
   hasProcessedImage: boolean;
   onReset: () => void;
+  onCancel: () => void;
   onProcess: () => void;
 }
 
@@ -15,6 +16,7 @@ export function ActionBar({
   isProcessing,
   hasProcessedImage,
   onReset,
+  onCancel,
   onProcess,
 }: ActionBarProps) {
   const posthog = usePostHog();
@@ -35,10 +37,27 @@ export function ActionBar({
     onProcess();
   };
 
+  const handleCancel = () => {
+    posthog?.capture("action_clicked", {
+      action: "cancel_processing",
+      component: "action_bar",
+    });
+    onCancel();
+  };
+
   return (
     <div className="border-foreground bg-background flex flex-col items-center justify-between space-y-4 border-2 p-4 shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] lg:flex-row">
       <div className="max-w-[200px] truncate font-bold">{fileName}</div>
       <div className="flex gap-2">
+        {isProcessing && (
+          <Button
+            variant="destructive"
+            onClick={handleCancel}
+            className="border-foreground rounded-none border-2"
+          >
+            <XCircle className="mr-2 h-4 w-4" /> Cancel
+          </Button>
+        )}
         <Button
           variant="outline"
           onClick={handleReset}

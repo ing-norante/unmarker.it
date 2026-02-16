@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { ActionBar } from "@/components/ActionBar";
 import { ImageComparison } from "@/components/ImageComparison";
 import { Footer } from "@/components/Footer";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { PipelineStepState, PipelineStepId } from "./lib/types";
 import {
   applyShake,
@@ -13,6 +14,16 @@ import {
   DEFAULT_OPTIONS,
 } from "./lib/pipeline";
 import { generateCameraLikeFilename } from "./lib/utils";
+
+const MAX_FILE_SIZE_MB = 25;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const MAX_MEGAPIXELS = 40;
+
+type StatusMessage = {
+  variant: "default" | "destructive";
+  title: string;
+  description: string;
+};
 
 const INITIAL_STEPS: PipelineStepState[] = [
   {
@@ -41,6 +52,77 @@ const INITIAL_STEPS: PipelineStepState[] = [
   },
 ];
 
+const createAbortError = () => {
+  const error = new Error("Processing cancelled");
+  error.name = "AbortError";
+  return error;
+};
+
+const isAbortError = (error: unknown) =>
+  error instanceof Error && error.name === "AbortError";
+
+const assertNotAborted = (signal?: AbortSignal) => {
+  if (signal?.aborted) {
+    throw createAbortError();
+  }
+};
+
+const delay = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+
+    const onAbort = () => {
+      window.clearTimeout(timeout);
+      reject(createAbortError());
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
+const loadImageDimensions = async (file: File) => {
+  const img = new Image();
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Failed to decode image"));
+      img.src = objectUrl;
+    });
+
+    return { width: img.width, height: img.height };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
+const loadImageFromFile = async (file: File, signal?: AbortSignal) => {
+  assertNotAborted(signal);
+
+  const img = new Image();
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = objectUrl;
+    });
+    assertNotAborted(signal);
+    return img;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
 function App() {
   const [originalImage, setOriginalImage] = useState<File | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
@@ -52,8 +134,12 @@ function App() {
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [steps, setSteps] = useState<PipelineStepState[]>(INITIAL_STEPS);
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
+    null,
+  );
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Cleanup object URLs
   useEffect(() => {
@@ -63,7 +149,50 @@ function App() {
     };
   }, [originalImageUrl, processedImageUrl]);
 
-  const handleImageSelect = (file: File) => {
+  const handleImageSelect = async (file: File) => {
+    setStatusMessage(null);
+
+    if (!file.type.startsWith("image/")) {
+      setStatusMessage({
+        variant: "destructive",
+        title: "Unsupported file type",
+        description: "Please select a valid image file.",
+      });
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setStatusMessage({
+        variant: "destructive",
+        title: "File is too large",
+        description: `Please use an image up to ${MAX_FILE_SIZE_MB} MB.`,
+      });
+      return;
+    }
+
+    let dimensions: { width: number; height: number };
+    try {
+      dimensions = await loadImageDimensions(file);
+    } catch {
+      setStatusMessage({
+        variant: "destructive",
+        title: "Could not read image",
+        description:
+          "This file could not be decoded. Try another image and retry.",
+      });
+      return;
+    }
+
+    const megapixels = (dimensions.width * dimensions.height) / 1_000_000;
+    if (megapixels > MAX_MEGAPIXELS) {
+      setStatusMessage({
+        variant: "destructive",
+        title: "Image resolution is too high",
+        description: `Please use an image up to ${MAX_MEGAPIXELS} megapixels.`,
+      });
+      return;
+    }
+
     if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
     if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
 
@@ -86,21 +215,20 @@ function App() {
   };
 
   const processPipeline = async () => {
-    if (!originalImage || !canvasRef.current) return;
+    if (!originalImage || !canvasRef.current || isProcessing) return;
 
+    setStatusMessage(null);
     setIsProcessing(true);
     setProcessedImageUrl(null); // Clear previous result
 
     // Reset all to idle first
     setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const { signal } = abortController;
 
     try {
-      // Load image to get dimensions
-      const img = new Image();
-      img.src = URL.createObjectURL(originalImage);
-      await new Promise((resolve) => {
-        img.onload = resolve;
-      });
+      const img = await loadImageFromFile(originalImage, signal);
 
       const canvas = canvasRef.current;
       canvas.width = img.width;
@@ -111,51 +239,86 @@ function App() {
 
       // --- Step 1: Shake ---
       updateStep("shake", { status: "running", progress: 10 });
-      await new Promise((r) => setTimeout(r, 500)); // Artificial delay for UX
+      await delay(500, signal); // Artificial delay for UX
 
-      await applyShake(ctx, img, DEFAULT_OPTIONS.shake);
+      await applyShake(ctx, img, DEFAULT_OPTIONS.shake, signal);
 
       updateStep("shake", { status: "done", progress: 100 });
 
       // --- Step 2: Stir ---
       updateStep("stir", { status: "running", progress: 10 });
-      await new Promise((r) => setTimeout(r, 500));
+      await delay(500, signal);
 
-      await applyStir(ctx, DEFAULT_OPTIONS.stir);
+      await applyStir(ctx, DEFAULT_OPTIONS.stir, signal);
 
       updateStep("stir", { status: "done", progress: 100 });
 
       // --- Step 3: Crush ---
       updateStep("crush", { status: "running", progress: 10 });
-      await new Promise((r) => setTimeout(r, 500));
+      await delay(500, signal);
 
-      const resultDataUrl = await applyCrush(canvas, DEFAULT_OPTIONS.crush);
+      const resultDataUrl = await applyCrush(
+        canvas,
+        DEFAULT_OPTIONS.crush,
+        signal,
+      );
+      assertNotAborted(signal);
       const generatedFileName = generateCameraLikeFilename();
 
       setProcessedImageUrl(resultDataUrl);
       setProcessedFileName(generatedFileName);
       updateStep("crush", { status: "done", progress: 100 });
     } catch (error) {
-      console.error("Pipeline failed", error);
-      // Mark current running step as error
-      setSteps((prev) =>
-        prev.map((s) =>
-          s.status === "running"
-            ? { ...s, status: "error", error: "Failed" }
-            : s,
-        ),
-      );
+      if (isAbortError(error)) {
+        setStatusMessage({
+          variant: "default",
+          title: "Processing cancelled",
+          description: "You can adjust the image and run the pipeline again.",
+        });
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.status === "running"
+              ? { ...s, status: "idle", progress: 0, error: undefined }
+              : s,
+          ),
+        );
+      } else {
+        console.error("Pipeline failed", error);
+        setStatusMessage({
+          variant: "destructive",
+          title: "Could not process image",
+          description:
+            "Try a smaller or different file. If this keeps happening, reload and retry.",
+        });
+        // Mark current running step as error
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.status === "running"
+              ? { ...s, status: "error", error: "Failed" }
+              : s,
+          ),
+        );
+      }
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       setIsProcessing(false);
     }
   };
 
+  const cancelProcessing = () => {
+    abortControllerRef.current?.abort();
+  };
+
   const reset = () => {
+    abortControllerRef.current?.abort();
     setOriginalImage(null);
     setOriginalImageUrl(null);
     setProcessedImageUrl(null);
     setProcessedFileName(null);
-    setSteps(INITIAL_STEPS);
+    setStatusMessage(null);
+    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
   };
 
   return (
@@ -172,6 +335,16 @@ function App() {
 
           {/* Right Panel: Workspace - Second on mobile, right on desktop */}
           <div className="order-2 space-y-6 lg:order-2 lg:col-span-8 lg:row-span-2">
+            {statusMessage && (
+              <Alert
+                variant={statusMessage.variant}
+                className="border-foreground rounded-none border-2"
+              >
+                <AlertTitle>{statusMessage.title}</AlertTitle>
+                <AlertDescription>{statusMessage.description}</AlertDescription>
+              </Alert>
+            )}
+
             {/* Upload Area */}
             {!originalImage && (
               <div className="flex h-full flex-col justify-center">
@@ -190,6 +363,7 @@ function App() {
                   isProcessing={isProcessing}
                   hasProcessedImage={!!processedImageUrl}
                   onReset={reset}
+                  onCancel={cancelProcessing}
                   onProcess={processPipeline}
                 />
 

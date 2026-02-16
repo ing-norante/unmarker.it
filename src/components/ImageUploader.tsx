@@ -110,7 +110,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             Drop an image, hit process, and get a fresh JPEG that's been shaken,
             stirred, and crushed. Designed to disrupt invisible watermark
             signals while keeping your image visually intact. No accounts, no
-            cloud, no nonsense.
+            image uploads, optional usage analytics.
           </p>
         </div>
       </div>

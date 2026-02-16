@@ -49,11 +49,25 @@ function generateGaussianBatch(size: number, stdDev: number): Float32Array {
 
 const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+const createAbortError = () => {
+  const error = new Error("Processing cancelled");
+  error.name = "AbortError";
+  return error;
+};
+
+const assertNotAborted = (signal?: AbortSignal) => {
+  if (signal?.aborted) {
+    throw createAbortError();
+  }
+};
+
 export async function applyShake(
   ctx: CanvasRenderingContext2D,
   image: HTMLImageElement,
-  options: ProcessingOptions["shake"] = DEFAULT_OPTIONS.shake
+  options: ProcessingOptions["shake"] = DEFAULT_OPTIONS.shake,
+  signal?: AbortSignal,
 ) {
+  assertNotAborted(signal);
   const { width, height } = ctx.canvas;
   const { rotationRange, scaleRange } = options!;
 
@@ -88,13 +102,16 @@ export async function applyShake(
   ctx.drawImage(image, 0, 0, width, height);
   ctx.restore();
 
+  assertNotAborted(signal);
   await nextTick();
 }
 
 export async function applyStir(
   ctx: CanvasRenderingContext2D,
-  options: ProcessingOptions["stir"] = DEFAULT_OPTIONS.stir
+  options: ProcessingOptions["stir"] = DEFAULT_OPTIONS.stir,
+  signal?: AbortSignal,
 ) {
+  assertNotAborted(signal);
   const { width, height } = ctx.canvas;
   const { noiseAmplitude } = options!;
 
@@ -111,6 +128,7 @@ export async function applyStir(
   const noiseB = generateGaussianBatch(pixelCount, stdDev);
 
   // Optimized loop: process all channels in one pass
+  const pixelsPerChunk = 65_536;
   let noiseIdx = 0;
   for (let i = 0; i < data.length; i += 4) {
     // Clamp with proper bounds checking
@@ -119,26 +137,38 @@ export async function applyStir(
     data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noiseB[noiseIdx]));
     // Alpha channel (i + 3) remains unchanged
     noiseIdx++;
+
+    if (noiseIdx % pixelsPerChunk === 0) {
+      assertNotAborted(signal);
+      await nextTick();
+    }
   }
 
+  assertNotAborted(signal);
   ctx.putImageData(imageData, 0, 0);
   await nextTick();
 }
 
 export async function applyCrush(
   canvas: HTMLCanvasElement,
-  options: ProcessingOptions["crush"] = DEFAULT_OPTIONS.crush
+  options: ProcessingOptions["crush"] = DEFAULT_OPTIONS.crush,
+  signal?: AbortSignal,
 ): Promise<string> {
+  assertNotAborted(signal);
   const { quality } = options!;
 
   // Clamp quality to valid range
   const clampedQuality = Math.max(0, Math.min(1, quality));
 
   try {
-    return canvas.toDataURL("image/jpeg", clampedQuality);
+    const output = canvas.toDataURL("image/jpeg", clampedQuality);
+    assertNotAborted(signal);
+    return output;
   } catch (error) {
     // Fallback to default quality if encoding fails
     console.warn("JPEG encoding failed, using default quality", error);
-    return canvas.toDataURL("image/jpeg", 0.92);
+    const output = canvas.toDataURL("image/jpeg", 0.92);
+    assertNotAborted(signal);
+    return output;
   }
 }

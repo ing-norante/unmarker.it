@@ -14,7 +14,7 @@ export function Header() {
           100% client-side.
         </span>
         <br />
-        Nothing leaves your browser.
+        Your image stays in your browser.
       </p>
     </header>
   );
