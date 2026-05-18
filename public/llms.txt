@@ -1,0 +1,36 @@
+# Unmarker.it
+
+> Unmarker.it is a browser-based image processing tool for disrupting invisible AI watermark signals. Images are processed locally in the user's browser with Canvas API operations and are not uploaded to Unmarker.it servers.
+
+## Core Facts
+
+- Official URL: https://www.unmarker.it/
+- Category: browser-based image processing tool
+- Main use case: disrupt invisible AI watermark signals in generated or edited images
+- Processing model: 100% client-side in the browser
+- Account requirement: no account required
+- Upload policy: images stay in the browser and are not uploaded for processing
+- Output format: lossy JPEG
+
+## Processing Pipeline
+
+1. Shake: applies a tiny geometric perturbation to change pixel-grid alignment.
+2. Stir: adds low-amplitude RGB noise to disturb statistical watermark traces.
+3. Crush: recompresses the result as JPEG to reduce remaining high-frequency signals.
+
+## Limitations
+
+- Unmarker.it does not guarantee that every invisible watermark will be removed or made undetectable.
+- Results depend on the watermarking method, input image, detector, compression level, and downstream reuse.
+- The output is a lossy JPEG, so metadata and original file format are not preserved.
+- Very large or unsupported image files may fail local browser processing.
+
+## Responsible Use
+
+Unmarker.it should be used for privacy research, robustness testing, personal media workflows, and education. It should not be used for impersonation, fraud, evading platform safety systems, misrepresenting image provenance, or distributing deceptive synthetic media.
+
+## References
+
+- Project repository: https://github.com/ing-norante/unmarker.it
+- Research background: https://arxiv.org/abs/2405.08363
+- Waterloo coverage: https://uwaterloo.ca/news/media/watermarks-offer-no-defense-against-deepfakes

@@ -5,13 +5,13 @@
   "license": "MIT",
   "author": {
     "name": "Ing. Norante",
-    "url": "https://unmarker.it"
+    "url": "https://www.unmarker.it"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/ing-norante/unmarker.it.git"
   },
-  "homepage": "https://unmarker.it",
+  "homepage": "https://www.unmarker.it",
   "bugs": {
     "url": "https://github.com/ing-norante/unmarker.it/issues"
   },
