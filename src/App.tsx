@@ -376,78 +376,90 @@ function App() {
   };
 
   return (
-    <div className="text-foreground selection:bg-primary/20 selection:text-foreground flex min-h-dvh flex-col font-sans">
-      <div className="bg-muted/20 flex flex-1 flex-col p-4 lg:min-h-0 lg:p-6">
-        <main
-          role="main"
-          className="mx-auto grid w-full max-w-7xl grid-cols-1 content-start gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(18rem,22rem)_1fr] lg:items-start lg:gap-x-8"
-        >
-          {/* Hero + pipeline: one column on desktop; hero pinned, steps scroll below */}
-          <div className="contents lg:sticky lg:top-6 lg:col-start-1 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:min-h-0 lg:flex-col lg:gap-5 lg:overflow-hidden">
-            <Header className="order-1 shrink-0 lg:order-0" />
+    <div className="bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex min-h-dvh p-0 font-sans lg:px-8">
+      <div className="bg-background mx-auto flex min-h-dvh w-full max-w-[1500px] flex-col overflow-hidden">
+        <div className="relative flex flex-col px-6 py-8 lg:min-h-0 lg:px-12 lg:py-10">
+          <main
+            role="main"
+            className="relative z-10 mx-auto grid w-full max-w-[1340px] grid-cols-1 content-start gap-8 lg:min-h-0 lg:grid-cols-[minmax(30rem,34rem)_minmax(0,1fr)] lg:items-start lg:gap-x-12"
+          >
+            {/* Hero + pipeline: one column on desktop; hero pinned, steps scroll below */}
+            <div className="contents lg:col-start-1 lg:flex lg:min-h-0 lg:flex-col lg:gap-4">
+              <Header className="order-1 shrink-0 lg:order-0" />
 
-            <aside className="order-3 flex min-h-0 flex-col gap-3 lg:order-0 lg:flex-1 lg:overflow-hidden">
-              <h2 className="text-muted-foreground shrink-0 text-xs font-medium tracking-[0.18em] uppercase">
-                Pipeline
-              </h2>
+              <aside className="order-3 flex min-h-0 flex-col gap-4 lg:order-0 lg:flex-1">
+                <div className="flex items-center gap-4">
+                  <h2 className="text-muted-foreground shrink-0 text-base font-black tracking-[-0.02em]">
+                    PIPELINE
+                  </h2>
+                  <div className="bg-border h-px flex-1" />
+                </div>
 
-              <div className="min-h-0 flex-1 pr-1 lg:overflow-y-auto lg:overscroll-contain">
-                <PipelineSteps steps={steps} />
+                <div className="min-h-0 flex-1 lg:overflow-y-auto lg:overscroll-contain">
+                  <PipelineSteps steps={steps} />
 
-                {isProcessing && (
-                  <div className="bg-card text-card-foreground ring-border mt-4 animate-pulse rounded-lg p-3 text-sm ring-1">
-                    Processing in progress...
-                  </div>
-                )}
-              </div>
-            </aside>
-          </div>
+                  {isProcessing && (
+                    <div className="bg-card text-card-foreground mt-4 animate-pulse border p-3 text-sm">
+                      Processing in progress...
+                    </div>
+                  )}
+                </div>
+              </aside>
+            </div>
 
-          {/* Workspace before pipeline on mobile; full-height right column on desktop */}
-          <section className="order-2 flex min-w-0 flex-col lg:col-start-2 lg:max-h-[calc(100dvh-7rem)] lg:min-h-0 lg:overflow-hidden">
-            {statusMessage && (
-              <Alert variant={statusMessage.variant} className="mb-4 shrink-0">
-                <AlertTitle>{statusMessage.title}</AlertTitle>
-                <AlertDescription>{statusMessage.description}</AlertDescription>
-              </Alert>
-            )}
+            {/* Workspace before pipeline on mobile; full-height right column on desktop */}
+            <section className="order-2 flex min-w-0 flex-col lg:col-start-2 lg:min-h-0">
+              {statusMessage && (
+                <Alert
+                  variant={statusMessage.variant}
+                  className="mb-4 shrink-0"
+                >
+                  <AlertTitle>{statusMessage.title}</AlertTitle>
+                  <AlertDescription>
+                    {statusMessage.description}
+                  </AlertDescription>
+                </Alert>
+              )}
 
-            {!originalImage && (
-              <div className="flex min-h-[min(50vh,28rem)] flex-col lg:min-h-0 lg:flex-1">
-                <ImageUploader
-                  onImageSelect={handleImageSelect}
-                  className="min-h-[min(50vh,28rem)] flex-1 lg:min-h-0"
-                />
-              </div>
-            )}
-
-            {originalImage && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 flex flex-col gap-4 duration-500 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
-                <ActionBar
-                  fileName={originalImage.name}
-                  isProcessing={isProcessing}
-                  hasProcessedImage={!!processedImageUrl}
-                  onReset={reset}
-                  onCancel={cancelProcessing}
-                  onProcess={processPipeline}
-                  className="shrink-0"
-                />
-
-                <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
-                  <ImageComparison
-                    originalImageUrl={originalImageUrl!}
-                    processedImageUrl={processedImageUrl}
-                    processedFileName={processedFileName}
+              {!originalImage && (
+                <div className="flex min-h-[min(62vh,50rem)] flex-col lg:min-h-[min(70vh,50rem)] lg:flex-1">
+                  <ImageUploader
+                    onImageSelect={handleImageSelect}
+                    className="min-h-[min(62vh,50rem)] flex-1 lg:min-h-[min(70vh,50rem)]"
                   />
                 </div>
-              </div>
-            )}
+              )}
 
-            <canvas ref={canvasRef} className="hidden" />
-          </section>
-        </main>
+              {originalImage && (
+                <div className="animate-in fade-in slide-in-from-bottom-4 flex flex-col gap-4 duration-500 lg:min-h-0 lg:flex-1">
+                  <ActionBar
+                    fileName={originalImage.name}
+                    isProcessing={isProcessing}
+                    hasProcessedImage={!!processedImageUrl}
+                    onReset={reset}
+                    onCancel={cancelProcessing}
+                    onProcess={processPipeline}
+                    className="shrink-0"
+                  />
+
+                  <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
+                    <ImageComparison
+                      originalImageUrl={originalImageUrl!}
+                      processedImageUrl={processedImageUrl}
+                      processedFileName={processedFileName}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <canvas ref={canvasRef} className="hidden" />
+            </section>
+          </main>
+        </div>
+        <div className="px-6 pb-6 lg:px-12 lg:pb-8">
+          <Footer />
+        </div>
       </div>
-      <Footer />
     </div>
   );
 }

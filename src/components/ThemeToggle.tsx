@@ -51,6 +51,7 @@ export function ThemeToggle() {
       variant="outline"
       size="icon"
       onClick={toggleTheme}
+      className="size-10"
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
       {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

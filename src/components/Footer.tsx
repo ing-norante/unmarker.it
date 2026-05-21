@@ -1,8 +1,7 @@
 import { usePostHog } from "posthog-js/react";
-import ReactLogo from "@/assets/react.svg";
-import ViteLogo from "@/assets/vite.svg";
-import CanvasLogo from "@/assets/canvas.svg";
 import { ThemeToggle } from "./ThemeToggle";
+import { Button } from "./ui/button";
+import { Atom, Frame, Zap } from "lucide-react";
 
 export function Footer() {
   const posthog = usePostHog();
@@ -21,68 +20,72 @@ export function Footer() {
     });
   };
   return (
-    <footer className="bg-background/95 shrink-0 border-t px-4 py-4 lg:px-6">
-      <div className="mx-auto w-full max-w-7xl">
-        <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+    <footer className="bg-background shrink-0 px-7 py-8 border-t">
+      <div className="flex flex-col items-center justify-between gap-5 md:flex-row">
+        <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
+          <span className="text-muted-foreground text-sm font-semibold">
+            Built with
+          </span>
           <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
-            <span className="text-muted-foreground text-sm">Built with</span>
-            <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
+            <Button asChild variant="outline" className="h-10">
               <a
                 href="https://react.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:bg-muted flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors"
               >
-                <img src={ReactLogo} alt="React" className="h-5 w-5" />
-                <span>React</span>
+                <Atom className="text-primary size-4" />
+                React
               </a>
+            </Button>
+            <Button asChild variant="outline" className="h-10">
               <a
                 href="https://vite.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:bg-muted flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors"
               >
-                <img src={ViteLogo} alt="Vite" className="h-5 w-5" />
-                <span>Vite</span>
+                <Zap className="text-primary size-4" />
+                Vite
               </a>
+            </Button>
 
+            <Button asChild variant="outline" className="h-10">
               <a
-                className="hover:bg-muted flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors"
                 href="https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <img
-                  src={CanvasLogo}
-                  alt="Canvas"
-                  className="h-5 w-5 dark:invert"
-                />
-                <span>Canvas API</span>
+                <Frame className="text-primary size-4" />
+                Canvas API
               </a>
-              <ThemeToggle />
-            </div>
+            </Button>
+            <ThemeToggle />
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-2">
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <Button asChild className="h-10 px-5 font-black">
             <a
               href="https://insigh.to/b/unmarkerit"
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleFeatureBoardClick}
-              className="hover:bg-muted rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors"
             >
               Feedback
             </a>
-            <span className="text-muted-foreground text-sm">Crafted by</span>
+          </Button>
+          <div className="bg-border h-8 w-px" />
+          <span className="text-muted-foreground text-sm font-semibold">
+            Crafted by
+          </span>
+          <Button asChild variant="secondary" className="h-10 px-5 font-black">
             <a
               href="https://github.com/ing-norante/unmarker.it"
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleGithubClick}
-              className="hover:bg-muted rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors"
             >
               ing.norante
             </a>
-          </div>
+          </Button>
         </div>
       </div>
     </footer>

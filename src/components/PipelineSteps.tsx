@@ -2,7 +2,16 @@ import React from "react";
 import type { PipelineStepState } from "@/lib/types";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, X } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  RefreshCcw,
+  ScanSearch,
+  Search,
+  Sparkles,
+  Waves,
+  X,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -12,50 +21,46 @@ interface PipelineStepsProps {
 
 export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
   return (
-    <div className="w-full space-y-3">
-      {steps.map((step) => (
+    <div className="w-full space-y-2">
+      {steps.map((step, index) => (
         <Card
           key={step.id}
           size="sm"
           className={cn(
-            "bg-card/90 ring-border/70 transition-all",
+            "bg-card/95 overflow-hidden border py-0 transition-colors",
             step.status === "running"
-              ? "ring-primary/35 bg-primary/5 ring-2"
-              : "hover:ring-foreground/15",
+              ? "border-primary bg-primary/10"
+              : "hover:bg-muted/40",
           )}
         >
-          <CardContent className="flex flex-col gap-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <StepIcon status={step.status} />
-                <span className="truncate text-sm font-medium">
-                  {step.label}
-                </span>
-              </div>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "shrink-0 text-[10px] capitalize",
-                  step.status === "idle" && "text-muted-foreground",
-                  step.status === "running" &&
-                    "border-primary/30 bg-primary/10 text-primary",
-                  step.status === "done" &&
-                    "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-                  step.status === "skipped" && "bg-muted text-muted-foreground",
-                  step.status === "error" &&
-                    "border-destructive/20 bg-destructive/10 text-destructive",
-                )}
-              >
-                {step.status}
-              </Badge>
+          <CardContent className="grid grid-cols-[1.75rem_3rem_minmax(0,1fr)] items-center gap-2.5 p-2.5 sm:grid-cols-[2rem_3.25rem_minmax(0,1fr)_4.35rem] sm:gap-3">
+            <div className="bg-background text-muted-foreground flex size-7 items-center justify-center border text-sm font-semibold">
+              {index + 1}
             </div>
 
-            <Progress value={step.progress} className="h-1.5" />
+            <div className="bg-muted text-foreground flex size-12 items-center justify-center border">
+              <StepGlyph id={step.id} status={step.status} />
+            </div>
 
-            {step.description && (
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                {step.description}
-              </p>
+            <div className="min-w-0 space-y-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="text-foreground truncate text-[0.84rem] font-extrabold tracking-[-0.02em]">
+                  {step.label}
+                </span>
+                {step.status === "done" && (
+                  <Check className="text-chart-2 size-4 shrink-0" />
+                )}
+              </div>
+              {step.description && (
+                <p className="text-muted-foreground line-clamp-2 text-[0.68rem] leading-tight font-medium">
+                  {step.description}
+                </p>
+              )}
+            </div>
+
+            <StatusBadge status={step.status} />
+            {step.status === "running" && (
+              <Progress className="col-span-full h-1" value={step.progress} />
             )}
           </CardContent>
         </Card>
@@ -64,29 +69,80 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
   );
 };
 
-const StepIcon = ({ status }: { status: PipelineStepState["status"] }) => {
+function StepGlyph({
+  id,
+  status,
+}: {
+  id: PipelineStepState["id"];
+  status: PipelineStepState["status"];
+}) {
+  if (status === "running") {
+    return <Loader2 className="size-6 animate-spin" strokeWidth={2.2} />;
+  }
+
+  if (status === "error") {
+    return <X className="text-destructive size-6" strokeWidth={2.2} />;
+  }
+
+  switch (id) {
+    case "gemini-detect":
+      return <Search className="size-6" strokeWidth={2.2} />;
+    case "gemini-restore":
+      return <RefreshCcw className="size-6" strokeWidth={2.2} />;
+    case "shake":
+      return <ScanSearch className="size-6" strokeWidth={2.2} />;
+    case "stir":
+      return <Waves className="size-6" strokeWidth={2.2} />;
+    case "crush":
+      return <Sparkles className="size-6" strokeWidth={2.2} />;
+  }
+}
+
+function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
   switch (status) {
     case "done":
       return (
-        <div className="rounded-full bg-emerald-500/10 p-1 text-emerald-700 dark:text-emerald-300">
-          <Check className="h-4 w-4" />
-        </div>
+        <Badge className="border-chart-2/20 bg-chart-2/10 text-chart-2 justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end">
+          <span className="bg-chart-2 size-1.5" />
+          Done
+        </Badge>
       );
     case "skipped":
       return (
-        <div className="border-border bg-muted h-6 w-6 rounded-full border opacity-80" />
+        <Badge
+          variant="outline"
+          className="bg-muted text-muted-foreground justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end"
+        >
+          <span className="bg-muted-foreground/40 size-1.5" />
+          Skip
+        </Badge>
       );
     case "running":
-      return <Loader2 className="text-primary h-6 w-6 animate-spin" />;
+      return (
+        <Badge className="border-primary/30 bg-primary/10 text-primary justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end">
+          <span className="bg-primary size-1.5 animate-pulse" />
+          Run
+        </Badge>
+      );
     case "error":
       return (
-        <div className="rounded-full bg-red-500 p-1 text-white">
-          <X className="h-4 w-4" />
-        </div>
+        <Badge
+          variant="destructive"
+          className="justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end"
+        >
+          <span className="bg-destructive size-1.5" />
+          Error
+        </Badge>
       );
     default:
       return (
-        <div className="border-border bg-background h-6 w-6 rounded-full border" />
+        <Badge
+          variant="outline"
+          className="bg-muted/60 text-muted-foreground justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end"
+        >
+          <span className="bg-muted-foreground/30 size-1.5" />
+          Idle
+        </Badge>
       );
   }
-};
+}

@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from "react";
-import { Upload, FileImage } from "lucide-react";
+import { FileImage, ImagePlus, Lock, Upload } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface ImageUploaderProps {
   onImageSelect: (file: File) => void;
@@ -68,10 +69,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   return (
     <Card
       className={cn(
-        "bg-card/80 border-border/80 hover:border-primary/40 hover:bg-card text-card-foreground hover:ring-primary/10 relative flex h-full min-h-64 w-full cursor-pointer flex-col items-center justify-center border border-dashed p-8 transition-all hover:ring-4 sm:p-10",
-        isDragging &&
-          "border-primary bg-primary/5 ring-primary/15 scale-[0.99] border-solid ring-4",
-        disabled && "hover:bg-card cursor-not-allowed opacity-50 hover:ring-0",
+        "group bg-card text-card-foreground hover:bg-muted/30 relative flex h-full min-h-64 w-full cursor-pointer overflow-hidden border p-6 transition-colors",
+        isDragging && "border-primary bg-primary/10 ring-primary/20 ring-3",
+        disabled && "cursor-not-allowed opacity-50",
         className,
       )}
       onDragOver={handleDragOver}
@@ -87,32 +87,53 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         }
       }}
     >
-      <input
-        id="file-upload"
-        type="file"
-        className="hidden"
-        accept="image/*"
-        onChange={handleFileChange}
-        disabled={disabled}
-      />
-      <div className="flex flex-col items-center gap-4 text-center">
-        <div className="bg-primary/10 text-primary flex size-16 items-center justify-center rounded-2xl">
-          {isDragging ? (
-            <FileImage className="h-8 w-8" />
-          ) : (
-            <Upload className="h-8 w-8" />
-          )}
-        </div>
-        <div className="max-w-xl space-y-2">
-          <p className="text-lg font-semibold">
-            {isDragging ? "Drop it!" : "Upload Image"}
-          </p>
-          <p className="text-muted-foreground text-sm leading-6">
-            Drop an image, hit process, and get a fresh JPEG that's been shaken,
-            stirred, and crushed. Designed to disrupt invisible watermark
-            signals while keeping your image visually intact. No accounts, no
-            image uploads, optional usage analytics.
-          </p>
+      <div className="border-primary/50 flex min-h-full w-full flex-1 flex-col items-center justify-center border border-dashed px-6 py-12 text-center sm:px-10">
+        <input
+          id="file-upload"
+          type="file"
+          className="hidden"
+          accept="image/*"
+          onChange={handleFileChange}
+          disabled={disabled}
+        />
+        <div className="flex flex-col items-center lg:translate-y-12">
+          <div className="mb-9 flex flex-col items-center">
+            <div className="bg-muted text-foreground group-hover:bg-accent relative flex size-28 items-center justify-center border transition-colors">
+              {isDragging ? (
+                <FileImage className="size-14" strokeWidth={2.3} />
+              ) : (
+                <Upload className="size-14" strokeWidth={2.3} />
+              )}
+            </div>
+          </div>
+
+          <div className="max-w-lg space-y-4">
+            <p className="text-foreground text-3xl font-black tracking-[-0.055em]">
+              {isDragging ? "Drop your image" : "Upload an image"}
+            </p>
+            <p className="text-muted-foreground mx-auto max-w-md text-lg leading-relaxed font-medium tracking-[-0.025em]">
+              Drop an image here, or click to select a file from your device.
+            </p>
+
+            <Button type="button" className="mt-3 h-10 gap-2 px-5 font-black">
+              <ImagePlus className="size-4" />
+              Choose Image
+            </Button>
+
+            <div className="text-muted-foreground text-sm leading-6 font-medium">
+              Supports JPG, JPEG, PNG, WebP
+              <br />
+              Max size: 25MB
+            </div>
+          </div>
+
+          <div className="bg-background/70 text-muted-foreground mt-20 inline-flex max-w-full items-center gap-2 border px-4 py-2 text-xs font-semibold">
+            <Lock className="size-4 shrink-0" />
+            <span className="truncate">
+              Your image is never uploaded. Everything runs locally in your
+              browser.
+            </span>
+          </div>
         </div>
       </div>
     </Card>
