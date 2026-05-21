@@ -17,6 +17,7 @@ interface PendingJob {
   onProgress?: (stage: GeminiWorkerProgressStage) => void;
   signal?: AbortSignal;
   abortListener?: () => void;
+  worker: Worker;
 }
 
 let worker: Worker | null = null;
@@ -30,18 +31,20 @@ export function processGeminiVisibleWatermark(
     onProgress?: (stage: GeminiWorkerProgressStage) => void;
   } = {},
 ) {
-  const jobId = nextJobId++;
-  const activeWorker = getGeminiWorker();
-
   return new Promise<GeminiVisibleProcessResult>((resolve, reject) => {
     if (options.signal?.aborted) {
       reject(createAbortError());
       return;
     }
 
+    const jobId = nextJobId++;
+    const activeWorker = getGeminiWorker();
+
     const abortListener = () => {
-      pendingJobs.delete(jobId);
-      reject(createAbortError());
+      if (!pendingJobs.has(jobId)) return;
+
+      terminateGeminiWorker(activeWorker);
+      rejectPendingJobsForWorker(activeWorker, createAbortError);
     };
 
     pendingJobs.set(jobId, {
@@ -50,6 +53,7 @@ export function processGeminiVisibleWatermark(
       onProgress: options.onProgress,
       signal: options.signal,
       abortListener,
+      worker: activeWorker,
     });
 
     options.signal?.addEventListener("abort", abortListener, { once: true });
@@ -60,51 +64,83 @@ export function processGeminiVisibleWatermark(
       imageData,
     };
 
-    activeWorker.postMessage(request, [imageData.data.buffer]);
+    try {
+      activeWorker.postMessage(request, [imageData.data.buffer]);
+    } catch (error) {
+      cleanupPendingJob(jobId, pendingJobs.get(jobId));
+      reject(
+        error instanceof Error ? error : new Error("Gemini worker failed"),
+      );
+    }
   });
 }
 
 function getGeminiWorker() {
   if (worker) return worker;
 
-  worker = new Worker(new URL("../workers/geminiVisible.worker.ts", import.meta.url));
+  const nextWorker = new Worker(
+    new URL("../workers/geminiVisible.worker.ts", import.meta.url),
+  );
+  worker = nextWorker;
 
-  worker.addEventListener("message", (event: MessageEvent<GeminiWorkerResponse>) => {
-    const message = event.data;
-    const pending = pendingJobs.get(message.jobId);
-    if (!pending) return;
+  nextWorker.addEventListener(
+    "message",
+    (event: MessageEvent<GeminiWorkerResponse>) => {
+      const message = event.data;
+      const pending = pendingJobs.get(message.jobId);
+      if (!pending) return;
 
-    if (message.type === "progress") {
-      pending.onProgress?.(message.stage);
-      return;
-    }
+      if (message.type === "progress") {
+        pending.onProgress?.(message.stage);
+        return;
+      }
 
-    cleanupPendingJob(message.jobId, pending);
+      cleanupPendingJob(message.jobId, pending);
 
-    if (message.type === "error") {
-      pending.reject(new Error(message.message));
-      return;
-    }
+      if (message.type === "error") {
+        pending.reject(new Error(message.message));
+        return;
+      }
 
-    pending.resolve({
-      detection: message.detection,
-      imageData: message.imageData,
-      skipped: message.type === "skipped",
-    });
-  });
+      pending.resolve({
+        detection: message.detection,
+        imageData: message.imageData,
+        skipped: message.type === "skipped",
+      });
+    },
+  );
 
-  worker.addEventListener("error", (event) => {
+  nextWorker.addEventListener("error", (event) => {
     const error = new Error(event.message || "Gemini worker failed");
-    for (const [jobId, pending] of pendingJobs) {
-      cleanupPendingJob(jobId, pending);
-      pending.reject(error);
-    }
+    terminateGeminiWorker(nextWorker);
+    rejectPendingJobsForWorker(nextWorker, () => error);
   });
 
-  return worker;
+  return nextWorker;
 }
 
-function cleanupPendingJob(jobId: number, pending: PendingJob) {
+function terminateGeminiWorker(targetWorker: Worker) {
+  targetWorker.terminate();
+  if (worker === targetWorker) {
+    worker = null;
+  }
+}
+
+function rejectPendingJobsForWorker(
+  targetWorker: Worker,
+  createError: () => Error,
+) {
+  for (const [jobId, pending] of [...pendingJobs]) {
+    if (pending.worker !== targetWorker) continue;
+
+    cleanupPendingJob(jobId, pending);
+    pending.reject(createError());
+  }
+}
+
+function cleanupPendingJob(jobId: number, pending: PendingJob | undefined) {
+  if (!pending) return;
+
   pendingJobs.delete(jobId);
   if (pending.abortListener) {
     pending.signal?.removeEventListener("abort", pending.abortListener);
