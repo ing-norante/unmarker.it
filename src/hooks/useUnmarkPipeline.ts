@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useObjectUrl } from "@/hooks/useObjectUrl";
 import {
   applyCrush,
   applyShake,
@@ -31,9 +32,6 @@ export function useUnmarkPipeline({
   originalImage,
   setStatusMessage,
 }: UseUnmarkPipelineOptions) {
-  const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(
-    null,
-  );
   const [processedFileName, setProcessedFileName] = useState<string | null>(
     null,
   );
@@ -47,6 +45,11 @@ export function useUnmarkPipeline({
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const {
+    url: processedImageUrl,
+    setObjectUrl: setProcessedObjectUrl,
+    clearObjectUrl: clearProcessedObjectUrl,
+  } = useObjectUrl();
 
   const updateStep = useCallback(
     (id: PipelineStepId, update: Partial<PipelineStepState>) => {
@@ -64,9 +67,9 @@ export function useUnmarkPipeline({
   }, []);
 
   const clearProcessedImage = useCallback(() => {
-    setProcessedImageUrl(null);
+    clearProcessedObjectUrl();
     setProcessedFileName(null);
-  }, []);
+  }, [clearProcessedObjectUrl]);
 
   const cancelProcessing = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -144,14 +147,14 @@ export function useUnmarkPipeline({
       updateStep("crush", { status: "running", progress: 10 });
       await delay(500, signal);
 
-      const resultDataUrl = await applyCrush(
+      const resultBlob = await applyCrush(
         canvas,
         { quality: crushQuality },
         signal,
       );
       assertNotAborted(signal);
 
-      setProcessedImageUrl(resultDataUrl);
+      setProcessedObjectUrl(resultBlob);
       setProcessedFileName(generateCameraLikeFilename());
       updateStep("crush", { status: "done", progress: 100 });
       toast.success("Image processed.");
@@ -187,6 +190,7 @@ export function useUnmarkPipeline({
     isProcessing,
     originalImage,
     resetSteps,
+    setProcessedObjectUrl,
     setStatusMessage,
     updateStep,
   ]);

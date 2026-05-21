@@ -7,7 +7,7 @@ Client-side image post-processing tool built to disrupt invisible AI watermark s
 This README is based on the current code in this repository.
 
 - Processing is fully local in the browser via Canvas and a Web Worker (`src/lib/pipeline.ts`, `src/workers/geminiVisible.worker.ts`, and hidden canvas orchestration in `src/App.tsx`)
-- Input accepts browser-decodable `image/*` files up to 40 megapixels; output is always JPEG via `canvas.toDataURL("image/jpeg", quality)`
+- Input accepts browser-decodable `image/*` files up to 40 megapixels; output is always JPEG via `canvas.toBlob(..., "image/jpeg", quality)` and an object URL for preview/download
 - Pipeline steps:
 
 1. `Gemini Scan`: detects the visible Gemini / Nano Banana sparkle watermark in the bottom-right corner using local OpenCV.js template matching

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyStir, GaussianRNG } from "./pipeline";
+import { applyCrush, applyStir, GaussianRNG } from "./pipeline";
 
 describe("pipeline", () => {
   it("applies Gaussian stdDev once, including cached spare samples", () => {
@@ -31,6 +31,47 @@ describe("pipeline", () => {
     expect(Array.from(source)).toEqual([110, 80, 255, 17, 235, 30, 0, 255]);
     expect(putImageData).toHaveBeenCalledTimes(1);
   });
+
+  it("encodes crush output as a JPEG Blob", async () => {
+    const expectedBlob = new Blob(["jpeg"], { type: "image/jpeg" });
+    const { canvas, toBlob } = makeBlobCanvas(expectedBlob);
+
+    const result = await applyCrush(canvas, { quality: 0.85 });
+
+    expect(result).toBe(expectedBlob);
+    expect(toBlob).toHaveBeenCalledWith(
+      expect.any(Function),
+      "image/jpeg",
+      0.85,
+    );
+  });
+
+  it("falls back to default JPEG quality when blob encoding fails", async () => {
+    const fallbackBlob = new Blob(["fallback"], { type: "image/jpeg" });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { canvas, toBlob } = makeBlobCanvasSequence([null, fallbackBlob]);
+
+    try {
+      const result = await applyCrush(canvas, { quality: 0.9 });
+
+      expect(result).toBe(fallbackBlob);
+      expect(toBlob).toHaveBeenNthCalledWith(
+        1,
+        expect.any(Function),
+        "image/jpeg",
+        0.9,
+      );
+      expect(toBlob).toHaveBeenNthCalledWith(
+        2,
+        expect.any(Function),
+        "image/jpeg",
+        0.92,
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });
 
 function sequenceRandom(values: number[]) {
@@ -61,5 +102,25 @@ function makeCanvasContext(
   return {
     ctx: ctx as unknown as CanvasRenderingContext2D,
     putImageData: ctx.putImageData,
+  };
+}
+
+function makeBlobCanvas(result: Blob | null) {
+  return makeBlobCanvasSequence([result]);
+}
+
+function makeBlobCanvasSequence(results: Array<Blob | null>) {
+  const toBlob = vi.fn((callback: BlobCallback) => {
+    const result = results.shift();
+    if (result === undefined) {
+      throw new Error("No test blob result available");
+    }
+
+    callback(result);
+  });
+
+  return {
+    canvas: { toBlob } as unknown as HTMLCanvasElement,
+    toBlob,
   };
 }

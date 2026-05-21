@@ -163,7 +163,7 @@ export async function applyCrush(
   canvas: HTMLCanvasElement,
   options: ProcessingOptions["crush"] = DEFAULT_OPTIONS.crush,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<Blob> {
   assertNotAborted(signal);
   const { quality } = options!;
 
@@ -173,14 +173,75 @@ export async function applyCrush(
   );
 
   try {
-    const output = canvas.toDataURL("image/jpeg", clampedQuality);
-    assertNotAborted(signal);
-    return output;
+    return await encodeCanvasAsJpegBlob(canvas, clampedQuality, signal);
   } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
+
     // Fallback to default quality if encoding fails
     console.warn("JPEG encoding failed, using default quality", error);
-    const output = canvas.toDataURL("image/jpeg", 0.92);
-    assertNotAborted(signal);
-    return output;
+    return await encodeCanvasAsJpegBlob(canvas, 0.92, signal);
   }
 }
+
+const isAbortError = (error: unknown) =>
+  error instanceof Error && error.name === "AbortError";
+
+const encodeCanvasAsJpegBlob = (
+  canvas: HTMLCanvasElement,
+  quality: number,
+  signal?: AbortSignal,
+) =>
+  new Promise<Blob>((resolve, reject) => {
+    assertNotAborted(signal);
+
+    let settled = false;
+
+    function cleanup() {
+      signal?.removeEventListener("abort", onAbort);
+    }
+
+    function rejectOnce(error: unknown) {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      reject(error);
+    }
+
+    function resolveOnce(blob: Blob) {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      resolve(blob);
+    }
+
+    function onAbort() {
+      rejectOnce(createAbortError());
+    }
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    try {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            rejectOnce(new Error("JPEG encoding produced no output"));
+            return;
+          }
+
+          resolveOnce(blob);
+        },
+        "image/jpeg",
+        quality,
+      );
+    } catch (error) {
+      rejectOnce(error);
+    }
+  });
