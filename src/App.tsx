@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ImageUploader } from "@/components/ImageUploader";
+import { CrushQualityControl } from "@/components/CrushQualityControl";
 import { PipelineSteps } from "@/components/PipelineSteps";
 import { Header } from "@/components/Header";
 import { ActionBar } from "@/components/ActionBar";
@@ -192,6 +193,9 @@ function App() {
     null,
   );
   const [isProcessing, setIsProcessing] = useState(false);
+  const [crushQuality, setCrushQuality] = useState(
+    DEFAULT_OPTIONS.crush!.quality,
+  );
   const [steps, setSteps] = useState<PipelineStepState[]>(INITIAL_STEPS);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
@@ -427,7 +431,7 @@ function App() {
 
       const resultDataUrl = await applyCrush(
         canvas,
-        DEFAULT_OPTIONS.crush,
+        { quality: crushQuality },
         signal,
       );
       assertNotAborted(signal);
@@ -581,6 +585,11 @@ function App() {
                   {appMode === "unmark" ? (
                     <>
                       <PipelineSteps steps={steps} />
+                      <CrushQualityControl
+                        value={crushQuality}
+                        onChange={setCrushQuality}
+                        disabled={isProcessing}
+                      />
 
                       {isProcessing && (
                         <div className="bg-card text-card-foreground mt-4 flex flex-col gap-2 border p-3 text-sm">

@@ -1,5 +1,8 @@
 import type { ProcessingOptions } from "./types";
 
+export const CRUSH_QUALITY_MIN = 0.5;
+export const CRUSH_QUALITY_MAX = 0.98;
+
 export const DEFAULT_OPTIONS: ProcessingOptions = {
   shake: {
     rotationRange: 0.5,
@@ -157,8 +160,10 @@ export async function applyCrush(
   assertNotAborted(signal);
   const { quality } = options!;
 
-  // Clamp quality to valid range
-  const clampedQuality = Math.max(0, Math.min(1, quality));
+  const clampedQuality = Math.max(
+    CRUSH_QUALITY_MIN,
+    Math.min(CRUSH_QUALITY_MAX, quality),
+  );
 
   try {
     const output = canvas.toDataURL("image/jpeg", clampedQuality);
