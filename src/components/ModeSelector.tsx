@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface ModeSelectorProps {
   mode: AppMode;
-  onModeChange: (mode: AppMode) => void;
+  onModeChange: (mode: AppMode) => void | Promise<void>;
   disabled?: boolean;
   className?: string;
 }
@@ -19,7 +19,9 @@ export function ModeSelector({
   return (
     <Tabs
       value={mode}
-      onValueChange={(value) => onModeChange(value as AppMode)}
+      onValueChange={(value) => {
+        void onModeChange(value as AppMode);
+      }}
       className={cn("w-full", className)}
     >
       <TabsList className="grid h-9 w-full grid-cols-2">

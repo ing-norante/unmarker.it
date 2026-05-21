@@ -45,6 +45,7 @@ const HOMEPAGE_FACTS = [
 function App() {
   const [appMode, setAppMode] = useState<AppMode>("unmark");
   const [originalImage, setOriginalImage] = useState<File | null>(null);
+  const [isModeSwitching, setIsModeSwitching] = useState(false);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
   );
@@ -93,13 +94,37 @@ function App() {
     setStatusMessage(null);
   };
 
-  const handleModeChange = (mode: AppMode) => {
+  const handleModeChange = async (mode: AppMode) => {
     if (mode === appMode) {
       return;
     }
 
-    reset();
-    setAppMode(mode);
+    setStatusMessage(null);
+
+    if (!originalImage) {
+      resetPipeline();
+      resetMetadataWorkflow();
+      setAppMode(mode);
+      return;
+    }
+
+    setIsModeSwitching(true);
+
+    try {
+      const validation = await validateFileForMode(mode, originalImage);
+      if (!validation.ok) {
+        setStatusMessage(validation.statusMessage);
+        return;
+      }
+
+      setAppMode(mode);
+
+      if (mode === "metadata" && !metadataScanResult) {
+        await scanMetadata(originalImage);
+      }
+    } finally {
+      setIsModeSwitching(false);
+    }
   };
 
   const handleImageSelect = async (file: File) => {
@@ -120,7 +145,8 @@ function App() {
     }
   };
 
-  const modeBusy = isProcessing || isMetadataScanning || isMetadataCleaning;
+  const modeBusy =
+    isModeSwitching || isProcessing || isMetadataScanning || isMetadataCleaning;
 
   return (
     <div className="bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex min-h-dvh p-0 font-sans lg:px-8">
