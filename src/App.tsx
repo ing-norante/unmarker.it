@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { ImageUploader } from "@/components/ImageUploader";
 import { CrushQualityControl } from "@/components/CrushQualityControl";
 import { PipelineSteps } from "@/components/PipelineSteps";
@@ -13,213 +13,74 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import type {
-  AppMode,
-  MetadataCleanResult,
-  MetadataScanResult,
-  PipelineStepState,
-  PipelineStepId,
-} from "./lib/types";
-import { toast } from "sonner";
+import { useMetadataWorkflow } from "@/hooks/useMetadataWorkflow";
+import { useObjectUrl } from "@/hooks/useObjectUrl";
+import { useUnmarkPipeline } from "@/hooks/useUnmarkPipeline";
 import {
-  applyShake,
-  applyStir,
-  applyCrush,
-  DEFAULT_OPTIONS,
-} from "./lib/pipeline";
-import {
-  canCleanMetadata,
-  cleanImageMetadata,
-  scanImageMetadata,
-} from "./lib/metadataCleaner";
-import { generateCameraLikeFilename } from "./lib/utils";
-import { processGeminiVisibleWatermark } from "./lib/geminiWorkerClient";
-import type { GeminiWorkerProgressStage } from "./lib/types";
-
-const MAX_FILE_SIZE_MB = 25;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const MAX_MEGAPIXELS = 40;
-const METADATA_EXTENSIONS = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "webp",
-  "avif",
-  "heic",
-  "heif",
-  "jxl",
-]);
-
-type StatusMessage = {
-  variant: "default" | "destructive";
-  title: string;
-  description: string;
-};
-
-const INITIAL_STEPS: PipelineStepState[] = [
-  {
-    id: "gemini-detect",
-    label: "Gemini Scan",
-    description:
-      "We scan the bottom-right corner for the Gemini / Nano Banana sparkle logo using a local OpenCV.js worker.",
-    status: "idle",
-    progress: 0,
-  },
-  {
-    id: "gemini-restore",
-    label: "Gemini Restore",
-    description:
-      "When detected, we reverse the logo alpha blend and repair residual sparkle edges with local inpainting.",
-    status: "idle",
-    progress: 0,
-  },
-  {
-    id: "shake",
-    label: "Shake (Geometry)",
-    description:
-      "We apply a tiny random rotation (±0.5°) and a subtle zoom-in. This breaks the pixel grid alignment many invisible watermarks depend on.",
-    status: "idle",
-    progress: 0,
-  },
-  {
-    id: "stir",
-    label: "Stir (Noise)",
-    description:
-      "We inject low-amplitude RGB noise across the image to disturb the statistical patterns used by watermark detectors.",
-    status: "idle",
-    progress: 0,
-  },
-  {
-    id: "crush",
-    label: "Crush (Quantization)",
-    description:
-      "We recompress the image as JPEG to crush remaining high-frequency watermark signals.",
-    status: "idle",
-    progress: 0,
-  },
-];
-
-const createAbortError = () => {
-  const error = new Error("Processing cancelled");
-  error.name = "AbortError";
-  return error;
-};
-
-const isAbortError = (error: unknown) =>
-  error instanceof Error && error.name === "AbortError";
-
-const assertNotAborted = (signal?: AbortSignal) => {
-  if (signal?.aborted) {
-    throw createAbortError();
-  }
-};
-
-const delay = (ms: number, signal?: AbortSignal) =>
-  new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(createAbortError());
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-
-    const onAbort = () => {
-      window.clearTimeout(timeout);
-      reject(createAbortError());
-    };
-
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-
-const loadImageDimensions = async (file: File) => {
-  const img = new Image();
-  const objectUrl = URL.createObjectURL(file);
-
-  try {
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Failed to decode image"));
-      img.src = objectUrl;
-    });
-
-    return { width: img.width, height: img.height };
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-};
-
-const loadImageFromFile = async (file: File, signal?: AbortSignal) => {
-  assertNotAborted(signal);
-
-  const img = new Image();
-  const objectUrl = URL.createObjectURL(file);
-
-  try {
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Failed to load image"));
-      img.src = objectUrl;
-    });
-    assertNotAborted(signal);
-    return img;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-};
-
-const createCanvasSnapshot = (canvas: HTMLCanvasElement) => {
-  const snapshot = document.createElement("canvas");
-  snapshot.width = canvas.width;
-  snapshot.height = canvas.height;
-  const snapshotCtx = snapshot.getContext("2d");
-  if (!snapshotCtx) {
-    throw new Error("Could not create canvas snapshot");
-  }
-  snapshotCtx.drawImage(canvas, 0, 0);
-  return snapshot;
-};
+  MAX_MEGAPIXELS,
+  validateMetadataFile,
+  validateUnmarkFile,
+} from "@/lib/fileValidation";
+import type { AppMode, MetadataScanResult, StatusMessage } from "@/lib/types";
 
 function App() {
   const [appMode, setAppMode] = useState<AppMode>("unmark");
   const [originalImage, setOriginalImage] = useState<File | null>(null);
-  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
-  const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(
-    null,
-  );
-  const [processedFileName, setProcessedFileName] = useState<string | null>(
-    null,
-  );
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [crushQuality, setCrushQuality] = useState(
-    DEFAULT_OPTIONS.crush!.quality,
-  );
-  const [steps, setSteps] = useState<PipelineStepState[]>(INITIAL_STEPS);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
   );
-  const [metadataScanResult, setMetadataScanResult] =
-    useState<MetadataScanResult | null>(null);
-  const [metadataCleanResult, setMetadataCleanResult] =
-    useState<MetadataCleanResult | null>(null);
-  const [metadataCleanUrl, setMetadataCleanUrl] = useState<string | null>(null);
-  const [isMetadataScanning, setIsMetadataScanning] = useState(false);
-  const [isMetadataCleaning, setIsMetadataCleaning] = useState(false);
+  const {
+    url: originalImageUrl,
+    setObjectUrl: setOriginalImageUrl,
+    clearObjectUrl: clearOriginalImageUrl,
+  } = useObjectUrl();
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const metadataScanJobRef = useRef(0);
+  const {
+    canvasRef,
+    processedImageUrl,
+    processedFileName,
+    isProcessing,
+    crushQuality,
+    setCrushQuality,
+    steps,
+    processPipeline,
+    cancelProcessing,
+    resetPipeline,
+  } = useUnmarkPipeline({
+    originalImage,
+    setStatusMessage,
+  });
 
-  // Cleanup object URLs
-  useEffect(() => {
-    return () => {
-      if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
-      if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
-      if (metadataCleanUrl) URL.revokeObjectURL(metadataCleanUrl);
-    };
-  }, [originalImageUrl, processedImageUrl, metadataCleanUrl]);
+  const {
+    metadataScanResult,
+    metadataCleanResult,
+    isMetadataScanning,
+    isMetadataCleaning,
+    metadataCanDownloadClean,
+    scanMetadata,
+    downloadCleanCopy,
+    resetMetadataWorkflow,
+  } = useMetadataWorkflow({
+    originalImage,
+    setStatusMessage,
+  });
+
+  const reset = () => {
+    resetPipeline();
+    resetMetadataWorkflow();
+    clearOriginalImageUrl();
+    setOriginalImage(null);
+    setStatusMessage(null);
+  };
+
+  const handleModeChange = (mode: AppMode) => {
+    if (mode === appMode) {
+      return;
+    }
+
+    reset();
+    setAppMode(mode);
+  };
 
   const handleImageSelect = async (file: File) => {
     if (appMode === "metadata") {
@@ -232,327 +93,35 @@ function App() {
 
   const handleUnmarkImageSelect = async (file: File) => {
     setStatusMessage(null);
-    setMetadataScanResult(null);
-    setMetadataCleanResult(null);
-    setMetadataCleanUrl(null);
+    resetMetadataWorkflow();
 
-    if (!file.type.startsWith("image/")) {
-      setStatusMessage({
-        variant: "destructive",
-        title: "Unsupported file type",
-        description: "Please select a valid image file.",
-      });
+    const validation = await validateUnmarkFile(file);
+    if (!validation.ok) {
+      setStatusMessage(validation.statusMessage);
       return;
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      setStatusMessage({
-        variant: "destructive",
-        title: "File is too large",
-        description: `Please use an image up to ${MAX_FILE_SIZE_MB} MB.`,
-      });
-      return;
-    }
-
-    let dimensions: { width: number; height: number };
-    try {
-      dimensions = await loadImageDimensions(file);
-    } catch {
-      setStatusMessage({
-        variant: "destructive",
-        title: "Could not read image",
-        description:
-          "This file could not be decoded. Try another image and retry.",
-      });
-      return;
-    }
-
-    const megapixels = (dimensions.width * dimensions.height) / 1_000_000;
-    if (megapixels > MAX_MEGAPIXELS) {
-      setStatusMessage({
-        variant: "destructive",
-        title: "Image resolution is too high",
-        description: `Please use an image up to ${MAX_MEGAPIXELS} megapixels.`,
-      });
-      return;
-    }
-
-    if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
-    if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
-
+    resetPipeline();
     setOriginalImage(file);
-    setOriginalImageUrl(URL.createObjectURL(file));
-    setProcessedImageUrl(null);
-    setProcessedFileName(null);
-
-    // Reset steps
-    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
+    setOriginalImageUrl(file);
   };
 
   const handleMetadataImageSelect = async (file: File) => {
     setStatusMessage(null);
-    setMetadataScanResult(null);
-    setMetadataCleanResult(null);
-    setMetadataCleanUrl(null);
+    resetMetadataWorkflow();
 
-    if (!isMetadataFileCandidate(file)) {
-      setStatusMessage({
-        variant: "destructive",
-        title: "Unsupported file type",
-        description:
-          "Please select a PNG, JPEG, WebP, AVIF, HEIF, or JXL image file.",
-      });
+    const validation = validateMetadataFile(file);
+    if (!validation.ok) {
+      setStatusMessage(validation.statusMessage);
       return;
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      setStatusMessage({
-        variant: "destructive",
-        title: "File is too large",
-        description: `Please use an image up to ${MAX_FILE_SIZE_MB} MB.`,
-      });
-      return;
-    }
-
-    if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
-    if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
-
+    resetPipeline();
     setOriginalImage(file);
-    setOriginalImageUrl(URL.createObjectURL(file));
-    setProcessedImageUrl(null);
-    setProcessedFileName(null);
-    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
-
-    const scanJob = metadataScanJobRef.current + 1;
-    metadataScanJobRef.current = scanJob;
-    setIsMetadataScanning(true);
-
-    try {
-      const result = await scanImageMetadata(file);
-      if (metadataScanJobRef.current !== scanJob) {
-        return;
-      }
-      setMetadataScanResult(result);
-      toast.success("Metadata scan complete.");
-    } catch (error) {
-      if (metadataScanJobRef.current !== scanJob) {
-        return;
-      }
-      console.error("Metadata scan failed", error);
-      setStatusMessage({
-        variant: "destructive",
-        title: "Could not scan metadata",
-        description:
-          "This file could not be read safely. Try another image and retry.",
-      });
-      toast.error("Could not scan metadata.");
-    } finally {
-      if (metadataScanJobRef.current === scanJob) {
-        setIsMetadataScanning(false);
-      }
-    }
+    setOriginalImageUrl(file);
+    await scanMetadata(file);
   };
 
-  const updateStep = (
-    id: PipelineStepId,
-    update: Partial<PipelineStepState>,
-  ) => {
-    setSteps((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...update } : s)),
-    );
-  };
-
-  const processPipeline = async () => {
-    if (!originalImage || !canvasRef.current || isProcessing) return;
-
-    setStatusMessage(null);
-    setIsProcessing(true);
-    setProcessedImageUrl(null); // Clear previous result
-
-    // Reset all to idle first
-    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-    const { signal } = abortController;
-
-    try {
-      const img = await loadImageFromFile(originalImage, signal);
-
-      const canvas = canvasRef.current;
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-      if (!ctx) throw new Error("Could not get canvas context");
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      // --- Step 1: Gemini Scan / Restore ---
-      updateStep("gemini-detect", { status: "running", progress: 10 });
-      const geminiResult = await processGeminiVisibleWatermark(
-        ctx.getImageData(0, 0, canvas.width, canvas.height),
-        {
-          signal,
-          onProgress: (stage) => {
-            updateGeminiProgress(stage, updateStep);
-          },
-        },
-      );
-      assertNotAborted(signal);
-
-      ctx.putImageData(geminiResult.imageData, 0, 0);
-      updateStep("gemini-detect", { status: "done", progress: 100 });
-      updateStep("gemini-restore", {
-        status: geminiResult.skipped ? "skipped" : "done",
-        progress: 100,
-      });
-
-      // --- Step 2: Shake ---
-      updateStep("shake", { status: "running", progress: 10 });
-      await delay(500, signal); // Artificial delay for UX
-
-      const shakeSource = createCanvasSnapshot(canvas);
-      await applyShake(ctx, shakeSource, DEFAULT_OPTIONS.shake, signal);
-
-      updateStep("shake", { status: "done", progress: 100 });
-
-      // --- Step 3: Stir ---
-      updateStep("stir", { status: "running", progress: 10 });
-      await delay(500, signal);
-
-      await applyStir(ctx, DEFAULT_OPTIONS.stir, signal);
-
-      updateStep("stir", { status: "done", progress: 100 });
-
-      // --- Step 4: Crush ---
-      updateStep("crush", { status: "running", progress: 10 });
-      await delay(500, signal);
-
-      const resultDataUrl = await applyCrush(
-        canvas,
-        { quality: crushQuality },
-        signal,
-      );
-      assertNotAborted(signal);
-      const generatedFileName = generateCameraLikeFilename();
-
-      setProcessedImageUrl(resultDataUrl);
-      setProcessedFileName(generatedFileName);
-      updateStep("crush", { status: "done", progress: 100 });
-      toast.success("Image processed.");
-    } catch (error) {
-      if (isAbortError(error)) {
-        setStatusMessage({
-          variant: "default",
-          title: "Processing cancelled",
-          description: "You can adjust the image and run the pipeline again.",
-        });
-        toast("Processing cancelled.");
-        setSteps((prev) =>
-          prev.map((s) =>
-            s.status === "running"
-              ? { ...s, status: "idle", progress: 0, error: undefined }
-              : s,
-          ),
-        );
-      } else {
-        console.error("Pipeline failed", error);
-        setStatusMessage({
-          variant: "destructive",
-          title: "Could not process image",
-          description:
-            "Try a smaller or different file. If this keeps happening, reload and retry.",
-        });
-        toast.error("Could not process image.");
-        // Mark current running step as error
-        setSteps((prev) =>
-          prev.map((s) =>
-            s.status === "running"
-              ? { ...s, status: "error", error: "Failed" }
-              : s,
-          ),
-        );
-      }
-    } finally {
-      if (abortControllerRef.current === abortController) {
-        abortControllerRef.current = null;
-      }
-      setIsProcessing(false);
-    }
-  };
-
-  const cancelProcessing = () => {
-    abortControllerRef.current?.abort();
-  };
-
-  const reset = () => {
-    abortControllerRef.current?.abort();
-    metadataScanJobRef.current += 1;
-    setOriginalImage(null);
-    setOriginalImageUrl(null);
-    setProcessedImageUrl(null);
-    setProcessedFileName(null);
-    setMetadataScanResult(null);
-    setMetadataCleanResult(null);
-    setMetadataCleanUrl(null);
-    setIsMetadataScanning(false);
-    setIsMetadataCleaning(false);
-    setStatusMessage(null);
-    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
-  };
-
-  const handleModeChange = (mode: AppMode) => {
-    if (mode === appMode) {
-      return;
-    }
-
-    reset();
-    setAppMode(mode);
-  };
-
-  const downloadCleanCopy = async () => {
-    if (!originalImage || !metadataScanResult || isMetadataCleaning) {
-      return;
-    }
-
-    setStatusMessage(null);
-    setIsMetadataCleaning(true);
-
-    try {
-      const result = await cleanImageMetadata(originalImage);
-
-      if (result.removedCount === 0) {
-        setStatusMessage({
-          variant: "default",
-          title: "No cleanup needed",
-          description:
-            "No removable AI metadata was found for this file and format.",
-        });
-        toast("No cleanup needed.");
-        return;
-      }
-
-      const objectUrl = URL.createObjectURL(result.blob);
-      setMetadataCleanResult(result);
-      setMetadataCleanUrl(objectUrl);
-      triggerDownload(objectUrl, result.fileName);
-      toast.success("Clean copy downloaded.");
-    } catch (error) {
-      console.error("Metadata clean failed", error);
-      setStatusMessage({
-        variant: "destructive",
-        title: "Could not clean metadata",
-        description:
-          "The metadata cleaner could not produce a safe clean copy for this file.",
-      });
-      toast.error("Could not clean metadata.");
-    } finally {
-      setIsMetadataCleaning(false);
-    }
-  };
-
-  const metadataCanDownloadClean = canCleanMetadata(metadataScanResult);
   const modeBusy = isProcessing || isMetadataScanning || isMetadataCleaning;
 
   return (
@@ -637,7 +206,7 @@ function App() {
                         <br />
                         Max resolution:{" "}
                         <span className="text-primary font-bold">
-                          40 MPixels
+                          {MAX_MEGAPIXELS} MPixels
                         </span>
                       </div>
                     }
@@ -723,61 +292,4 @@ function MetadataSidebar({
       {isScanning && <Skeleton className="h-1 w-full" />}
     </div>
   );
-}
-
-function isMetadataFileCandidate(file: File) {
-  if (file.type.startsWith("image/")) {
-    return true;
-  }
-
-  const dot = file.name.lastIndexOf(".");
-  if (dot < 0) {
-    return false;
-  }
-
-  return METADATA_EXTENSIONS.has(file.name.slice(dot + 1).toLowerCase());
-}
-
-function triggerDownload(url: string, fileName: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-}
-
-function updateGeminiProgress(
-  stage: GeminiWorkerProgressStage,
-  updateStep: (id: PipelineStepId, update: Partial<PipelineStepState>) => void,
-) {
-  switch (stage) {
-    case "loading-opencv":
-      updateStep("gemini-detect", { status: "running", progress: 20 });
-      break;
-    case "loading-alpha":
-      updateStep("gemini-detect", { status: "running", progress: 35 });
-      break;
-    case "detecting":
-      updateStep("gemini-detect", { status: "running", progress: 70 });
-      break;
-    case "restoring":
-      updateStep("gemini-detect", { status: "done", progress: 100 });
-      updateStep("gemini-restore", { status: "running", progress: 35 });
-      break;
-    case "inpainting":
-      updateStep("gemini-restore", { status: "running", progress: 75 });
-      break;
-    case "skipped":
-      updateStep("gemini-detect", { status: "done", progress: 100 });
-      updateStep("gemini-restore", { status: "skipped", progress: 100 });
-      break;
-    case "done":
-      updateStep("gemini-restore", { status: "done", progress: 100 });
-      break;
-    case "error":
-      updateStep("gemini-restore", { status: "error", progress: 100 });
-      break;
-  }
 }

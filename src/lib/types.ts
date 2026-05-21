@@ -1,5 +1,11 @@
 export type AppMode = "unmark" | "metadata";
 
+export type StatusMessage = {
+  variant: "default" | "destructive";
+  title: string;
+  description: string;
+};
+
 export type PipelineStepId =
   | "gemini-detect"
   | "gemini-restore"
