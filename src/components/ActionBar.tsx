@@ -1,5 +1,11 @@
 import { Button } from "./ui/button";
-import { RefreshCcw, XCircle, Zap } from "lucide-react";
+import {
+  ArrowClockwiseIcon,
+  FileImageIcon,
+  LightningIcon,
+  XCircleIcon,
+} from "@phosphor-icons/react";
+import { Spinner } from "./ui/spinner";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 
@@ -51,36 +57,37 @@ export function ActionBar({
   return (
     <div
       className={cn(
-        "border-foreground bg-background flex flex-col items-center justify-between gap-4 border-2 p-4 shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] lg:sticky lg:top-0 lg:z-10 lg:flex-row",
+        "bg-card/95 text-card-foreground flex flex-col justify-between gap-4 border p-4 lg:sticky lg:top-0 lg:z-10 lg:flex-row lg:items-center",
         className,
       )}
     >
-      <div className="max-w-[200px] truncate font-bold">{fileName}</div>
-      <div className="flex gap-2">
+      <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+        <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center border">
+          <FileImageIcon className="size-4" weight="bold" />
+        </span>
+        <span className="truncate">{fileName}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
         {isProcessing && (
-          <Button
-            variant="destructive"
-            onClick={handleCancel}
-            className="border-foreground rounded-none border-2"
-          >
-            <XCircle className="mr-2 h-4 w-4" /> Cancel
+          <Button variant="destructive" onClick={handleCancel}>
+            <XCircleIcon data-icon="inline-start" />
+            Cancel
           </Button>
         )}
-        <Button
-          variant="outline"
-          onClick={handleReset}
-          disabled={isProcessing}
-          className="border-foreground rounded-none border-2 hover:bg-red-100 dark:hover:bg-red-900"
-        >
-          <RefreshCcw className="mr-2 h-4 w-4" /> Reset
+        <Button variant="outline" onClick={handleReset} disabled={isProcessing}>
+          <ArrowClockwiseIcon data-icon="inline-start" />
+          Reset
         </Button>
         <Button
           onClick={handleProcess}
           disabled={isProcessing || hasProcessedImage}
-          variant="neobrutalist"
-          className={hasProcessedImage ? "opacity-50" : ""}
+          className={cn("font-black", hasProcessedImage && "opacity-50")}
         >
-          <Zap className="mr-2 h-4 w-4" />
+          {isProcessing ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <LightningIcon data-icon="inline-start" />
+          )}
           {isProcessing ? "Processing..." : "UnmarkIt!"}
         </Button>
       </div>

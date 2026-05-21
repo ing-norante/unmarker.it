@@ -14,13 +14,21 @@
 
 ## Processing Pipeline
 
-1. Shake: applies a tiny geometric perturbation to change pixel-grid alignment.
-2. Stir: adds low-amplitude RGB noise to disturb statistical watermark traces.
-3. Crush: recompresses the result as JPEG to reduce remaining high-frequency signals.
+1. Gemini Scan: scans the bottom-right corner for the visible Gemini / Nano Banana sparkle watermark and attempts local restoration with an OpenCV.js Web Worker.
+2. Shake: applies a tiny geometric perturbation to change pixel-grid alignment.
+3. Stir: adds low-amplitude RGB noise to disturb statistical watermark traces.
+4. Crush: recompresses the result as JPEG to reduce remaining high-frequency signals.
+
+## Technical Notes
+
+- Gemini Scan uses OpenCV.js locally in a browser Web Worker.
+- Production deployments require a CSP that allows `'unsafe-eval'` and `'wasm-unsafe-eval'` for the OpenCV.js worker.
+- The app does not call a Gemini API or any server-side image processing endpoint.
 
 ## Limitations
 
 - Unmarker.it does not guarantee that every invisible watermark will be removed or made undetectable.
+- Gemini Scan targets a visible Gemini / Nano Banana sparkle mark and does not guarantee removal of invisible provenance metadata or invisible watermarking systems.
 - Results depend on the watermarking method, input image, detector, compression level, and downstream reuse.
 - The output is a lossy JPEG, so metadata and original file format are not preserved.
 - Very large or unsupported image files may fail local browser processing.

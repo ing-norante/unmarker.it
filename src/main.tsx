@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import { PostHogProvider } from "posthog-js/react";
+import { ThemeProvider } from "next-themes";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -15,7 +18,17 @@ createRoot(document.getElementById("root")!).render(
         debug: import.meta.env.MODE === "development",
       }}
     >
-      <App />
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="light"
+        enableSystem={false}
+        storageKey="theme"
+      >
+        <TooltipProvider>
+          <App />
+          <Toaster />
+        </TooltipProvider>
+      </ThemeProvider>
     </PostHogProvider>
   </StrictMode>,
 );

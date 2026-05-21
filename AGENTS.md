@@ -1,0 +1,1 @@
+- Do not try to launch a test session with the local dev server. The QA tests are done by the human for his own purposes. At most you can suggest what to test and how to test it.
