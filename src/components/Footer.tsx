@@ -1,7 +1,12 @@
 import { usePostHog } from "posthog-js/react";
 import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "./ui/button";
-import { Atom, Frame, Zap } from "lucide-react";
+import { Separator } from "./ui/separator";
+import {
+  AtomIcon,
+  FrameCornersIcon,
+  LightningIcon,
+} from "@phosphor-icons/react";
 
 export function Footer() {
   const posthog = usePostHog();
@@ -20,7 +25,7 @@ export function Footer() {
     });
   };
   return (
-    <footer className="bg-background shrink-0 px-7 py-8 border-t">
+    <footer className="bg-background shrink-0 border-t px-7 py-8">
       <div className="flex flex-col items-center justify-between gap-5 md:flex-row">
         <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
           <span className="text-muted-foreground text-sm font-semibold">
@@ -33,7 +38,7 @@ export function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Atom className="text-primary size-4" />
+                <AtomIcon data-icon="inline-start" />
                 React
               </a>
             </Button>
@@ -43,7 +48,7 @@ export function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Zap className="text-primary size-4" />
+                <LightningIcon data-icon="inline-start" />
                 Vite
               </a>
             </Button>
@@ -54,7 +59,7 @@ export function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Frame className="text-primary size-4" />
+                <FrameCornersIcon data-icon="inline-start" />
                 Canvas API
               </a>
             </Button>
@@ -72,7 +77,7 @@ export function Footer() {
               Feedback
             </a>
           </Button>
-          <div className="bg-border h-8 w-px" />
+          <Separator orientation="vertical" className="h-8" />
           <span className="text-muted-foreground text-sm font-semibold">
             Crafted by
           </span>

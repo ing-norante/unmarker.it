@@ -6,7 +6,11 @@ import { ActionBar } from "@/components/ActionBar";
 import { ImageComparison } from "@/components/ImageComparison";
 import { Footer } from "@/components/Footer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { PipelineStepState, PipelineStepId } from "./lib/types";
+import { toast } from "sonner";
 import {
   applyShake,
   applyStir,
@@ -322,6 +326,7 @@ function App() {
       setProcessedImageUrl(resultDataUrl);
       setProcessedFileName(generatedFileName);
       updateStep("crush", { status: "done", progress: 100 });
+      toast.success("Image processed.");
     } catch (error) {
       if (isAbortError(error)) {
         setStatusMessage({
@@ -329,6 +334,7 @@ function App() {
           title: "Processing cancelled",
           description: "You can adjust the image and run the pipeline again.",
         });
+        toast("Processing cancelled.");
         setSteps((prev) =>
           prev.map((s) =>
             s.status === "running"
@@ -344,6 +350,7 @@ function App() {
           description:
             "Try a smaller or different file. If this keeps happening, reload and retry.",
         });
+        toast.error("Could not process image.");
         // Mark current running step as error
         setSteps((prev) =>
           prev.map((s) =>
@@ -392,17 +399,19 @@ function App() {
                   <h2 className="text-muted-foreground shrink-0 text-base font-black tracking-[-0.02em]">
                     PIPELINE
                   </h2>
+                  <Separator className="flex-1" />
                 </div>
 
-                <div className="min-h-0 flex-1 lg:overflow-y-auto lg:overscroll-contain">
+                <ScrollArea className="min-h-0 flex-1 lg:overscroll-contain">
                   <PipelineSteps steps={steps} />
 
                   {isProcessing && (
-                    <div className="bg-card text-card-foreground mt-4 animate-pulse border p-3 text-sm">
-                      Processing in progress...
+                    <div className="bg-card text-card-foreground mt-4 flex flex-col gap-2 border p-3 text-sm">
+                      <span>Processing in progress...</span>
+                      <Skeleton className="h-1 w-full" />
                     </div>
                   )}
-                </div>
+                </ScrollArea>
               </aside>
             </div>
 
@@ -441,13 +450,13 @@ function App() {
                     className="shrink-0"
                   />
 
-                  <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
+                  <ScrollArea className="lg:min-h-0 lg:flex-1 lg:overscroll-contain">
                     <ImageComparison
                       originalImageUrl={originalImageUrl!}
                       processedImageUrl={processedImageUrl}
                       processedFileName={processedFileName}
                     />
-                  </div>
+                  </ScrollArea>
                 </div>
               )}
 

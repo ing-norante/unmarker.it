@@ -1,5 +1,11 @@
 import { Button } from "./ui/button";
-import { FileImage, RefreshCcw, XCircle, Zap } from "lucide-react";
+import {
+  ArrowClockwiseIcon,
+  FileImageIcon,
+  LightningIcon,
+  XCircleIcon,
+} from "@phosphor-icons/react";
+import { Spinner } from "./ui/spinner";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 
@@ -57,25 +63,31 @@ export function ActionBar({
     >
       <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
         <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center border">
-          <FileImage className="size-4" />
+          <FileImageIcon className="size-4" weight="bold" />
         </span>
         <span className="truncate">{fileName}</span>
       </div>
       <div className="flex flex-wrap gap-2">
         {isProcessing && (
           <Button variant="destructive" onClick={handleCancel}>
-            <XCircle className="mr-2 h-4 w-4" /> Cancel
+            <XCircleIcon data-icon="inline-start" />
+            Cancel
           </Button>
         )}
         <Button variant="outline" onClick={handleReset} disabled={isProcessing}>
-          <RefreshCcw className="mr-2 h-4 w-4" /> Reset
+          <ArrowClockwiseIcon data-icon="inline-start" />
+          Reset
         </Button>
         <Button
           onClick={handleProcess}
           disabled={isProcessing || hasProcessedImage}
           className={cn("font-black", hasProcessedImage && "opacity-50")}
         >
-          <Zap className="mr-2 h-4 w-4" />
+          {isProcessing ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <LightningIcon data-icon="inline-start" />
+          )}
           {isProcessing ? "Processing..." : "UnmarkIt!"}
         </Button>
       </div>

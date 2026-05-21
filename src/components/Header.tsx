@@ -1,10 +1,16 @@
 import { cn } from "@/lib/utils";
-import { Lock, ShieldCheck, Zap } from "lucide-react";
+import {
+  LightningIcon,
+  LockKeyIcon,
+  ShieldCheckIcon,
+} from "@phosphor-icons/react";
 
 export function Header({ className }: { className?: string }) {
   return (
-    <header className={cn("relative shrink-0 space-y-5 pb-1", className)}>
-      <div className="relative space-y-3">
+    <header
+      className={cn("relative flex shrink-0 flex-col gap-5 pb-1", className)}
+    >
+      <div className="relative flex flex-col gap-3">
         {/* <Sparkles className="fill-primary text-primary absolute top-0 right-10 size-5 sm:right-16" /> */}
         <h1 className="text-foreground text-[clamp(3.15rem,5vw,4.6rem)] leading-[0.88] font-black tracking-[-0.065em] sm:whitespace-nowrap">
           UNMARKER IT
@@ -21,17 +27,17 @@ export function Header({ className }: { className?: string }) {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Feature
-          icon={ShieldCheck}
+          icon={ShieldCheckIcon}
           title="100% Private"
           body="Nothing leaves your device"
         />
         <Feature
-          icon={Zap}
+          icon={LightningIcon}
           title="Blazing Fast"
           body="All processing happens locally"
         />
         <Feature
-          icon={Lock}
+          icon={LockKeyIcon}
           title="No Uploads"
           body="Your image never leaves you"
         />
@@ -45,13 +51,13 @@ function Feature({
   title,
   body,
 }: {
-  icon: typeof ShieldCheck;
+  icon: typeof ShieldCheckIcon;
   title: string;
   body: string;
 }) {
   return (
     <div className="flex items-center gap-3">
-      <Icon className="text-foreground size-5 shrink-0" strokeWidth={2.2} />
+      <Icon className="text-foreground size-5 shrink-0" weight="bold" />
       <div className="min-w-0">
         <div className="text-foreground text-xs leading-tight font-extrabold">
           {title}

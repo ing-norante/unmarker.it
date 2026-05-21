@@ -1,5 +1,10 @@
 import React, { useCallback, useState } from "react";
-import { FileImage, ImagePlus, Lock, Upload } from "lucide-react";
+import {
+  FileImageIcon,
+  ImageSquareIcon,
+  LockKeyIcon,
+  UploadSimpleIcon,
+} from "@phosphor-icons/react";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -100,14 +105,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           <div className="mb-9 flex flex-col items-center">
             <div className="bg-muted text-foreground group-hover:bg-accent relative flex size-28 items-center justify-center border transition-colors">
               {isDragging ? (
-                <FileImage className="size-14" strokeWidth={2.3} />
+                <FileImageIcon className="size-14" weight="bold" />
               ) : (
-                <Upload className="size-14" strokeWidth={2.3} />
+                <UploadSimpleIcon className="size-14" weight="bold" />
               )}
             </div>
           </div>
 
-          <div className="max-w-lg space-y-4">
+          <div className="flex max-w-lg flex-col gap-4">
             <p className="text-foreground text-3xl font-black tracking-[-0.055em]">
               {isDragging ? "Drop your image" : "Upload an image"}
             </p>
@@ -116,7 +121,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             </p>
 
             <Button type="button" className="mt-3 h-10 gap-2 px-5 font-black">
-              <ImagePlus className="size-4" />
+              <ImageSquareIcon data-icon="inline-start" />
               Choose Image
             </Button>
 
@@ -128,7 +133,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           </div>
 
           <div className="bg-background/70 text-muted-foreground mt-20 inline-flex max-w-full items-center gap-2 border px-4 py-2 text-xs font-semibold">
-            <Lock className="size-4 shrink-0" />
+            <LockKeyIcon className="size-4 shrink-0" weight="bold" />
             <span className="truncate">
               Your image is never uploaded. Everything runs locally in your
               browser.

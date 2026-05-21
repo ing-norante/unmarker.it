@@ -3,16 +3,16 @@ import type { PipelineStepState } from "@/lib/types";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
-  Check,
-  Loader2,
-  RefreshCcw,
-  ScanSearch,
-  Search,
-  Sparkles,
-  Waves,
-  X,
-} from "lucide-react";
+  ArrowClockwiseIcon,
+  CheckIcon,
+  MagnifyingGlassIcon,
+  ScanIcon,
+  SparkleIcon,
+  WavesIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 interface PipelineStepsProps {
@@ -21,7 +21,7 @@ interface PipelineStepsProps {
 
 export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
   return (
-    <div className="w-full space-y-2">
+    <div className="flex w-full flex-col gap-2">
       {steps.map((step) => (
         <Card
           key={step.id}
@@ -38,13 +38,16 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
               <StepGlyph id={step.id} status={step.status} />
             </div>
 
-            <div className="min-w-0 space-y-1">
+            <div className="flex min-w-0 flex-col gap-1">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="text-foreground truncate text-[0.84rem] font-extrabold tracking-[-0.02em]">
                   {step.label}
                 </span>
                 {step.status === "done" && (
-                  <Check className="text-chart-2 size-4 shrink-0" />
+                  <CheckIcon
+                    className="text-chart-2 size-4 shrink-0"
+                    weight="bold"
+                  />
                 )}
               </div>
               {step.description && (
@@ -73,24 +76,24 @@ function StepGlyph({
   status: PipelineStepState["status"];
 }) {
   if (status === "running") {
-    return <Loader2 className="size-6 animate-spin" strokeWidth={2.2} />;
+    return <Spinner className="size-6" />;
   }
 
   if (status === "error") {
-    return <X className="text-destructive size-6" strokeWidth={2.2} />;
+    return <XIcon className="text-destructive size-6" weight="bold" />;
   }
 
   switch (id) {
     case "gemini-detect":
-      return <Search className="size-6" strokeWidth={2.2} />;
+      return <MagnifyingGlassIcon className="size-6" weight="bold" />;
     case "gemini-restore":
-      return <RefreshCcw className="size-6" strokeWidth={2.2} />;
+      return <ArrowClockwiseIcon className="size-6" weight="bold" />;
     case "shake":
-      return <ScanSearch className="size-6" strokeWidth={2.2} />;
+      return <ScanIcon className="size-6" weight="bold" />;
     case "stir":
-      return <Waves className="size-6" strokeWidth={2.2} />;
+      return <WavesIcon className="size-6" weight="bold" />;
     case "crush":
-      return <Sparkles className="size-6" strokeWidth={2.2} />;
+      return <SparkleIcon className="size-6" weight="bold" />;
   }
 }
 
@@ -116,7 +119,7 @@ function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
     case "running":
       return (
         <Badge className="border-primary/30 bg-primary/10 text-primary justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end">
-          <span className="bg-primary size-1.5 animate-pulse" />
+          <Spinner data-icon="inline-start" />
           Run
         </Badge>
       );

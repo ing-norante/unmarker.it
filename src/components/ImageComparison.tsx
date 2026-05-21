@@ -6,7 +6,14 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Button } from "./ui/button";
-import { Download } from "lucide-react";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "./ui/empty";
+import { DownloadSimpleIcon, ImageSquareIcon } from "@phosphor-icons/react";
 import { usePostHog } from "posthog-js/react";
 
 interface ImageComparisonProps {
@@ -58,9 +65,17 @@ export function ImageComparison({
               className="max-h-full max-w-full object-contain"
             />
           ) : (
-            <div className="border-border text-muted-foreground border border-dashed px-6 py-8 text-center text-sm">
-              <p>Result will appear here</p>
-            </div>
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ImageSquareIcon />
+                </EmptyMedia>
+                <EmptyTitle>Result will appear here</EmptyTitle>
+                <EmptyDescription>
+                  Run the pipeline to generate a processed JPEG.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
         </CardContent>
         {processedImageUrl && (
@@ -71,7 +86,8 @@ export function ImageComparison({
                 download={processedFileName}
                 onClick={handleDownload}
               >
-                <Download className="mr-2 h-4 w-4" /> Download Processed JPEG
+                <DownloadSimpleIcon data-icon="inline-start" />
+                Download Processed JPEG
               </a>
             </Button>
           </CardFooter>
