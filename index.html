@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -8,12 +8,10 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>
-      Unmarker.it - Client-Side AI Watermark Remover & Image Scrambler
-    </title>
+    <title>Unmarker.it AI Watermark Remover | Client-Side Tool</title>
     <meta
       name="description"
-      content="Unmarker.it is a 100% client-side AI watermark remover. Drop an image and we shake, stir, and crush it in your browser to disrupt invisible AI watermarks. No image uploads, no servers."
+      content="Remove invisible AI watermarks in your browser with Unmarker.it. Images stay local as shake, stir, and JPEG crush steps disrupt watermark signals. No uploads."
     />
     <meta
       name="keywords"
@@ -70,8 +68,8 @@
             "@type": "WebPage",
             "@id": "https://www.unmarker.it/#webpage",
             "url": "https://www.unmarker.it/",
-            "name": "Unmarker.it - Client-Side AI Watermark Remover & Image Scrambler",
-            "description": "Drop an image and Unmarker.it applies local shake, stir, and JPEG recompression steps in your browser to disrupt invisible AI watermark signals without uploading the image.",
+            "name": "Unmarker.it AI Watermark Remover | Client-Side Tool",
+            "description": "Remove invisible AI watermarks in your browser with Unmarker.it. Images stay local while shake, stir, and JPEG crush steps disrupt watermark signals.",
             "isPartOf": {
               "@id": "https://www.unmarker.it/#website"
             },
@@ -95,6 +93,13 @@
             "operatingSystem": "Web",
             "browserRequirements": "Requires a modern browser with Canvas API support.",
             "isAccessibleForFree": true,
+            "image": {
+              "@type": "ImageObject",
+              "url": "https://www.unmarker.it/og-image.png",
+              "width": 1200,
+              "height": 630
+            },
+            "sameAs": ["https://github.com/ing-norante/unmarker.it"],
             "offers": {
               "@type": "Offer",
               "price": "0",
@@ -125,10 +130,10 @@
     <script>
       // Dark mode initialization - runs before React to avoid FOUC
       // Default to light mode unless explicitly set to dark
-      (function() {
-        const theme = localStorage.getItem('theme');
-        if (theme === 'dark') {
-          document.documentElement.classList.add('dark');
+      (function () {
+        const theme = localStorage.getItem("theme");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
         }
       })();
     </script>
