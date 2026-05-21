@@ -1,6 +1,7 @@
 import { Button } from "./ui/button";
 import { RefreshCcw, XCircle, Zap } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
+import { cn } from "@/lib/utils";
 
 interface ActionBarProps {
   fileName: string;
@@ -9,6 +10,7 @@ interface ActionBarProps {
   onReset: () => void;
   onCancel: () => void;
   onProcess: () => void;
+  className?: string;
 }
 
 export function ActionBar({
@@ -18,6 +20,7 @@ export function ActionBar({
   onReset,
   onCancel,
   onProcess,
+  className,
 }: ActionBarProps) {
   const posthog = usePostHog();
 
@@ -46,7 +49,12 @@ export function ActionBar({
   };
 
   return (
-    <div className="border-foreground bg-background flex flex-col items-center justify-between space-y-4 border-2 p-4 shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] lg:flex-row">
+    <div
+      className={cn(
+        "border-foreground bg-background flex flex-col items-center justify-between gap-4 border-2 p-4 shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] lg:sticky lg:top-0 lg:z-10 lg:flex-row",
+        className,
+      )}
+    >
       <div className="max-w-[200px] truncate font-bold">{fileName}</div>
       <div className="flex gap-2">
         {isProcessing && (

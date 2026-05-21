@@ -68,7 +68,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   return (
     <Card
       className={cn(
-        "border-foreground bg-background hover:bg-muted relative flex cursor-pointer flex-col items-center justify-center border-2 border-dashed p-10 transition-all",
+        "border-foreground bg-background hover:bg-muted relative flex h-full min-h-64 w-full cursor-pointer flex-col items-center justify-center border-2 border-dashed p-8 transition-all sm:p-10",
         isDragging && "bg-accent scale-[0.99] border-solid",
         disabled && "hover:bg-background cursor-not-allowed opacity-50",
         className,

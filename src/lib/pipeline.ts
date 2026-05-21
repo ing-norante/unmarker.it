@@ -63,7 +63,7 @@ const assertNotAborted = (signal?: AbortSignal) => {
 
 export async function applyShake(
   ctx: CanvasRenderingContext2D,
-  image: HTMLImageElement,
+  image: CanvasImageSource,
   options: ProcessingOptions["shake"] = DEFAULT_OPTIONS.shake,
   signal?: AbortSignal,
 ) {

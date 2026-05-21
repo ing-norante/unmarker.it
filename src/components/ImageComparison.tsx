@@ -24,13 +24,13 @@ export function ImageComparison({
   };
 
   return (
-    <div className="mx-auto max-w-80 md:max-w-none grid gap-6 md:grid-cols-2">
+    <div className="grid gap-4 pb-2 md:grid-cols-2 md:gap-5">
       {/* Original */}
       <Card className="neobrutalist-card bg-background overflow-hidden">
         <div className="border-foreground border-b-2 bg-yellow-300 p-2 text-center text-sm font-bold text-black uppercase dark:bg-yellow-400">
           Original
         </div>
-        <div className="bg-muted/50 relative flex aspect-square items-center justify-center p-4">
+        <div className="bg-muted/50 relative flex h-48 items-center justify-center p-3 sm:h-52 lg:h-[min(32vh,13rem)]">
           <img
             src={originalImageUrl}
             alt="Original"
@@ -44,7 +44,7 @@ export function ImageComparison({
         <div className="border-foreground border-b-2 bg-green-300 p-2 text-center text-sm font-bold text-black uppercase dark:bg-green-400">
           {processedImageUrl ? "Processed Result" : "Preview"}
         </div>
-        <div className="bg-muted/50 relative flex aspect-square items-center justify-center p-4">
+        <div className="bg-muted/50 relative flex h-48 items-center justify-center p-3 sm:h-52 lg:h-[min(32vh,13rem)]">
           {processedImageUrl ? (
             <img
               src={processedImageUrl}
