@@ -16,11 +16,21 @@ export const DEFAULT_OPTIONS: ProcessingOptions = {
   },
 };
 
-// Gaussian random number generator using Box-Muller transform
-// More elegant and natural than uniform noise
-class GaussianRNG {
+export type RandomSource = () => number;
+
+export interface GaussianNoiseSource {
+  next(mean?: number, stdDev?: number): number;
+}
+
+// Gaussian random number generator using the Box-Muller transform.
+export class GaussianRNG implements GaussianNoiseSource {
   private spare: number | null = null;
   private hasSpare = false;
+  private readonly random: RandomSource;
+
+  constructor(random: RandomSource = Math.random) {
+    this.random = random;
+  }
 
   next(mean: number = 0, stdDev: number = 1): number {
     if (this.hasSpare) {
@@ -28,9 +38,9 @@ class GaussianRNG {
       return this.spare! * stdDev + mean;
     }
 
-    const u1 = Math.random();
-    const u2 = Math.random();
-    const mag = stdDev * Math.sqrt(-2.0 * Math.log(u1));
+    const u1 = Math.max(this.random(), Number.MIN_VALUE);
+    const u2 = this.random();
+    const mag = Math.sqrt(-2.0 * Math.log(u1));
     const z0 = mag * Math.cos(2.0 * Math.PI * u2);
     const z1 = mag * Math.sin(2.0 * Math.PI * u2);
 
@@ -38,16 +48,6 @@ class GaussianRNG {
     this.spare = z1;
     return z0 * stdDev + mean;
   }
-}
-
-// Batch random number generator for better performance
-function generateGaussianBatch(size: number, stdDev: number): Float32Array {
-  const rng = new GaussianRNG();
-  const batch = new Float32Array(size);
-  for (let i = 0; i < size; i++) {
-    batch[i] = rng.next(0, stdDev);
-  }
-  return batch;
 }
 
 const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -97,7 +97,7 @@ export async function applyShake(
     -scale * sin, // c: horizontal skewing
     scale * cos, // d: vertical scaling
     centerX - centerX * scale * cos + centerY * scale * sin, // e: horizontal translation
-    centerY - centerX * scale * sin - centerY * scale * cos // f: vertical translation
+    centerY - centerX * scale * sin - centerY * scale * cos, // f: vertical translation
   );
 
   ctx.imageSmoothingEnabled = true;
@@ -113,6 +113,7 @@ export async function applyStir(
   ctx: CanvasRenderingContext2D,
   options: ProcessingOptions["stir"] = DEFAULT_OPTIONS.stir,
   signal?: AbortSignal,
+  rng: GaussianNoiseSource = new GaussianRNG(),
 ) {
   assertNotAborted(signal);
   const { width, height } = ctx.canvas;
@@ -122,26 +123,32 @@ export async function applyStir(
   const data = imageData.data;
   const pixelCount = width * height;
 
-  // Pre-generate Gaussian noise in batches for better performance
-  // Use noiseAmplitude as standard deviation for Gaussian distribution
-  // Scale so 3σ ≈ amplitude (covers 99.7% of values)
+  // Scale so 3σ is roughly the configured amplitude.
   const stdDev = noiseAmplitude / 3;
-  const noiseR = generateGaussianBatch(pixelCount, stdDev);
-  const noiseG = generateGaussianBatch(pixelCount, stdDev);
-  const noiseB = generateGaussianBatch(pixelCount, stdDev);
 
-  // Optimized loop: process all channels in one pass
   const pixelsPerChunk = 65_536;
-  let noiseIdx = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    // Clamp with proper bounds checking
-    data[i] = Math.max(0, Math.min(255, data[i] + noiseR[noiseIdx]));
-    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noiseG[noiseIdx]));
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noiseB[noiseIdx]));
-    // Alpha channel (i + 3) remains unchanged
-    noiseIdx++;
+  for (
+    let pixelStart = 0;
+    pixelStart < pixelCount;
+    pixelStart += pixelsPerChunk
+  ) {
+    const pixelEnd = Math.min(pixelStart + pixelsPerChunk, pixelCount);
 
-    if (noiseIdx % pixelsPerChunk === 0) {
+    for (let pixel = pixelStart; pixel < pixelEnd; pixel++) {
+      const i = pixel * 4;
+      data[i] = Math.max(0, Math.min(255, data[i] + rng.next(0, stdDev)));
+      data[i + 1] = Math.max(
+        0,
+        Math.min(255, data[i + 1] + rng.next(0, stdDev)),
+      );
+      data[i + 2] = Math.max(
+        0,
+        Math.min(255, data[i + 2] + rng.next(0, stdDev)),
+      );
+      // Alpha channel (i + 3) remains unchanged.
+    }
+
+    if (pixelEnd < pixelCount) {
       assertNotAborted(signal);
       await nextTick();
     }

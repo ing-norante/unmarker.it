@@ -13,7 +13,7 @@ This README is based on the current code in this repository.
 1. `Gemini Scan`: detects the visible Gemini / Nano Banana sparkle watermark in the bottom-right corner using local OpenCV.js template matching
 2. `Gemini Restore`: when detected, reverses the logo alpha blend and repairs residual sparkle edges with local inpainting; this step is skipped when no mark is detected
 3. `shake`: small random rotate/scale affine transform
-4. `stir`: per-channel Gaussian noise (Box-Muller + typed arrays)
+4. `stir`: per-channel Gaussian noise (streamed Box-Muller samples)
 5. `crush`: JPEG recompression (default quality `0.85`)
 
 - UI stack is React 19 + TypeScript + Tailwind v4 + Radix primitives, built with Rolldown Vite
