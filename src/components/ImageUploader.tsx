@@ -14,12 +14,20 @@ interface ImageUploaderProps {
   onImageSelect: (file: File) => void;
   className?: string;
   disabled?: boolean;
+  accept?: string;
+  title?: string;
+  description?: string;
+  details?: React.ReactNode;
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImageSelect,
   className,
   disabled = false,
+  accept = "image/*",
+  title,
+  description,
+  details,
 }) => {
   const posthog = usePostHog();
   const [isDragging, setIsDragging] = useState(false);
@@ -49,7 +57,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       if (disabled) return;
 
       const files = Array.from(e.dataTransfer.files);
-      if (files.length > 0 && files[0].type.startsWith("image/")) {
+      if (files.length > 0) {
         onImageSelect(files[0]);
       }
     },
@@ -102,7 +110,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           id="file-upload"
           type="file"
           className="hidden"
-          accept="image/*"
+          accept={accept}
           onChange={handleFileChange}
           disabled={disabled}
         />
@@ -122,10 +130,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
           <div className="flex w-full max-w-lg min-w-0 flex-col gap-3 sm:gap-4">
             <p className="text-foreground text-xl font-black tracking-tight sm:text-2xl sm:tracking-[-0.055em] lg:text-3xl">
-              {isDragging ? "Drop your image" : "Drag an image"}
+              {isDragging ? "Drop your image" : (title ?? "Drag an image")}
             </p>
             <p className="text-muted-foreground text-sm leading-relaxed font-medium tracking-tight text-pretty sm:text-base lg:text-lg">
-              Drop it here, or click to select a file from your device.
+              {description ??
+                "Drop it here, or click to select a file from your device."}
             </p>
 
             <Button
@@ -136,12 +145,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               Choose Image
             </Button>
 
-            <div className="text-muted-foreground text-xs leading-6 font-medium sm:text-sm">
-              Supports JPG, JPEG, PNG, WebP
-              <br />
-              Max resolution:{" "}
-              <span className="text-primary font-bold">40 MPixels</span>
-            </div>
+            {details ?? (
+              <div className="text-muted-foreground text-xs leading-6 font-medium sm:text-sm">
+                Supports JPG, JPEG, PNG, WebP
+                <br />
+                Max resolution:{" "}
+                <span className="text-primary font-bold">40 MPixels</span>
+              </div>
+            )}
           </div>
 
           <div className="bg-background/70 text-muted-foreground mt-8 flex w-full max-w-lg min-w-0 items-start justify-center gap-2 px-3 py-2 text-center text-[11px] font-semibold sm:mt-12 sm:px-4 sm:text-xs lg:mt-20">

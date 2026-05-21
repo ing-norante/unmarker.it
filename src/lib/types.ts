@@ -1,3 +1,5 @@
+export type AppMode = "unmark" | "metadata";
+
 export type PipelineStepId =
   | "gemini-detect"
   | "gemini-restore"
@@ -32,6 +34,47 @@ export interface ProcessingOptions {
   crush?: {
     quality: number; // 0–1
   };
+}
+
+export type MetadataSignalType =
+  | "c2pa"
+  | "xmp"
+  | "exif"
+  | "png-text"
+  | "webp-metadata"
+  | "isobmff-box"
+  | "binary-marker";
+
+export type MetadataImageFormat =
+  | "png"
+  | "jpeg"
+  | "webp"
+  | "avif"
+  | "heif"
+  | "jxl"
+  | "unknown";
+
+export interface MetadataSignal {
+  type: MetadataSignalType;
+  label: string;
+  location: string;
+  marker?: string;
+  removable: boolean;
+}
+
+export interface MetadataScanResult {
+  hasAiMetadata: boolean;
+  format: MetadataImageFormat;
+  signals: MetadataSignal[];
+  warnings: string[];
+}
+
+export interface MetadataCleanResult {
+  blob: Blob;
+  fileName: string;
+  format: MetadataImageFormat;
+  removedCount: number;
+  warnings: string[];
 }
 
 export interface GeminiWatermarkRegion {

@@ -5,11 +5,20 @@ import { Header } from "@/components/Header";
 import { ActionBar } from "@/components/ActionBar";
 import { ImageComparison } from "@/components/ImageComparison";
 import { Footer } from "@/components/Footer";
+import { MetadataPanel } from "@/components/MetadataPanel";
+import { ModeSelector } from "@/components/ModeSelector";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { PipelineStepState, PipelineStepId } from "./lib/types";
+import type {
+  AppMode,
+  MetadataCleanResult,
+  MetadataScanResult,
+  PipelineStepState,
+  PipelineStepId,
+} from "./lib/types";
 import { toast } from "sonner";
 import {
   applyShake,
@@ -17,11 +26,28 @@ import {
   applyCrush,
   DEFAULT_OPTIONS,
 } from "./lib/pipeline";
+import {
+  canCleanMetadata,
+  cleanImageMetadata,
+  scanImageMetadata,
+} from "./lib/metadataCleaner";
 import { generateCameraLikeFilename } from "./lib/utils";
 import { processGeminiVisibleWatermark } from "./lib/geminiWorkerClient";
 import type { GeminiWorkerProgressStage } from "./lib/types";
 
+const MAX_FILE_SIZE_MB = 25;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const MAX_MEGAPIXELS = 40;
+const METADATA_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "avif",
+  "heic",
+  "heif",
+  "jxl",
+]);
 
 type StatusMessage = {
   variant: "default" | "destructive";
@@ -156,6 +182,7 @@ const createCanvasSnapshot = (canvas: HTMLCanvasElement) => {
 };
 
 function App() {
+  const [appMode, setAppMode] = useState<AppMode>("unmark");
   const [originalImage, setOriginalImage] = useState<File | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(
@@ -169,26 +196,56 @@ function App() {
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
   );
+  const [metadataScanResult, setMetadataScanResult] =
+    useState<MetadataScanResult | null>(null);
+  const [metadataCleanResult, setMetadataCleanResult] =
+    useState<MetadataCleanResult | null>(null);
+  const [metadataCleanUrl, setMetadataCleanUrl] = useState<string | null>(null);
+  const [isMetadataScanning, setIsMetadataScanning] = useState(false);
+  const [isMetadataCleaning, setIsMetadataCleaning] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const metadataScanJobRef = useRef(0);
 
   // Cleanup object URLs
   useEffect(() => {
     return () => {
       if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
       if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
+      if (metadataCleanUrl) URL.revokeObjectURL(metadataCleanUrl);
     };
-  }, [originalImageUrl, processedImageUrl]);
+  }, [originalImageUrl, processedImageUrl, metadataCleanUrl]);
 
   const handleImageSelect = async (file: File) => {
+    if (appMode === "metadata") {
+      await handleMetadataImageSelect(file);
+      return;
+    }
+
+    await handleUnmarkImageSelect(file);
+  };
+
+  const handleUnmarkImageSelect = async (file: File) => {
     setStatusMessage(null);
+    setMetadataScanResult(null);
+    setMetadataCleanResult(null);
+    setMetadataCleanUrl(null);
 
     if (!file.type.startsWith("image/")) {
       setStatusMessage({
         variant: "destructive",
         title: "Unsupported file type",
         description: "Please select a valid image file.",
+      });
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setStatusMessage({
+        variant: "destructive",
+        title: "File is too large",
+        description: `Please use an image up to ${MAX_FILE_SIZE_MB} MB.`,
       });
       return;
     }
@@ -226,6 +283,70 @@ function App() {
 
     // Reset steps
     setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
+  };
+
+  const handleMetadataImageSelect = async (file: File) => {
+    setStatusMessage(null);
+    setMetadataScanResult(null);
+    setMetadataCleanResult(null);
+    setMetadataCleanUrl(null);
+
+    if (!isMetadataFileCandidate(file)) {
+      setStatusMessage({
+        variant: "destructive",
+        title: "Unsupported file type",
+        description:
+          "Please select a PNG, JPEG, WebP, AVIF, HEIF, or JXL image file.",
+      });
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setStatusMessage({
+        variant: "destructive",
+        title: "File is too large",
+        description: `Please use an image up to ${MAX_FILE_SIZE_MB} MB.`,
+      });
+      return;
+    }
+
+    if (originalImageUrl) URL.revokeObjectURL(originalImageUrl);
+    if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
+
+    setOriginalImage(file);
+    setOriginalImageUrl(URL.createObjectURL(file));
+    setProcessedImageUrl(null);
+    setProcessedFileName(null);
+    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
+
+    const scanJob = metadataScanJobRef.current + 1;
+    metadataScanJobRef.current = scanJob;
+    setIsMetadataScanning(true);
+
+    try {
+      const result = await scanImageMetadata(file);
+      if (metadataScanJobRef.current !== scanJob) {
+        return;
+      }
+      setMetadataScanResult(result);
+      toast.success("Metadata scan complete.");
+    } catch (error) {
+      if (metadataScanJobRef.current !== scanJob) {
+        return;
+      }
+      console.error("Metadata scan failed", error);
+      setStatusMessage({
+        variant: "destructive",
+        title: "Could not scan metadata",
+        description:
+          "This file could not be read safely. Try another image and retry.",
+      });
+      toast.error("Could not scan metadata.");
+    } finally {
+      if (metadataScanJobRef.current === scanJob) {
+        setIsMetadataScanning(false);
+      }
+    }
   };
 
   const updateStep = (
@@ -363,13 +484,72 @@ function App() {
 
   const reset = () => {
     abortControllerRef.current?.abort();
+    metadataScanJobRef.current += 1;
     setOriginalImage(null);
     setOriginalImageUrl(null);
     setProcessedImageUrl(null);
     setProcessedFileName(null);
+    setMetadataScanResult(null);
+    setMetadataCleanResult(null);
+    setMetadataCleanUrl(null);
+    setIsMetadataScanning(false);
+    setIsMetadataCleaning(false);
     setStatusMessage(null);
     setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "idle", progress: 0 })));
   };
+
+  const handleModeChange = (mode: AppMode) => {
+    if (mode === appMode) {
+      return;
+    }
+
+    reset();
+    setAppMode(mode);
+  };
+
+  const downloadCleanCopy = async () => {
+    if (!originalImage || !metadataScanResult || isMetadataCleaning) {
+      return;
+    }
+
+    setStatusMessage(null);
+    setIsMetadataCleaning(true);
+
+    try {
+      const result = await cleanImageMetadata(originalImage);
+
+      if (result.removedCount === 0) {
+        setStatusMessage({
+          variant: "default",
+          title: "No cleanup needed",
+          description:
+            "No removable AI metadata was found for this file and format.",
+        });
+        toast("No cleanup needed.");
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(result.blob);
+      setMetadataCleanResult(result);
+      setMetadataCleanUrl(objectUrl);
+      triggerDownload(objectUrl, result.fileName);
+      toast.success("Clean copy downloaded.");
+    } catch (error) {
+      console.error("Metadata clean failed", error);
+      setStatusMessage({
+        variant: "destructive",
+        title: "Could not clean metadata",
+        description:
+          "The metadata cleaner could not produce a safe clean copy for this file.",
+      });
+      toast.error("Could not clean metadata.");
+    } finally {
+      setIsMetadataCleaning(false);
+    }
+  };
+
+  const metadataCanDownloadClean = canCleanMetadata(metadataScanResult);
+  const modeBusy = isProcessing || isMetadataScanning || isMetadataCleaning;
 
   return (
     <div className="bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex min-h-dvh p-0 font-sans lg:px-8">
@@ -382,23 +562,38 @@ function App() {
             {/* Hero + pipeline: one column on desktop; hero pinned, steps scroll below */}
             <div className="contents lg:col-start-1 lg:flex lg:min-h-0 lg:flex-col lg:gap-4">
               <Header className="order-1 shrink-0 lg:order-0" />
+              <ModeSelector
+                mode={appMode}
+                onModeChange={handleModeChange}
+                disabled={modeBusy}
+                className="order-2 shrink-0 lg:order-0"
+              />
 
               <aside className="order-3 flex min-h-0 flex-col gap-4 lg:order-0 lg:flex-1">
                 <div className="flex items-center gap-4">
                   <h2 className="text-muted-foreground shrink-0 text-base font-black tracking-[-0.02em]">
-                    PIPELINE
+                    {appMode === "unmark" ? "PIPELINE" : "METADATA"}
                   </h2>
                   <Separator className="flex-1" />
                 </div>
 
                 <ScrollArea className="min-h-0 flex-1 lg:overscroll-contain">
-                  <PipelineSteps steps={steps} />
+                  {appMode === "unmark" ? (
+                    <>
+                      <PipelineSteps steps={steps} />
 
-                  {isProcessing && (
-                    <div className="bg-card text-card-foreground mt-4 flex flex-col gap-2 border p-3 text-sm">
-                      <span>Processing in progress...</span>
-                      <Skeleton className="h-1 w-full" />
-                    </div>
+                      {isProcessing && (
+                        <div className="bg-card text-card-foreground mt-4 flex flex-col gap-2 border p-3 text-sm">
+                          <span>Processing in progress...</span>
+                          <Skeleton className="h-1 w-full" />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <MetadataSidebar
+                      result={metadataScanResult}
+                      isScanning={isMetadataScanning}
+                    />
                   )}
                 </ScrollArea>
               </aside>
@@ -422,12 +617,27 @@ function App() {
                 <div className="flex min-h-[min(62vh,50rem)] flex-col lg:min-h-[min(70vh,50rem)] lg:flex-1">
                   <ImageUploader
                     onImageSelect={handleImageSelect}
+                    accept={"image/*"}
+                    title="Drag an image"
+                    description={
+                      "Drop it here, or click to select a file from your device."
+                    }
+                    details={
+                      <div className="text-muted-foreground text-xs leading-6 font-medium sm:text-sm">
+                        Supports JPG, JPEG, PNG, WebP
+                        <br />
+                        Max resolution:{" "}
+                        <span className="text-primary font-bold">
+                          40 MPixels
+                        </span>
+                      </div>
+                    }
                     className="min-h-[min(62vh,50rem)] flex-1 lg:min-h-[min(70vh,50rem)]"
                   />
                 </div>
               )}
 
-              {originalImage && (
+              {originalImage && appMode === "unmark" && (
                 <div className="animate-in fade-in slide-in-from-bottom-4 flex flex-col gap-4 duration-500 lg:min-h-0 lg:flex-1">
                   <ActionBar
                     fileName={originalImage.name}
@@ -449,6 +659,22 @@ function App() {
                 </div>
               )}
 
+              {originalImage && appMode === "metadata" && (
+                <ScrollArea className="lg:min-h-0 lg:flex-1 lg:overscroll-contain">
+                  <MetadataPanel
+                    file={originalImage}
+                    fileUrl={originalImageUrl}
+                    scanResult={metadataScanResult}
+                    cleanResult={metadataCleanResult}
+                    isScanning={isMetadataScanning}
+                    isCleaning={isMetadataCleaning}
+                    canDownloadClean={metadataCanDownloadClean}
+                    onReset={reset}
+                    onDownloadClean={downloadCleanCopy}
+                  />
+                </ScrollArea>
+              )}
+
               <canvas ref={canvasRef} className="hidden" />
             </section>
           </main>
@@ -462,6 +688,56 @@ function App() {
 }
 
 export default App;
+
+function MetadataSidebar({
+  result,
+  isScanning,
+}: {
+  result: MetadataScanResult | null;
+  isScanning: boolean;
+}) {
+  const signalCount = result?.signals.length ?? 0;
+
+  return (
+    <div className="bg-card text-card-foreground flex flex-col gap-3 border p-3 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-bold">
+          {isScanning ? "Scanning" : result ? "Scan complete" : "Idle"}
+        </span>
+        <Badge variant="outline">{result?.format ?? "none"}</Badge>
+      </div>
+      <p className="text-muted-foreground text-xs leading-relaxed">
+        {result
+          ? `${signalCount} AI metadata signal${signalCount === 1 ? "" : "s"} found.`
+          : "Upload a file to scan."}
+      </p>
+      {isScanning && <Skeleton className="h-1 w-full" />}
+    </div>
+  );
+}
+
+function isMetadataFileCandidate(file: File) {
+  if (file.type.startsWith("image/")) {
+    return true;
+  }
+
+  const dot = file.name.lastIndexOf(".");
+  if (dot < 0) {
+    return false;
+  }
+
+  return METADATA_EXTENSIONS.has(file.name.slice(dot + 1).toLowerCase());
+}
+
+function triggerDownload(url: string, fileName: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
 
 function updateGeminiProgress(
   stage: GeminiWorkerProgressStage,
