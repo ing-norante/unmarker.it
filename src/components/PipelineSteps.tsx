@@ -40,6 +40,8 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
                     "animate-pulse bg-yellow-300 text-black dark:bg-yellow-400",
                   step.status === "done" &&
                     "bg-green-400 text-black dark:bg-green-500",
+                  step.status === "skipped" &&
+                    "bg-muted text-muted-foreground border-foreground/50",
                   step.status === "error" &&
                     "bg-red-400 text-white dark:bg-red-500",
                 )}
@@ -73,6 +75,10 @@ const StepIcon = ({ status }: { status: PipelineStepState["status"] }) => {
         <div className="bg-foreground text-background rounded-full p-1">
           <Check className="h-4 w-4" />
         </div>
+      );
+    case "skipped":
+      return (
+        <div className="border-foreground h-6 w-6 rounded-full border-2 opacity-60" />
       );
     case "running":
       return <Loader2 className="h-6 w-6 animate-spin" />;

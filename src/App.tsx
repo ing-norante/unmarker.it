@@ -14,6 +14,8 @@ import {
   DEFAULT_OPTIONS,
 } from "./lib/pipeline";
 import { generateCameraLikeFilename } from "./lib/utils";
+import { processGeminiVisibleWatermark } from "./lib/geminiWorkerClient";
+import type { GeminiWorkerProgressStage } from "./lib/types";
 
 const MAX_FILE_SIZE_MB = 25;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -26,6 +28,22 @@ type StatusMessage = {
 };
 
 const INITIAL_STEPS: PipelineStepState[] = [
+  {
+    id: "gemini-detect",
+    label: "Gemini Scan",
+    description:
+      "We scan the bottom-right corner for the Gemini / Nano Banana sparkle logo using a local OpenCV.js worker.",
+    status: "idle",
+    progress: 0,
+  },
+  {
+    id: "gemini-restore",
+    label: "Gemini Restore",
+    description:
+      "When detected, we reverse the logo alpha blend and repair residual sparkle edges with local inpainting.",
+    status: "idle",
+    progress: 0,
+  },
   {
     id: "shake",
     label: "Shake (Geometry)",
@@ -121,6 +139,18 @@ const loadImageFromFile = async (file: File, signal?: AbortSignal) => {
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+};
+
+const createCanvasSnapshot = (canvas: HTMLCanvasElement) => {
+  const snapshot = document.createElement("canvas");
+  snapshot.width = canvas.width;
+  snapshot.height = canvas.height;
+  const snapshotCtx = snapshot.getContext("2d");
+  if (!snapshotCtx) {
+    throw new Error("Could not create canvas snapshot");
+  }
+  snapshotCtx.drawImage(canvas, 0, 0);
+  return snapshot;
 };
 
 function App() {
@@ -233,19 +263,43 @@ function App() {
       const canvas = canvasRef.current;
       canvas.width = img.width;
       canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
       if (!ctx) throw new Error("Could not get canvas context");
 
-      // --- Step 1: Shake ---
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // --- Step 1: Gemini Scan / Restore ---
+      updateStep("gemini-detect", { status: "running", progress: 10 });
+      const geminiResult = await processGeminiVisibleWatermark(
+        ctx.getImageData(0, 0, canvas.width, canvas.height),
+        {
+          signal,
+          onProgress: (stage) => {
+            updateGeminiProgress(stage, updateStep);
+          },
+        },
+      );
+      assertNotAborted(signal);
+
+      ctx.putImageData(geminiResult.imageData, 0, 0);
+      updateStep("gemini-detect", { status: "done", progress: 100 });
+      updateStep("gemini-restore", {
+        status: geminiResult.skipped ? "skipped" : "done",
+        progress: 100,
+      });
+
+      // --- Step 2: Shake ---
       updateStep("shake", { status: "running", progress: 10 });
       await delay(500, signal); // Artificial delay for UX
 
-      await applyShake(ctx, img, DEFAULT_OPTIONS.shake, signal);
+      const shakeSource = createCanvasSnapshot(canvas);
+      await applyShake(ctx, shakeSource, DEFAULT_OPTIONS.shake, signal);
 
       updateStep("shake", { status: "done", progress: 100 });
 
-      // --- Step 2: Stir ---
+      // --- Step 3: Stir ---
       updateStep("stir", { status: "running", progress: 10 });
       await delay(500, signal);
 
@@ -253,7 +307,7 @@ function App() {
 
       updateStep("stir", { status: "done", progress: 100 });
 
-      // --- Step 3: Crush ---
+      // --- Step 4: Crush ---
       updateStep("crush", { status: "running", progress: 10 });
       await delay(500, signal);
 
@@ -400,3 +454,37 @@ function App() {
 }
 
 export default App;
+
+function updateGeminiProgress(
+  stage: GeminiWorkerProgressStage,
+  updateStep: (id: PipelineStepId, update: Partial<PipelineStepState>) => void,
+) {
+  switch (stage) {
+    case "loading-opencv":
+      updateStep("gemini-detect", { status: "running", progress: 20 });
+      break;
+    case "loading-alpha":
+      updateStep("gemini-detect", { status: "running", progress: 35 });
+      break;
+    case "detecting":
+      updateStep("gemini-detect", { status: "running", progress: 70 });
+      break;
+    case "restoring":
+      updateStep("gemini-detect", { status: "done", progress: 100 });
+      updateStep("gemini-restore", { status: "running", progress: 35 });
+      break;
+    case "inpainting":
+      updateStep("gemini-restore", { status: "running", progress: 75 });
+      break;
+    case "skipped":
+      updateStep("gemini-detect", { status: "done", progress: 100 });
+      updateStep("gemini-restore", { status: "skipped", progress: 100 });
+      break;
+    case "done":
+      updateStep("gemini-restore", { status: "done", progress: 100 });
+      break;
+    case "error":
+      updateStep("gemini-restore", { status: "error", progress: 100 });
+      break;
+  }
+}
