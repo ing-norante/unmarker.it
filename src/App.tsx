@@ -17,9 +17,9 @@ import { useMetadataWorkflow } from "@/hooks/useMetadataWorkflow";
 import { useObjectUrl } from "@/hooks/useObjectUrl";
 import { useUnmarkPipeline } from "@/hooks/useUnmarkPipeline";
 import {
-  MAX_MEGAPIXELS,
-  validateMetadataFile,
-  validateUnmarkFile,
+  getFileModePolicy,
+  validateFileForMode,
+  type FileModePolicy,
 } from "@/lib/fileValidation";
 import type { AppMode, MetadataScanResult, StatusMessage } from "@/lib/types";
 
@@ -64,6 +64,7 @@ function App() {
     originalImage,
     setStatusMessage,
   });
+  const filePolicy = getFileModePolicy(appMode);
 
   const reset = () => {
     resetPipeline();
@@ -83,43 +84,21 @@ function App() {
   };
 
   const handleImageSelect = async (file: File) => {
+    setStatusMessage(null);
+    resetMetadataWorkflow();
+
+    const validation = await validateFileForMode(appMode, file);
+    if (!validation.ok) {
+      setStatusMessage(validation.statusMessage);
+      return;
+    }
+
+    resetPipeline();
+    setOriginalImage(file);
+    setOriginalImageUrl(file);
     if (appMode === "metadata") {
-      await handleMetadataImageSelect(file);
-      return;
+      await scanMetadata(file);
     }
-
-    await handleUnmarkImageSelect(file);
-  };
-
-  const handleUnmarkImageSelect = async (file: File) => {
-    setStatusMessage(null);
-    resetMetadataWorkflow();
-
-    const validation = await validateUnmarkFile(file);
-    if (!validation.ok) {
-      setStatusMessage(validation.statusMessage);
-      return;
-    }
-
-    resetPipeline();
-    setOriginalImage(file);
-    setOriginalImageUrl(file);
-  };
-
-  const handleMetadataImageSelect = async (file: File) => {
-    setStatusMessage(null);
-    resetMetadataWorkflow();
-
-    const validation = validateMetadataFile(file);
-    if (!validation.ok) {
-      setStatusMessage(validation.statusMessage);
-      return;
-    }
-
-    resetPipeline();
-    setOriginalImage(file);
-    setOriginalImageUrl(file);
-    await scanMetadata(file);
   };
 
   const modeBusy = isProcessing || isMetadataScanning || isMetadataCleaning;
@@ -195,21 +174,12 @@ function App() {
                 <div className="flex min-h-[min(62vh,50rem)] flex-col lg:min-h-[min(70vh,50rem)] lg:flex-1">
                   <ImageUploader
                     onImageSelect={handleImageSelect}
-                    accept={"image/*"}
+                    accept={filePolicy.accept}
                     title="Drag an image"
                     description={
                       "Drop it here, or click to select a file from your device."
                     }
-                    details={
-                      <div className="text-muted-foreground text-xs leading-6 font-medium sm:text-sm">
-                        Supports JPG, JPEG, PNG, WebP
-                        <br />
-                        Max resolution:{" "}
-                        <span className="text-primary font-bold">
-                          {MAX_MEGAPIXELS} MPixels
-                        </span>
-                      </div>
-                    }
+                    details={<FilePolicyDetails policy={filePolicy} />}
                     className="min-h-[min(62vh,50rem)] flex-1 lg:min-h-[min(70vh,50rem)]"
                   />
                 </div>
@@ -266,6 +236,19 @@ function App() {
 }
 
 export default App;
+
+function FilePolicyDetails({ policy }: { policy: FileModePolicy }) {
+  return (
+    <div className="text-muted-foreground text-xs leading-6 font-medium sm:text-sm">
+      <span>{policy.supportedCopy}</span>
+      {policy.limitCopy.map((limit) => (
+        <span key={limit} className="block">
+          {limit}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function MetadataSidebar({
   result,

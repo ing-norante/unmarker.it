@@ -15,6 +15,7 @@ import {
 } from "./ui/empty";
 import { DownloadSimpleIcon, ImageSquareIcon } from "@phosphor-icons/react";
 import { usePostHog } from "posthog-js/react";
+import { trackAction } from "@/lib/analytics";
 
 interface ImageComparisonProps {
   originalImageUrl: string;
@@ -30,10 +31,7 @@ export function ImageComparison({
   const posthog = usePostHog();
 
   const handleDownload = () => {
-    posthog?.capture("action_clicked", {
-      action: "download_processed",
-      component: "image_comparison",
-    });
+    trackAction(posthog, "download_processed", "image_comparison");
   };
 
   return (

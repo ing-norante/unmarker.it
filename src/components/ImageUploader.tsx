@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useId, useRef, useState } from "react";
 import {
   FileImageIcon,
   ImageSquareIcon,
@@ -6,6 +6,7 @@ import {
   UploadSimpleIcon,
 } from "@phosphor-icons/react";
 import { usePostHog } from "posthog-js/react";
+import { trackAction } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,41 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   details,
 }) => {
   const posthog = usePostHog();
+  const fileInputId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const selectFile = useCallback(
+    (file: File) => {
+      trackAction(posthog, "upload_image", "uploader");
+      onImageSelect(file);
+    },
+    [onImageSelect, posthog],
+  );
+
+  const openFileDialog = useCallback(() => {
+    if (disabled) {
+      return;
+    }
+
+    fileInputRef.current?.click();
+  }, [disabled]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.target !== e.currentTarget) {
+        return;
+      }
+
+      if (e.key !== "Enter" && e.key !== " ") {
+        return;
+      }
+
+      e.preventDefault();
+      openFileDialog();
+    },
+    [openFileDialog],
+  );
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -58,10 +93,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
-        onImageSelect(files[0]);
+        selectFile(files[0]);
       }
     },
-    [onImageSelect, disabled],
+    [selectFile, disabled],
   );
 
   const handleFileChange = useCallback(
@@ -69,18 +104,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       if (disabled) return;
       const files = e.target.files;
       if (files && files.length > 0) {
-        posthog?.capture("action_clicked", {
-          action: "upload_image",
-          component: "uploader",
-        });
-        onImageSelect(files[0]);
+        selectFile(files[0]);
       }
     },
-    [onImageSelect, disabled, posthog],
+    [selectFile, disabled],
   );
 
   return (
     <Card
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-controls={fileInputId}
+      aria-disabled={disabled}
       className={cn(
         "group bg-card text-card-foreground hover:bg-muted/30 relative flex h-full min-h-64 w-full min-w-0 cursor-pointer overflow-hidden border-0 p-4 ring-0 transition-colors sm:p-6",
         isDragging && "bg-primary/10",
@@ -90,15 +125,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onClick={() => {
-        if (!disabled) {
-          posthog?.capture("action_clicked", {
-            action: "upload_image",
-            component: "uploader",
-          });
-          document.getElementById("file-upload")?.click();
-        }
-      }}
+      onClick={openFileDialog}
+      onKeyDown={handleKeyDown}
     >
       <div
         className={cn(
@@ -107,7 +135,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         )}
       >
         <input
-          id="file-upload"
+          ref={fileInputRef}
+          id={fileInputId}
           type="file"
           className="hidden"
           accept={accept}
@@ -140,19 +169,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <Button
               type="button"
               className="mt-1 h-10 w-full gap-2 px-5 font-black sm:mt-3 sm:w-auto"
+              disabled={disabled}
             >
               <ImageSquareIcon data-icon="inline-start" />
               Choose Image
             </Button>
 
-            {details ?? (
-              <div className="text-muted-foreground text-xs leading-6 font-medium sm:text-sm">
-                Supports JPG, JPEG, PNG, WebP
-                <br />
-                Max resolution:{" "}
-                <span className="text-primary font-bold">40 MPixels</span>
-              </div>
-            )}
+            {details}
           </div>
 
           <div className="bg-background/70 text-muted-foreground mt-8 flex w-full max-w-lg min-w-0 items-start justify-center gap-2 px-3 py-2 text-center text-[11px] font-semibold sm:mt-12 sm:px-4 sm:text-xs lg:mt-20">

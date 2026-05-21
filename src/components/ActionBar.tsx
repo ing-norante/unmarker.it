@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react";
 import { Spinner } from "./ui/spinner";
 import { usePostHog } from "posthog-js/react";
+import { trackAction } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 interface ActionBarProps {
@@ -31,26 +32,17 @@ export function ActionBar({
   const posthog = usePostHog();
 
   const handleReset = () => {
-    posthog?.capture("action_clicked", {
-      action: "reset",
-      component: "action_bar",
-    });
+    trackAction(posthog, "reset", "action_bar");
     onReset();
   };
 
   const handleProcess = () => {
-    posthog?.capture("action_clicked", {
-      action: "process_image",
-      component: "action_bar",
-    });
+    trackAction(posthog, "process_image", "action_bar");
     onProcess();
   };
 
   const handleCancel = () => {
-    posthog?.capture("action_clicked", {
-      action: "cancel_processing",
-      component: "action_bar",
-    });
+    trackAction(posthog, "cancel_processing", "action_bar");
     onCancel();
   };
 

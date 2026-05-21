@@ -4,26 +4,32 @@ import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import {
   AtomIcon,
+  BookOpenIcon,
   FrameCornersIcon,
   LightningIcon,
+  NewspaperIcon,
 } from "@phosphor-icons/react";
+import { trackAction } from "@/lib/analytics";
 
 export function Footer() {
   const posthog = usePostHog();
 
   const handleFeatureBoardClick = () => {
-    posthog?.capture("action_clicked", {
-      action: "feature_board_link",
-      component: "footer",
-    });
+    trackAction(posthog, "feature_board_link", "footer");
   };
 
   const handleGithubClick = () => {
-    posthog?.capture("action_clicked", {
-      action: "github_repo_link",
-      component: "footer",
-    });
+    trackAction(posthog, "github_repo_link", "footer");
   };
+
+  const handleArxivClick = () => {
+    trackAction(posthog, "research_arxiv_link", "footer");
+  };
+
+  const handleWaterlooClick = () => {
+    trackAction(posthog, "research_waterloo_link", "footer");
+  };
+
   return (
     <footer className="bg-background shrink-0 border-t px-7 py-8">
       <div className="flex flex-col items-center justify-between gap-5 md:flex-row">
@@ -61,6 +67,30 @@ export function Footer() {
               >
                 <FrameCornersIcon data-icon="inline-start" />
                 Canvas API
+              </a>
+            </Button>
+            <Button asChild variant="outline" className="h-10">
+              <a
+                href="https://arxiv.org/abs/2405.08363"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="UnMarker: A Universal Attack on Defensive Image Watermarking"
+                onClick={handleArxivClick}
+              >
+                <BookOpenIcon data-icon="inline-start" />
+                arXiv
+              </a>
+            </Button>
+            <Button asChild variant="outline" className="h-10">
+              <a
+                href="https://uwaterloo.ca/news/media/watermarks-offer-no-defense-against-deepfakes"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Watermarks offer no defense against deepfakes"
+                onClick={handleWaterlooClick}
+              >
+                <NewspaperIcon data-icon="inline-start" />
+                UWaterloo
               </a>
             </Button>
             <ThemeToggle />

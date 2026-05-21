@@ -108,6 +108,13 @@ src/
 - Output is always lossy JPEG (original format/metadata are not preserved).
 - Automated tests currently cover shared Gemini watermark helpers.
 
+## References
+
+Sources that informed the design of this tool:
+
+- [UnMarker: A Universal Attack on Defensive Image Watermarking](https://arxiv.org/abs/2405.08363) — research background
+- [Watermarks offer no defense against deepfakes](https://uwaterloo.ca/news/media/watermarks-offer-no-defense-against-deepfakes) — University of Waterloo coverage
+
 ## License
 
 [MIT](LICENSE)

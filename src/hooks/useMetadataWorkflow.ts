@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useObjectUrl } from "@/hooks/useObjectUrl";
+import { triggerBrowserDownload } from "@/lib/download";
 import {
   canCleanMetadata,
   cleanImageMetadata,
@@ -114,7 +115,7 @@ export function useMetadataWorkflow({
       setMetadataCleanResult(result);
 
       if (objectUrl) {
-        triggerDownload(objectUrl, result.fileName);
+        triggerBrowserDownload(objectUrl, result.fileName);
       }
       toast.success("Clean copy downloaded.");
     } catch (error) {
@@ -149,14 +150,4 @@ export function useMetadataWorkflow({
     downloadCleanCopy,
     resetMetadataWorkflow,
   };
-}
-
-function triggerDownload(url: string, fileName: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
 }

@@ -13,6 +13,7 @@ import {
   resetRunningPipelineSteps,
   updateGeminiProgress,
 } from "@/lib/pipelineSteps";
+import { withObjectUrl } from "@/lib/objectUrl";
 import type {
   PipelineStepId,
   PipelineStepState,
@@ -254,9 +255,7 @@ const loadImageFromFile = async (file: File, signal?: AbortSignal) => {
   assertNotAborted(signal);
 
   const img = new Image();
-  const objectUrl = URL.createObjectURL(file);
-
-  try {
+  return withObjectUrl(file, async (objectUrl) => {
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
       img.onerror = () => reject(new Error("Failed to load image"));
@@ -264,9 +263,7 @@ const loadImageFromFile = async (file: File, signal?: AbortSignal) => {
     });
     assertNotAborted(signal);
     return img;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+  });
 };
 
 const createCanvasSnapshot = (canvas: HTMLCanvasElement) => {
