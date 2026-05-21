@@ -121,7 +121,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <p className="text-foreground text-3xl font-black tracking-[-0.055em]">
               {isDragging ? "Drop your image" : "Drag an image"}
             </p>
-            <p className="text-muted-foreground mx-auto max-w-md text-lg leading-relaxed font-medium tracking-[-0.025em]">
+            <p className="text-muted-foreground mx-auto max-w-md text-lg leading-relaxed font-medium tracking-tight">
               Drop it here, or click to select a file from your device.
             </p>
 
