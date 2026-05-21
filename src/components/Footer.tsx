@@ -72,7 +72,7 @@ export function Footer() {
               onClick={handleFeatureBoardClick}
               className="border-foreground bg-yellow-300 text-black hover:bg-yellow-400 border-2 px-3 py-1 text-sm font-black transition-colors"
             >
-              Feature Board
+              Feedback
             </a>
             <span className="text-sm font-medium tracking-wide">
               Crafted by
