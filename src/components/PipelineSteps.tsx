@@ -22,7 +22,7 @@ interface PipelineStepsProps {
 export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
   return (
     <div className="w-full space-y-2">
-      {steps.map((step, index) => (
+      {steps.map((step) => (
         <Card
           key={step.id}
           size="sm"
@@ -33,11 +33,7 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
               : "hover:bg-muted/40",
           )}
         >
-          <CardContent className="grid grid-cols-[1.75rem_3rem_minmax(0,1fr)] items-center gap-2.5 p-2.5 sm:grid-cols-[2rem_3.25rem_minmax(0,1fr)_4.35rem] sm:gap-3">
-            <div className="bg-background text-muted-foreground flex size-7 items-center justify-center border text-sm font-semibold">
-              {index + 1}
-            </div>
-
+          <CardContent className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-2.5 p-2.5 sm:grid-cols-[3.25rem_minmax(0,1fr)_4.35rem] sm:gap-3">
             <div className="bg-muted text-foreground flex size-12 items-center justify-center border">
               <StepGlyph id={step.id} status={step.status} />
             </div>

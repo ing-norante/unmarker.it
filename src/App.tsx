@@ -392,7 +392,6 @@ function App() {
                   <h2 className="text-muted-foreground shrink-0 text-base font-black tracking-[-0.02em]">
                     PIPELINE
                   </h2>
-                  <div className="bg-border h-px flex-1" />
                 </div>
 
                 <div className="min-h-0 flex-1 lg:overflow-y-auto lg:overscroll-contain">
