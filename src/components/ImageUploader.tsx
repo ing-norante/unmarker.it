@@ -74,7 +74,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   return (
     <Card
       className={cn(
-        "group bg-card text-card-foreground hover:bg-muted/30 relative flex h-full min-h-64 w-full cursor-pointer overflow-hidden border-0 p-6 ring-0 transition-colors",
+        "group bg-card text-card-foreground hover:bg-muted/30 relative flex h-full min-h-64 w-full min-w-0 cursor-pointer overflow-hidden border-0 p-4 ring-0 transition-colors sm:p-6",
         isDragging && "bg-primary/10",
         disabled && "cursor-not-allowed opacity-50",
         className,
@@ -94,7 +94,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     >
       <div
         className={cn(
-          "border-primary/50 flex min-h-full w-full flex-1 flex-col items-center justify-center border border-dashed px-6 py-12 text-center sm:px-10",
+          "border-primary/50 flex min-h-full w-full min-w-0 flex-1 flex-col items-center justify-center border border-dashed px-4 py-8 text-center sm:px-6 sm:py-12 lg:px-10",
           isDragging && "border-primary",
         )}
       >
@@ -106,31 +106,37 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           onChange={handleFileChange}
           disabled={disabled}
         />
-        <div className="flex flex-col items-center lg:translate-y-12">
-          <div className="mb-9 flex flex-col items-center">
-            <div className="bg-muted text-foreground group-hover:bg-accent relative flex size-28 items-center justify-center border transition-colors">
+        <div className="flex w-full min-w-0 flex-col items-center lg:translate-y-12">
+          <div className="mb-6 flex flex-col items-center sm:mb-9">
+            <div className="bg-muted text-foreground group-hover:bg-accent relative flex size-20 items-center justify-center border transition-colors sm:size-28">
               {isDragging ? (
-                <FileImageIcon className="size-14" weight="bold" />
+                <FileImageIcon className="size-10 sm:size-14" weight="bold" />
               ) : (
-                <UploadSimpleIcon className="size-14" weight="bold" />
+                <UploadSimpleIcon
+                  className="size-10 sm:size-14"
+                  weight="bold"
+                />
               )}
             </div>
           </div>
 
-          <div className="flex max-w-lg flex-col gap-4">
-            <p className="text-foreground text-3xl font-black tracking-[-0.055em]">
+          <div className="flex w-full max-w-lg min-w-0 flex-col gap-3 sm:gap-4">
+            <p className="text-foreground text-xl font-black tracking-tight sm:text-2xl sm:tracking-[-0.055em] lg:text-3xl">
               {isDragging ? "Drop your image" : "Drag an image"}
             </p>
-            <p className="text-muted-foreground mx-auto max-w-md text-lg leading-relaxed font-medium tracking-tight">
+            <p className="text-muted-foreground text-sm leading-relaxed font-medium tracking-tight text-pretty sm:text-base lg:text-lg">
               Drop it here, or click to select a file from your device.
             </p>
 
-            <Button type="button" className="mt-3 h-10 gap-2 px-5 font-black">
+            <Button
+              type="button"
+              className="mt-1 h-10 w-full gap-2 px-5 font-black sm:mt-3 sm:w-auto"
+            >
               <ImageSquareIcon data-icon="inline-start" />
               Choose Image
             </Button>
 
-            <div className="text-muted-foreground text-sm leading-6 font-medium">
+            <div className="text-muted-foreground text-xs leading-6 font-medium sm:text-sm">
               Supports JPG, JPEG, PNG, WebP
               <br />
               Max resolution:{" "}
@@ -138,9 +144,12 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             </div>
           </div>
 
-          <div className="bg-background/70 text-muted-foreground mt-20 inline-flex max-w-full items-center gap-2 px-4 py-2 text-xs font-semibold">
-            <LockKeyIcon className="size-4 shrink-0" weight="bold" />
-            <span className="truncate">
+          <div className="bg-background/70 text-muted-foreground mt-8 flex w-full max-w-lg min-w-0 items-start justify-center gap-2 px-3 py-2 text-center text-[11px] font-semibold sm:mt-12 sm:px-4 sm:text-xs lg:mt-20">
+            <LockKeyIcon
+              className="mt-0.5 size-3.5 shrink-0 sm:size-4"
+              weight="bold"
+            />
+            <span className="text-pretty">
               Your image is never uploaded. Everything runs locally in your
               browser.
             </span>
