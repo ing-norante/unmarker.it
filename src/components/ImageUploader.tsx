@@ -74,8 +74,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   return (
     <Card
       className={cn(
-        "group bg-card text-card-foreground hover:bg-muted/30 relative flex h-full min-h-64 w-full cursor-pointer overflow-hidden border p-6 transition-colors",
-        isDragging && "border-primary bg-primary/10 ring-primary/20 ring-3",
+        "group bg-card text-card-foreground hover:bg-muted/30 relative flex h-full min-h-64 w-full cursor-pointer overflow-hidden border-0 p-6 ring-0 transition-colors",
+        isDragging && "bg-primary/10",
         disabled && "cursor-not-allowed opacity-50",
         className,
       )}
@@ -92,7 +92,12 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         }
       }}
     >
-      <div className="border-primary/50 flex min-h-full w-full flex-1 flex-col items-center justify-center border border-dashed px-6 py-12 text-center sm:px-10">
+      <div
+        className={cn(
+          "border-primary/50 flex min-h-full w-full flex-1 flex-col items-center justify-center border border-dashed px-6 py-12 text-center sm:px-10",
+          isDragging && "border-primary",
+        )}
+      >
         <input
           id="file-upload"
           type="file"
@@ -114,10 +119,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
           <div className="flex max-w-lg flex-col gap-4">
             <p className="text-foreground text-3xl font-black tracking-[-0.055em]">
-              {isDragging ? "Drop your image" : "Upload an image"}
+              {isDragging ? "Drop your image" : "Drag an image"}
             </p>
             <p className="text-muted-foreground mx-auto max-w-md text-lg leading-relaxed font-medium tracking-[-0.025em]">
-              Drop an image here, or click to select a file from your device.
+              Drop it here, or click to select a file from your device.
             </p>
 
             <Button type="button" className="mt-3 h-10 gap-2 px-5 font-black">
@@ -128,11 +133,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <div className="text-muted-foreground text-sm leading-6 font-medium">
               Supports JPG, JPEG, PNG, WebP
               <br />
-              Max size: 25MB
+              Max size:{" "}
+              <span className="text-primary font-bold uppercase">
+                unlimited
+              </span>
             </div>
           </div>
 
-          <div className="bg-background/70 text-muted-foreground mt-20 inline-flex max-w-full items-center gap-2 border px-4 py-2 text-xs font-semibold">
+          <div className="bg-background/70 text-muted-foreground mt-20 inline-flex max-w-full items-center gap-2 px-4 py-2 text-xs font-semibold">
             <LockKeyIcon className="size-4 shrink-0" weight="bold" />
             <span className="truncate">
               Your image is never uploaded. Everything runs locally in your

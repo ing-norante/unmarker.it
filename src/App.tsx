@@ -21,8 +21,6 @@ import { generateCameraLikeFilename } from "./lib/utils";
 import { processGeminiVisibleWatermark } from "./lib/geminiWorkerClient";
 import type { GeminiWorkerProgressStage } from "./lib/types";
 
-const MAX_FILE_SIZE_MB = 25;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const MAX_MEGAPIXELS = 40;
 
 type StatusMessage = {
@@ -191,15 +189,6 @@ function App() {
         variant: "destructive",
         title: "Unsupported file type",
         description: "Please select a valid image file.",
-      });
-      return;
-    }
-
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      setStatusMessage({
-        variant: "destructive",
-        title: "File is too large",
-        description: `Please use an image up to ${MAX_FILE_SIZE_MB} MB.`,
       });
       return;
     }
