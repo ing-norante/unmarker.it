@@ -1,5 +1,5 @@
 import { Button } from "./ui/button";
-import { RefreshCcw, XCircle, Zap } from "lucide-react";
+import { FileImage, RefreshCcw, XCircle, Zap } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 
@@ -51,33 +51,28 @@ export function ActionBar({
   return (
     <div
       className={cn(
-        "border-foreground bg-background flex flex-col items-center justify-between gap-4 border-2 p-4 shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] lg:sticky lg:top-0 lg:z-10 lg:flex-row",
+        "bg-card/90 ring-border/70 text-card-foreground flex flex-col justify-between gap-4 rounded-xl p-3 ring-1 backdrop-blur lg:sticky lg:top-0 lg:z-10 lg:flex-row lg:items-center",
         className,
       )}
     >
-      <div className="max-w-[200px] truncate font-bold">{fileName}</div>
-      <div className="flex gap-2">
+      <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+        <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
+          <FileImage className="size-4" />
+        </span>
+        <span className="truncate">{fileName}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
         {isProcessing && (
-          <Button
-            variant="destructive"
-            onClick={handleCancel}
-            className="border-foreground rounded-none border-2"
-          >
+          <Button variant="destructive" onClick={handleCancel}>
             <XCircle className="mr-2 h-4 w-4" /> Cancel
           </Button>
         )}
-        <Button
-          variant="outline"
-          onClick={handleReset}
-          disabled={isProcessing}
-          className="border-foreground rounded-none border-2 hover:bg-red-100 dark:hover:bg-red-900"
-        >
+        <Button variant="outline" onClick={handleReset} disabled={isProcessing}>
           <RefreshCcw className="mr-2 h-4 w-4" /> Reset
         </Button>
         <Button
           onClick={handleProcess}
           disabled={isProcessing || hasProcessedImage}
-          variant="neobrutalist"
           className={hasProcessedImage ? "opacity-50" : ""}
         >
           <Zap className="mr-2 h-4 w-4" />

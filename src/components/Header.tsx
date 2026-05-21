@@ -3,21 +3,17 @@ import { cn } from "@/lib/utils";
 export function Header({ className }: { className?: string }) {
   return (
     <header
-      className={cn(
-        "bg-background shrink-0 space-y-3 lg:border-foreground/10 lg:border-b lg:pb-5 lg:space-y-4",
-        className,
-      )}
+      className={cn("shrink-0 space-y-4 border-b pb-5 lg:space-y-5", className)}
     >
-      <h1 className="border-foreground border-b-4 pb-1 text-5xl font-black tracking-tighter uppercase sm:text-6xl lg:border-b-8 lg:pb-2">
-        Unmarker
-        <br />
-        It
+      <div className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
+        Client-side image pipeline
+      </div>
+      <h1 className="font-heading text-4xl leading-[0.95] font-semibold text-balance sm:text-5xl">
+        Unmarker.it
       </h1>
-      <p className="border-foreground border-l-4 pl-3 text-base leading-relaxed font-medium sm:pl-4 sm:text-lg lg:text-xl">
+      <p className="text-muted-foreground max-w-[34rem] text-sm leading-6 sm:text-base">
         Shake off invisible AI watermarks.{" "}
-        <span className="bg-yellow-300 px-1 font-bold text-black dark:bg-yellow-400">
-          100% client-side.
-        </span>{" "}
+        <span className="text-foreground font-medium">100% client-side.</span>{" "}
         Your image stays in your browser.
       </p>
     </header>

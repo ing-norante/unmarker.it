@@ -376,18 +376,18 @@ function App() {
   };
 
   return (
-    <div className="text-foreground flex min-h-dvh flex-col font-sans selection:bg-yellow-300 selection:text-black">
-      <div className="bg-background flex flex-1 flex-col bg-[linear-gradient(to_right,#80808022_1px,transparent_1px),linear-gradient(to_bottom,#80808022_1px,transparent_1px)] bg-size-[70px_70px] p-4 lg:min-h-0 lg:p-6">
+    <div className="text-foreground selection:bg-primary/20 selection:text-foreground flex min-h-dvh flex-col font-sans">
+      <div className="bg-muted/20 flex flex-1 flex-col p-4 lg:min-h-0 lg:p-6">
         <main
           role="main"
-          className="mx-auto grid w-full max-w-7xl grid-cols-1 content-start gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(18rem,22rem)_1fr] lg:items-start lg:gap-x-10"
+          className="mx-auto grid w-full max-w-7xl grid-cols-1 content-start gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(18rem,22rem)_1fr] lg:items-start lg:gap-x-8"
         >
           {/* Hero + pipeline: one column on desktop; hero pinned, steps scroll below */}
           <div className="contents lg:sticky lg:top-6 lg:col-start-1 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:min-h-0 lg:flex-col lg:gap-5 lg:overflow-hidden">
             <Header className="order-1 shrink-0 lg:order-0" />
 
             <aside className="order-3 flex min-h-0 flex-col gap-3 lg:order-0 lg:flex-1 lg:overflow-hidden">
-              <h2 className="border-foreground inline-block shrink-0 border-b-4 text-xl font-bold uppercase lg:text-2xl">
+              <h2 className="text-muted-foreground shrink-0 text-xs font-medium tracking-[0.18em] uppercase">
                 Pipeline
               </h2>
 
@@ -395,8 +395,8 @@ function App() {
                 <PipelineSteps steps={steps} />
 
                 {isProcessing && (
-                  <div className="border-foreground bg-foreground text-background mt-4 animate-pulse border-2 p-3 font-mono text-sm">
-                    PROCESSING IN PROGRESS...
+                  <div className="bg-card text-card-foreground ring-border mt-4 animate-pulse rounded-lg p-3 text-sm ring-1">
+                    Processing in progress...
                   </div>
                 )}
               </div>
@@ -406,10 +406,7 @@ function App() {
           {/* Workspace before pipeline on mobile; full-height right column on desktop */}
           <section className="order-2 flex min-w-0 flex-col lg:col-start-2 lg:max-h-[calc(100dvh-7rem)] lg:min-h-0 lg:overflow-hidden">
             {statusMessage && (
-              <Alert
-                variant={statusMessage.variant}
-                className="border-foreground mb-4 shrink-0 rounded-none border-2"
-              >
+              <Alert variant={statusMessage.variant} className="mb-4 shrink-0">
                 <AlertTitle>{statusMessage.title}</AlertTitle>
                 <AlertDescription>{statusMessage.description}</AlertDescription>
               </Alert>

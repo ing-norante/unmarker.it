@@ -68,9 +68,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   return (
     <Card
       className={cn(
-        "border-foreground bg-background hover:bg-muted relative flex h-full min-h-64 w-full cursor-pointer flex-col items-center justify-center border-2 border-dashed p-8 transition-all sm:p-10",
-        isDragging && "bg-accent scale-[0.99] border-solid",
-        disabled && "hover:bg-background cursor-not-allowed opacity-50",
+        "bg-card/80 border-border/80 hover:border-primary/40 hover:bg-card text-card-foreground hover:ring-primary/10 relative flex h-full min-h-64 w-full cursor-pointer flex-col items-center justify-center border border-dashed p-8 transition-all hover:ring-4 sm:p-10",
+        isDragging &&
+          "border-primary bg-primary/5 ring-primary/15 scale-[0.99] border-solid ring-4",
+        disabled && "hover:bg-card cursor-not-allowed opacity-50 hover:ring-0",
         className,
       )}
       onDragOver={handleDragOver}
@@ -95,18 +96,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         disabled={disabled}
       />
       <div className="flex flex-col items-center gap-4 text-center">
-        <div className="border-foreground rounded-full border-2 bg-yellow-300 p-4 shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] dark:bg-yellow-400">
+        <div className="bg-primary/10 text-primary flex size-16 items-center justify-center rounded-2xl">
           {isDragging ? (
-            <FileImage className="h-8 w-8 text-black" />
+            <FileImage className="h-8 w-8" />
           ) : (
-            <Upload className="h-8 w-8 text-black" />
+            <Upload className="h-8 w-8" />
           )}
         </div>
-        <div className="space-y-1">
-          <p className="text-lg font-bold tracking-wide uppercase">
+        <div className="max-w-xl space-y-2">
+          <p className="text-lg font-semibold">
             {isDragging ? "Drop it!" : "Upload Image"}
           </p>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-sm leading-6">
             Drop an image, hit process, and get a fresh JPEG that's been shaken,
             stirred, and crushed. Designed to disrupt invisible watermark
             signals while keeping your image visually intact. No accounts, no

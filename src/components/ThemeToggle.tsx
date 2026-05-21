@@ -51,7 +51,6 @@ export function ThemeToggle() {
       variant="outline"
       size="icon"
       onClick={toggleTheme}
-      className="border-foreground bg-background hover:bg-accent border-2 shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
       {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

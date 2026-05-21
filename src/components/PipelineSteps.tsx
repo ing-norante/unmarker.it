@@ -12,52 +12,48 @@ interface PipelineStepsProps {
 
 export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
   return (
-    <div className="w-full space-y-2.5">
+    <div className="w-full space-y-3">
       {steps.map((step) => (
         <Card
           key={step.id}
+          size="sm"
           className={cn(
-            "border-2 shadow-[3px_3px_0px_0px_rgba(var(--neo-shadow),1)] transition-shadow",
+            "bg-card/90 ring-border/70 transition-all",
             step.status === "running"
-              ? "bg-background ring-2 ring-yellow-300"
-              : "bg-background/95",
+              ? "ring-primary/35 bg-primary/5 ring-2"
+              : "hover:ring-foreground/15",
           )}
         >
-          <CardContent className="flex flex-col gap-2 p-3">
+          <CardContent className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2.5">
                 <StepIcon status={step.status} />
-                <span className="truncate text-sm font-bold tracking-wide uppercase">
+                <span className="truncate text-sm font-medium">
                   {step.label}
                 </span>
               </div>
               <Badge
-                variant="neobrutalist"
+                variant="outline"
                 className={cn(
-                  "shrink-0 text-[10px] uppercase",
-                  step.status === "idle" &&
-                    "bg-background text-foreground border-foreground/50",
+                  "shrink-0 text-[10px] capitalize",
+                  step.status === "idle" && "text-muted-foreground",
                   step.status === "running" &&
-                    "animate-pulse bg-yellow-300 text-black dark:bg-yellow-400",
+                    "border-primary/30 bg-primary/10 text-primary",
                   step.status === "done" &&
-                    "bg-green-400 text-black dark:bg-green-500",
-                  step.status === "skipped" &&
-                    "bg-muted text-muted-foreground border-foreground/50",
+                    "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                  step.status === "skipped" && "bg-muted text-muted-foreground",
                   step.status === "error" &&
-                    "bg-red-400 text-white dark:bg-red-500",
+                    "border-destructive/20 bg-destructive/10 text-destructive",
                 )}
               >
                 {step.status}
               </Badge>
             </div>
 
-            <Progress
-              value={step.progress}
-              className="border-foreground h-2 border-2"
-            />
+            <Progress value={step.progress} className="h-1.5" />
 
             {step.description && (
-              <p className="text-foreground/70 font-mono text-[11px] leading-relaxed font-medium tracking-wide">
+              <p className="text-muted-foreground text-xs leading-relaxed">
                 {step.description}
               </p>
             )}
@@ -72,16 +68,16 @@ const StepIcon = ({ status }: { status: PipelineStepState["status"] }) => {
   switch (status) {
     case "done":
       return (
-        <div className="bg-foreground text-background rounded-full p-1">
+        <div className="rounded-full bg-emerald-500/10 p-1 text-emerald-700 dark:text-emerald-300">
           <Check className="h-4 w-4" />
         </div>
       );
     case "skipped":
       return (
-        <div className="border-foreground h-6 w-6 rounded-full border-2 opacity-60" />
+        <div className="border-border bg-muted h-6 w-6 rounded-full border opacity-80" />
       );
     case "running":
-      return <Loader2 className="h-6 w-6 animate-spin" />;
+      return <Loader2 className="text-primary h-6 w-6 animate-spin" />;
     case "error":
       return (
         <div className="rounded-full bg-red-500 p-1 text-white">
@@ -90,7 +86,7 @@ const StepIcon = ({ status }: { status: PipelineStepState["status"] }) => {
       );
     default:
       return (
-        <div className="border-foreground h-6 w-6 rounded-full border-2" />
+        <div className="border-border bg-background h-6 w-6 rounded-full border" />
       );
   }
 };

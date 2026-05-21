@@ -21,35 +21,33 @@ export function Footer() {
     });
   };
   return (
-    <footer className="border-foreground bg-background shrink-0 border-t-4 px-4 pt-4 pb-4 lg:px-6">
+    <footer className="bg-background/95 shrink-0 border-t px-4 py-4 lg:px-6">
       <div className="mx-auto w-full max-w-7xl">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-          <div className="flex flex-wrap items-center justify-center gap-6 md:justify-start">
-            <span className="text-sm font-medium tracking-wide">
-              Built with
-            </span>
-            <div className="flex flex-wrap items-center justify-center gap-4 md:justify-start">
+          <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
+            <span className="text-muted-foreground text-sm">Built with</span>
+            <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
               <a
                 href="https://react.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border-foreground bg-background flex items-center gap-2 border-2 px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(var(--neo-shadow),1)] transition-colors hover:bg-cyan-100 hover:shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] dark:hover:bg-cyan-900"
+                className="hover:bg-muted flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors"
               >
                 <img src={ReactLogo} alt="React" className="h-5 w-5" />
-                <span className="text-sm font-bold">React</span>
+                <span>React</span>
               </a>
               <a
                 href="https://vite.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border-foreground bg-background flex items-center gap-2 border-2 px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(var(--neo-shadow),1)] transition-colors hover:bg-purple-100 hover:shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] dark:hover:bg-purple-900"
+                className="hover:bg-muted flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors"
               >
                 <img src={ViteLogo} alt="Vite" className="h-5 w-5" />
-                <span className="text-sm font-bold">Vite</span>
+                <span>Vite</span>
               </a>
 
               <a
-                className="border-foreground bg-background flex items-center gap-2 border-2 px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(var(--neo-shadow),1)] transition-colors hover:bg-yellow-100 hover:shadow-[4px_4px_0px_0px_rgba(var(--neo-shadow),1)] dark:hover:bg-yellow-900"
+                className="hover:bg-muted flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors"
                 href="https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -59,30 +57,28 @@ export function Footer() {
                   alt="Canvas"
                   className="h-5 w-5 dark:invert"
                 />
-                <span className="text-sm font-bold">Canvas API</span>
+                <span>Canvas API</span>
               </a>
               <ThemeToggle />
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <a
               href="https://insigh.to/b/unmarkerit"
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleFeatureBoardClick}
-              className="border-foreground bg-yellow-300 text-black hover:bg-yellow-400 border-2 px-3 py-1 text-sm font-black transition-colors"
+              className="hover:bg-muted rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors"
             >
               Feedback
             </a>
-            <span className="text-sm font-medium tracking-wide">
-              Crafted by
-            </span>
+            <span className="text-muted-foreground text-sm">Crafted by</span>
             <a
               href="https://github.com/ing-norante/unmarker.it"
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleGithubClick}
-              className="border-foreground bg-foreground text-background hover:text-foreground border-2 px-3 py-1 text-sm font-black transition-colors hover:bg-yellow-300 dark:hover:bg-yellow-400 dark:hover:text-black"
+              className="hover:bg-muted rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors"
             >
               ing.norante
             </a>

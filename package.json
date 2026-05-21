@@ -39,6 +39,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/geist-mono": "^5.2.8",
+    "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-progress": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/vite": "^4.1.18",
@@ -47,8 +49,10 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.564.0",
     "posthog-js": "^1.347.2",
+    "radix-ui": "^1.4.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "shadcn": "^4.8.0",
     "tailwind-merge": "^3.4.1",
     "tailwindcss": "^4.1.18"
   },
