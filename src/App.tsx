@@ -376,42 +376,56 @@ function App() {
   };
 
   return (
-    <div className="text-foreground flex min-h-screen flex-col font-sans selection:bg-yellow-300 selection:text-black">
-      <div className="bg-background z-0 flex items-center bg-[linear-gradient(to_right,#80808022_1px,transparent_1px),linear-gradient(to_bottom,#80808022_1px,transparent_1px)] bg-size-[70px_70px] p-4 md:p-4 lg:h-dvh">
+    <div className="text-foreground flex min-h-dvh flex-col font-sans selection:bg-yellow-300 selection:text-black">
+      <div className="bg-background flex flex-1 flex-col bg-[linear-gradient(to_right,#80808022_1px,transparent_1px),linear-gradient(to_bottom,#80808022_1px,transparent_1px)] bg-size-[70px_70px] p-4 lg:min-h-0 lg:p-6">
         <main
           role="main"
-          className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-8 lg:grid-cols-12"
+          className="mx-auto grid w-full max-w-7xl grid-cols-1 content-start gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(18rem,22rem)_1fr] lg:items-start lg:gap-x-10"
         >
-          {/* Header - First on mobile, part of left panel on desktop */}
-          <div className="order-1 lg:order-1 lg:col-span-4">
-            <Header />
+          {/* Hero + pipeline: one column on desktop; hero pinned, steps scroll below */}
+          <div className="contents lg:sticky lg:top-6 lg:col-start-1 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:min-h-0 lg:flex-col lg:gap-5 lg:overflow-hidden">
+            <Header className="order-1 shrink-0 lg:order-0" />
+
+            <aside className="order-3 flex min-h-0 flex-col gap-3 lg:order-0 lg:flex-1 lg:overflow-hidden">
+              <h2 className="border-foreground inline-block shrink-0 border-b-4 text-xl font-bold uppercase lg:text-2xl">
+                Pipeline
+              </h2>
+
+              <div className="min-h-0 flex-1 pr-1 lg:overflow-y-auto lg:overscroll-contain">
+                <PipelineSteps steps={steps} />
+
+                {isProcessing && (
+                  <div className="border-foreground bg-foreground text-background mt-4 animate-pulse border-2 p-3 font-mono text-sm">
+                    PROCESSING IN PROGRESS...
+                  </div>
+                )}
+              </div>
+            </aside>
           </div>
 
-          {/* Right Panel: Workspace - Second on mobile, right on desktop */}
-          <div className="order-2 space-y-6 lg:order-2 lg:col-span-8 lg:row-span-2">
+          {/* Workspace before pipeline on mobile; full-height right column on desktop */}
+          <section className="order-2 flex min-w-0 flex-col lg:col-start-2 lg:max-h-[calc(100dvh-7rem)] lg:min-h-0 lg:overflow-hidden">
             {statusMessage && (
               <Alert
                 variant={statusMessage.variant}
-                className="border-foreground rounded-none border-2"
+                className="border-foreground mb-4 shrink-0 rounded-none border-2"
               >
                 <AlertTitle>{statusMessage.title}</AlertTitle>
                 <AlertDescription>{statusMessage.description}</AlertDescription>
               </Alert>
             )}
 
-            {/* Upload Area */}
             {!originalImage && (
-              <div className="flex h-full flex-col justify-center">
+              <div className="flex min-h-[min(50vh,28rem)] flex-col lg:min-h-0 lg:flex-1">
                 <ImageUploader
                   onImageSelect={handleImageSelect}
-                  className="h-96"
+                  className="min-h-[min(50vh,28rem)] flex-1 lg:min-h-0"
                 />
               </div>
             )}
 
-            {/* Preview Area */}
             {originalImage && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 grid gap-6 duration-500">
+              <div className="animate-in fade-in slide-in-from-bottom-4 flex flex-col gap-4 duration-500 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
                 <ActionBar
                   fileName={originalImage.name}
                   isProcessing={isProcessing}
@@ -419,33 +433,21 @@ function App() {
                   onReset={reset}
                   onCancel={cancelProcessing}
                   onProcess={processPipeline}
+                  className="shrink-0"
                 />
 
-                <ImageComparison
-                  originalImageUrl={originalImageUrl!}
-                  processedImageUrl={processedImageUrl}
-                  processedFileName={processedFileName}
-                />
+                <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
+                  <ImageComparison
+                    originalImageUrl={originalImageUrl!}
+                    processedImageUrl={processedImageUrl}
+                    processedFileName={processedFileName}
+                  />
+                </div>
               </div>
             )}
 
-            {/* Hidden Canvas for processing */}
             <canvas ref={canvasRef} className="hidden" />
-          </div>
-
-          {/* Pipeline - Third on mobile, part of left panel on desktop */}
-          <div className="order-3 space-y-2 lg:order-1 lg:col-span-4 lg:row-start-2">
-            <h2 className="border-foreground mb-4 inline-block border-b-4 text-2xl font-bold uppercase">
-              Pipeline
-            </h2>
-            <PipelineSteps steps={steps} />
-
-            {isProcessing && (
-              <div className="border-foreground bg-foreground text-background mt-6 animate-pulse border-2 p-4 font-mono">
-                PROCESSING IN PROGRESS...
-              </div>
-            )}
-          </div>
+          </section>
         </main>
       </div>
       <Footer />
