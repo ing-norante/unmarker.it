@@ -10,14 +10,16 @@
 - Processing model: 100% client-side in the browser
 - Account requirement: no account required
 - Upload policy: images stay in the browser and are not uploaded for processing
+- Input limit: browser-decodable image files up to 40 megapixels
 - Output format: lossy JPEG
 
 ## Processing Pipeline
 
-1. Gemini Scan: scans the bottom-right corner for the visible Gemini / Nano Banana sparkle watermark and attempts local restoration with an OpenCV.js Web Worker.
-2. Shake: applies a tiny geometric perturbation to change pixel-grid alignment.
-3. Stir: adds low-amplitude RGB noise to disturb statistical watermark traces.
-4. Crush: recompresses the result as JPEG to reduce remaining high-frequency signals.
+1. Gemini Scan: scans the bottom-right corner for the visible Gemini / Nano Banana sparkle watermark with an OpenCV.js Web Worker.
+2. Gemini Restore: when a mark is detected, reverses the logo alpha blend and repairs residual sparkle edges with local inpainting; this step is skipped when no mark is detected.
+3. Shake: applies a tiny geometric perturbation to change pixel-grid alignment.
+4. Stir: adds low-amplitude RGB noise to disturb statistical watermark traces.
+5. Crush: recompresses the result as JPEG to reduce remaining high-frequency signals.
 
 ## Technical Notes
 
@@ -31,7 +33,7 @@
 - Gemini Scan targets a visible Gemini / Nano Banana sparkle mark and does not guarantee removal of invisible provenance metadata or invisible watermarking systems.
 - Results depend on the watermarking method, input image, detector, compression level, and downstream reuse.
 - The output is a lossy JPEG, so metadata and original file format are not preserved.
-- Very large or unsupported image files may fail local browser processing.
+- Images above 40 megapixels are rejected before processing, and unsupported image files may fail local browser decoding.
 
 ## Responsible Use
 

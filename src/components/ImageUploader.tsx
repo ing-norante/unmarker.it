@@ -133,10 +133,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <div className="text-muted-foreground text-sm leading-6 font-medium">
               Supports JPG, JPEG, PNG, WebP
               <br />
-              Max size:{" "}
-              <span className="text-primary font-bold uppercase">
-                unlimited
-              </span>
+              Max resolution:{" "}
+              <span className="text-primary font-bold">40 MPixels</span>
             </div>
           </div>
 

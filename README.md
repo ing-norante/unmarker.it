@@ -7,13 +7,14 @@ Client-side image post-processing tool built to disrupt invisible AI watermark s
 This README is based on the current code in this repository.
 
 - Processing is fully local in the browser via Canvas and a Web Worker (`src/lib/pipeline.ts`, `src/workers/geminiVisible.worker.ts`, and hidden canvas orchestration in `src/App.tsx`)
-- Input accepts any `image/*`; output is always JPEG via `canvas.toDataURL("image/jpeg", quality)`
+- Input accepts browser-decodable `image/*` files up to 40 megapixels; output is always JPEG via `canvas.toDataURL("image/jpeg", quality)`
 - Pipeline steps:
 
-1. `Gemini Scan`: detects and restores the visible Gemini / Nano Banana sparkle watermark in the bottom-right corner using local OpenCV.js template matching and inpainting
-2. `shake`: small random rotate/scale affine transform
-3. `stir`: per-channel Gaussian noise (Box-Muller + typed arrays)
-4. `crush`: JPEG recompression (default quality `0.85`)
+1. `Gemini Scan`: detects the visible Gemini / Nano Banana sparkle watermark in the bottom-right corner using local OpenCV.js template matching
+2. `Gemini Restore`: when detected, reverses the logo alpha blend and repairs residual sparkle edges with local inpainting; this step is skipped when no mark is detected
+3. `shake`: small random rotate/scale affine transform
+4. `stir`: per-channel Gaussian noise (Box-Muller + typed arrays)
+5. `crush`: JPEG recompression (default quality `0.85`)
 
 - UI stack is React 19 + TypeScript + Tailwind v4 + Radix primitives, built with Rolldown Vite
 - App includes PostHog event instrumentation in several components (`src/main.tsx`, `src/components/*`)
@@ -23,6 +24,7 @@ This README is based on the current code in this repository.
 - The app code does not upload image files to a backend.
 - Analytics events are instrumented through PostHog.
 - If `VITE_PUBLIC_POSTHOG_KEY` and `VITE_PUBLIC_POSTHOG_HOST` are configured, usage events may be sent to PostHog.
+- Image files and pixel data are still processed locally; PostHog instrumentation is for usage events only.
 
 ## Verified Status
 
@@ -102,6 +104,7 @@ src/
 
 - This is a heuristic perturbation pipeline, not a guaranteed watermark remover.
 - Gemini Scan targets the visible Gemini / Nano Banana sparkle mark only; it does not guarantee removal of invisible provenance or watermarking systems.
+- Input images above 40 megapixels are rejected before processing.
 - Output is always lossy JPEG (original format/metadata are not preserved).
 - Automated tests currently cover shared Gemini watermark helpers.
 
