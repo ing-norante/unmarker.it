@@ -1,4 +1,5 @@
-import { usePostHog } from "posthog-js/react";
+import { ThemeProvider } from "next-themes";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
@@ -12,22 +13,35 @@ import {
 import { trackAction } from "@/lib/analytics";
 
 export function Footer() {
-  const posthog = usePostHog();
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="light"
+      enableSystem={false}
+      storageKey="theme"
+    >
+      <TooltipProvider>
+        <FooterContent />
+      </TooltipProvider>
+    </ThemeProvider>
+  );
+}
 
+function FooterContent() {
   const handleFeatureBoardClick = () => {
-    trackAction(posthog, "feature_board_link", "footer");
+    trackAction("feature_board_link", "footer");
   };
 
   const handleGithubClick = () => {
-    trackAction(posthog, "github_repo_link", "footer");
+    trackAction("github_repo_link", "footer");
   };
 
   const handleArxivClick = () => {
-    trackAction(posthog, "research_arxiv_link", "footer");
+    trackAction("research_arxiv_link", "footer");
   };
 
   const handleWaterlooClick = () => {
-    trackAction(posthog, "research_waterloo_link", "footer");
+    trackAction("research_waterloo_link", "footer");
   };
 
   return (

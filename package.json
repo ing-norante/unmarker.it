@@ -33,7 +33,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist/server && node scripts/prerender.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview"

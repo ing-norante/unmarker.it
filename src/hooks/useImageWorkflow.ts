@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { usePostHog } from "posthog-js/react";
 import { useObjectUrl } from "@/hooks/useObjectUrl";
 import { useUnmarkPipeline } from "@/hooks/useUnmarkPipeline";
 import { triggerBrowserDownload } from "@/lib/download";
@@ -41,7 +40,6 @@ const EMPTY_CAPABILITIES: ImageWorkflowCapabilities = {
 export function useImageWorkflow({
   setStatusMessage,
 }: UseImageWorkflowOptions) {
-  const posthog = usePostHog();
   const [originalImage, setOriginalImage] = useState<File | null>(null);
   const [phase, setPhase] = useState<WorkflowPhase>("idle");
   const [preflightAudit, setPreflightAudit] = useState<ImageAuditResult | null>(
@@ -106,9 +104,9 @@ export function useImageWorkflow({
         title,
         description,
       });
-      trackAction(posthog, "workflow_error", "workflow");
+      trackAction("workflow_error", "workflow");
     },
-    [posthog, setStatusMessage],
+    [setStatusMessage],
   );
 
   const runPostflight = useCallback(
@@ -189,16 +187,16 @@ export function useImageWorkflow({
       if (!result.ok) {
         if (result.reason === "cancelled") {
           setPhase("cancelled");
-          trackAction(posthog, "workflow_cancelled", "workflow");
+          trackAction("workflow_cancelled", "workflow");
           return;
         }
 
         setPhase("error");
-        trackAction(posthog, "workflow_error", "workflow");
+        trackAction("workflow_error", "workflow");
         return;
       }
 
-      trackAction(posthog, "processing_complete", "workflow");
+      trackAction("processing_complete", "workflow");
       setPhase("postflight-scanning");
 
       try {
@@ -216,7 +214,7 @@ export function useImageWorkflow({
         setPostflightAudit(postAudit);
         setWorkflowWarnings(postAudit.warnings);
         setPhase("complete");
-        trackAction(posthog, "postflight_complete", "workflow");
+        trackAction("postflight_complete", "workflow");
       } catch (error) {
         if (isAbortError(error) || workflowJobRef.current !== jobId) {
           return;
@@ -226,10 +224,10 @@ export function useImageWorkflow({
         setPostflightAudit(null);
         setWorkflowWarnings(["Postflight verification did not complete."]);
         setPhase("complete");
-        trackAction(posthog, "postflight_complete", "workflow");
+        trackAction("postflight_complete", "workflow");
       }
     },
-    [pipeline, posthog, runPostflight],
+    [pipeline, runPostflight],
   );
 
   const runPreflight = useCallback(
@@ -329,11 +327,11 @@ export function useImageWorkflow({
         setDetectionHint(visibleDetection?.detected ? visibleDetection : null);
         setCapabilities(nextCapabilities);
         setWorkflowWarnings(warnings);
-        trackAction(posthog, "preflight_complete", "workflow");
+        trackAction("preflight_complete", "workflow");
 
         if (!decodeResult.canDecode) {
           setPhase("analysis-only");
-          trackAction(posthog, "analysis_only", "workflow");
+          trackAction("analysis_only", "workflow");
           return;
         }
 
@@ -360,7 +358,7 @@ export function useImageWorkflow({
         }
       }
     },
-    [posthog, runProcessing, setStatusMessage, setWorkflowError],
+    [runProcessing, setStatusMessage, setWorkflowError],
   );
 
   const selectImage = useCallback(
@@ -374,16 +372,10 @@ export function useImageWorkflow({
       clearWorkflowState();
       setOriginalImage(file);
       setOriginalObjectUrl(file);
-      trackAction(posthog, "workflow_started", "workflow");
+      trackAction("workflow_started", "workflow");
       void runPreflight(file);
     },
-    [
-      clearWorkflowState,
-      posthog,
-      runPreflight,
-      setOriginalObjectUrl,
-      setStatusMessage,
-    ],
+    [clearWorkflowState, runPreflight, setOriginalObjectUrl, setStatusMessage],
   );
 
   const cancel = useCallback(() => {
@@ -413,8 +405,8 @@ export function useImageWorkflow({
       title: "Workflow cancelled",
       description: "Reset the image or retry when you are ready.",
     });
-    trackAction(posthog, "workflow_cancelled", "workflow");
-  }, [phase, pipeline, posthog, setStatusMessage]);
+    trackAction("workflow_cancelled", "workflow");
+  }, [phase, pipeline, setStatusMessage]);
 
   const retry = useCallback(() => {
     if (!originalImage) return;
@@ -444,14 +436,13 @@ export function useImageWorkflow({
   const reprocess = useCallback(() => {
     if (!originalImage || !preflightAudit || !capabilities.canProcess) return;
 
-    trackAction(posthog, "reprocess_started", "workflow");
+    trackAction("reprocess_started", "workflow");
     setStatusMessage(null);
     void runProcessing(originalImage, preflightAudit, detectionHint);
   }, [
     capabilities.canProcess,
     detectionHint,
     originalImage,
-    posthog,
     preflightAudit,
     runProcessing,
     setStatusMessage,
@@ -488,7 +479,7 @@ export function useImageWorkflow({
         triggerBrowserDownload(objectUrl, result.fileName);
       }
 
-      trackAction(posthog, "download_metadata_clean", "workflow");
+      trackAction("download_metadata_clean", "workflow");
       toast.success("Metadata-clean copy downloaded.");
     } catch (error) {
       console.error("Metadata clean failed", error);
@@ -507,7 +498,6 @@ export function useImageWorkflow({
     clearMetadataCleanObjectUrl,
     isMetadataCleaning,
     originalImage,
-    posthog,
     preflightAudit?.metadataScan,
     setMetadataCleanObjectUrl,
     setStatusMessage,

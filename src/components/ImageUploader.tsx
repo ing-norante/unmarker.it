@@ -1,11 +1,8 @@
 import React, { useCallback, useId, useRef, useState } from "react";
-import {
-  FileImageIcon,
-  ImageSquareIcon,
-  LockKeyIcon,
-  UploadSimpleIcon,
-} from "@phosphor-icons/react";
-import { usePostHog } from "posthog-js/react";
+import { FileImageIcon } from "@phosphor-icons/react/dist/ssr/FileImage";
+import { ImageSquareIcon } from "@phosphor-icons/react/dist/ssr/ImageSquare";
+import { LockKeyIcon } from "@phosphor-icons/react/dist/ssr/LockKey";
+import { UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr/UploadSimple";
 import { trackAction } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -30,17 +27,16 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   description,
   details,
 }) => {
-  const posthog = usePostHog();
   const fileInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const selectFile = useCallback(
     (file: File) => {
-      trackAction(posthog, "upload_image", "uploader");
+      trackAction("upload_image", "uploader");
       onImageSelect(file);
     },
-    [onImageSelect, posthog],
+    [onImageSelect],
   );
 
   const openFileDialog = useCallback(() => {

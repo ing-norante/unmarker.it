@@ -1,5 +1,3 @@
-import type { PostHog } from "posthog-js";
-
 export type TrackingAction =
   | "cancel_processing"
   | "download_processed"
@@ -27,15 +25,46 @@ export type TrackingComponent =
   | "uploader"
   | "workflow";
 
+let posthogPromise: Promise<typeof import("posthog-js").default | null> | null =
+  null;
+
+function getPostHog() {
+  if (typeof window === "undefined") {
+    return Promise.resolve(null);
+  }
+
+  const apiKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
+  const apiHost = import.meta.env.VITE_PUBLIC_POSTHOG_API_HOST;
+  const uiHost = import.meta.env.VITE_PUBLIC_POSTHOG_UI_HOST;
+  if (!apiKey) {
+    return Promise.resolve(null);
+  }
+
+  posthogPromise ??= import("posthog-js").then(({ default: posthog }) => {
+    posthog.init(apiKey, {
+      ...(apiHost ? { api_host: apiHost } : {}),
+      ...(uiHost ? { ui_host: uiHost } : {}),
+      defaults: "2025-05-24",
+      capture_exceptions: true,
+      debug: import.meta.env.MODE === "development",
+    });
+
+    return posthog;
+  });
+
+  return posthogPromise;
+}
+
 export function trackAction(
-  posthog: PostHog | null | undefined,
   action: TrackingAction,
   component: TrackingComponent,
 ) {
   // Keep analytics file-agnostic: action events must not include file names,
   // MIME types, dimensions, hashes, or other image-derived values.
-  posthog?.capture("action_clicked", {
-    action,
-    component,
+  void getPostHog().then((posthog) => {
+    posthog?.capture("action_clicked", {
+      action,
+      component,
+    });
   });
 }

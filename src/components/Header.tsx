@@ -1,9 +1,7 @@
 import { cn } from "@/lib/utils";
-import {
-  LightningIcon,
-  LockKeyIcon,
-  ShieldCheckIcon,
-} from "@phosphor-icons/react";
+import { LightningIcon } from "@phosphor-icons/react/dist/ssr/Lightning";
+import { LockKeyIcon } from "@phosphor-icons/react/dist/ssr/LockKey";
+import { ShieldCheckIcon } from "@phosphor-icons/react/dist/ssr/ShieldCheck";
 
 export function Header({ className }: { className?: string }) {
   return (

@@ -8,7 +8,6 @@ import {
   XCircleIcon,
 } from "@phosphor-icons/react";
 import { Spinner } from "./ui/spinner";
-import { usePostHog } from "posthog-js/react";
 import { trackAction } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import type { WorkflowPhase } from "@/lib/types";
@@ -46,7 +45,6 @@ export function ActionBar({
   onDownloadCleanMetadata,
   className,
 }: ActionBarProps) {
-  const posthog = usePostHog();
   const isBusy =
     phase === "preflight-scanning" ||
     phase === "processing" ||
@@ -59,27 +57,27 @@ export function ActionBar({
   const canReprocess = phase === "complete" && canProcess;
 
   const handleReset = () => {
-    trackAction(posthog, "reset", "action_bar");
+    trackAction("reset", "action_bar");
     onReset();
   };
 
   const handleRetry = () => {
-    trackAction(posthog, "process_image", "action_bar");
+    trackAction("process_image", "action_bar");
     onRetry();
   };
 
   const handleReprocess = () => {
-    trackAction(posthog, "reprocess_started", "action_bar");
+    trackAction("reprocess_started", "action_bar");
     onReprocess();
   };
 
   const handleCancel = () => {
-    trackAction(posthog, "cancel_processing", "action_bar");
+    trackAction("cancel_processing", "action_bar");
     onCancel();
   };
 
   const handleDownload = () => {
-    trackAction(posthog, "download_processed", "action_bar");
+    trackAction("download_processed", "action_bar");
   };
 
   return (
