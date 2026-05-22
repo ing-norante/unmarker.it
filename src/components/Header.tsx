@@ -34,21 +34,9 @@ export function Header({ className }: { className?: string }) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:gap-4 2xl:gap-5">
-        <Feature
-          icon={ShieldCheckIcon}
-          title="100% Private"
-          body="Nothing leaves your device"
-        />
-        <Feature
-          icon={LightningIcon}
-          title="Blazing Fast"
-          body="All processing happens locally"
-        />
-        <Feature
-          icon={LockKeyIcon}
-          title="No Uploads"
-          body="Your image never leaves you"
-        />
+        <Feature icon={ShieldCheckIcon} title="100% Private" />
+        <Feature icon={LightningIcon} title="Blazing Fast" />
+        <Feature icon={LockKeyIcon} title="No Uploads" />
       </div>
     </header>
   );
@@ -57,11 +45,9 @@ export function Header({ className }: { className?: string }) {
 function Feature({
   icon: Icon,
   title,
-  body,
 }: {
   icon: typeof ShieldCheckIcon;
   title: string;
-  body: string;
 }) {
   return (
     <div className="flex items-center gap-3">
@@ -73,7 +59,6 @@ function Feature({
         <div className="text-foreground text-sm leading-tight font-extrabold sm:text-base 2xl:text-lg">
           {title}
         </div>
-        <div className="text-muted-foreground text-ui-body">{body}</div>
       </div>
     </div>
   );
