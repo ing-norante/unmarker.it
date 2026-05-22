@@ -77,7 +77,7 @@ function App() {
   return (
     <div className="bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex min-h-dvh p-0 font-sans">
       <div className="bg-background flex min-h-dvh w-full flex-col overflow-x-clip">
-        <div className="relative flex flex-col px-[var(--page-gutter)] py-8 lg:min-h-0 lg:py-10 2xl:py-12">
+        <div className="relative flex flex-col px-(--page-gutter) py-8 lg:min-h-0 lg:py-10 2xl:py-12">
           <main
             role="main"
             className="wide-display-grid relative z-10 grid w-full grid-cols-1 content-start gap-8 lg:min-h-0 lg:grid-cols-[minmax(28rem,42%)_minmax(0,1fr)] lg:items-start lg:gap-x-10 xl:grid-cols-[minmax(34rem,45%)_minmax(0,1fr)] xl:gap-x-12 2xl:gap-x-16"
@@ -189,10 +189,10 @@ function App() {
             </section>
           </main>
         </div>
-        <div className="px-[var(--page-gutter)] pb-8">
+        <div className="px-(--page-gutter) pb-8">
           <HomepageFacts />
         </div>
-        <div className="px-[var(--page-gutter)] pb-6 lg:pb-8">
+        <div className="px-(--page-gutter) pb-6 lg:pb-8">
           <Footer />
         </div>
       </div>
@@ -219,10 +219,13 @@ function HomepageFacts() {
             uploads.
           </h2>
           <p className="text-muted-foreground text-sm leading-relaxed font-medium sm:text-base 2xl:text-lg">
-            Unmarker.it is a privacy-first browser tool that analyzes local AI
-            provenance signals, removes supported visible marks, disrupts hidden
-            watermark patterns, and verifies the generated JPEG again in your
-            browser. No uploads, no servers, no data leaving your device.
+            Unmarker.it is a privacy-first browser tool that neutralizes
+            invisible AI watermark signals embedded in images — no uploads, no
+            servers, no data leaving your device. Built on adversarial
+            disruption techniques from recent computer vision research, it
+            applies targeted, mathematically precise perturbations directly in
+            your browser to break machine-readable watermark patterns without
+            visible degradation.
           </p>
         </div>
 
