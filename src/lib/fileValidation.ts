@@ -40,6 +40,8 @@ const METADATA_ACCEPT_VALUES = [
   ...METADATA_MIME_TYPES,
 ];
 
+export const WORKFLOW_ACCEPT = ["image/*", ...METADATA_ACCEPT_VALUES].join(",");
+
 type FileValidationResult =
   | { ok: true }
   | { ok: false; statusMessage: StatusMessage };
@@ -53,6 +55,15 @@ export interface FileModePolicy {
   supportedCopy: string;
   limitCopy: string[];
   validate: FileValidator;
+}
+
+export interface WorkflowImageDecodeResult {
+  canDecode: boolean;
+  width: number | null;
+  height: number | null;
+  megapixels: number | null;
+  reason?: "decode-failed" | "too-large";
+  statusMessage?: StatusMessage;
 }
 
 export const FILE_MODE_POLICIES: Record<AppMode, FileModePolicy> = {
@@ -77,8 +88,37 @@ export function getFileModePolicy(mode: AppMode) {
   return FILE_MODE_POLICIES[mode];
 }
 
+export function getWorkflowFilePolicy(): FileModePolicy {
+  return {
+    accept: WORKFLOW_ACCEPT,
+    supportedCopy:
+      "Supports browser-readable images, plus PNG, JPEG, WebP, AVIF, HEIF, and JXL metadata analysis",
+    limitCopy: [
+      `Max processing resolution: ${MAX_MEGAPIXELS} MPixels`,
+      `Max file size: ${MAX_FILE_SIZE_MB} MB`,
+    ],
+    validate: validateWorkflowFile,
+  };
+}
+
 export async function validateFileForMode(mode: AppMode, file: File) {
   return await getFileModePolicy(mode).validate(file);
+}
+
+export function validateWorkflowFile(file: File): FileValidationResult {
+  const sizeValidation = validateFileSize(file);
+  if (!sizeValidation.ok) {
+    return sizeValidation;
+  }
+
+  if (isWorkflowFileCandidate(file)) {
+    return { ok: true };
+  }
+
+  return invalidFile(
+    "Unsupported file type",
+    "Please select an image file or a PNG, JPEG, WebP, AVIF, HEIF, or JXL file for metadata analysis.",
+  );
 }
 
 export async function validateUnmarkFile(
@@ -141,6 +181,52 @@ export function isMetadataFileCandidate(file: File) {
   return METADATA_EXTENSIONS.has(file.name.slice(dot + 1).toLowerCase());
 }
 
+export function isWorkflowFileCandidate(file: File) {
+  return (
+    file.type.toLowerCase().startsWith("image/") ||
+    isMetadataFileCandidate(file)
+  );
+}
+
+export async function inspectBrowserImageDecode(
+  file: File,
+): Promise<WorkflowImageDecodeResult> {
+  try {
+    const dimensions = await loadImageDimensions(file);
+    const megapixels = (dimensions.width * dimensions.height) / 1_000_000;
+
+    if (megapixels > MAX_MEGAPIXELS) {
+      return {
+        canDecode: false,
+        width: dimensions.width,
+        height: dimensions.height,
+        megapixels,
+        reason: "too-large",
+        statusMessage: {
+          variant: "destructive",
+          title: "Image resolution is too high",
+          description: `Please use an image up to ${MAX_MEGAPIXELS} megapixels for processing.`,
+        },
+      };
+    }
+
+    return {
+      canDecode: true,
+      width: dimensions.width,
+      height: dimensions.height,
+      megapixels,
+    };
+  } catch {
+    return {
+      canDecode: false,
+      width: null,
+      height: null,
+      megapixels: null,
+      reason: "decode-failed",
+    };
+  }
+}
+
 function validateFileSize(file: File): FileValidationResult {
   if (file.size <= MAX_FILE_SIZE_BYTES) {
     return { ok: true };
@@ -166,7 +252,7 @@ function invalidFile(
   };
 }
 
-async function loadImageDimensions(file: File) {
+export async function loadImageDimensions(file: File) {
   const img = new Image();
 
   return await withObjectUrl(file, async (objectUrl) => {

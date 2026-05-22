@@ -12,7 +12,7 @@ export interface GeminiVisibleProcessResult {
 }
 
 interface PendingJob {
-  resolve: (result: GeminiVisibleProcessResult) => void;
+  resolve: (message: GeminiWorkerTerminalResponse) => void;
   reject: (error: Error) => void;
   onProgress?: (stage: GeminiWorkerProgressStage) => void;
   signal?: AbortSignal;
@@ -20,18 +20,75 @@ interface PendingJob {
   worker: Worker;
 }
 
+type GeminiWorkerTerminalResponse = Exclude<
+  GeminiWorkerResponse,
+  { type: "progress" }
+>;
+
 let worker: Worker | null = null;
 let nextJobId = 1;
 const pendingJobs = new Map<number, PendingJob>();
 
-export function processGeminiVisibleWatermark(
+export async function detectGeminiVisibleWatermark(
   imageData: ImageData,
   options: {
     signal?: AbortSignal;
     onProgress?: (stage: GeminiWorkerProgressStage) => void;
   } = {},
 ) {
-  return new Promise<GeminiVisibleProcessResult>((resolve, reject) => {
+  const message = await runGeminiWorkerJob(
+    {
+      type: "detect",
+      jobId: 0,
+      imageData,
+    },
+    options,
+  );
+
+  if (message.type !== "detected") {
+    throw new Error("Gemini worker returned an invalid detect response");
+  }
+
+  return message.detection;
+}
+
+export function processGeminiVisibleWatermark(
+  imageData: ImageData,
+  options: {
+    signal?: AbortSignal;
+    onProgress?: (stage: GeminiWorkerProgressStage) => void;
+    detectionHint?: GeminiDetectionResult | null;
+  } = {},
+) {
+  return runGeminiWorkerJob(
+    {
+      type: "process",
+      jobId: 0,
+      imageData,
+      detectionHint: options.detectionHint ?? undefined,
+    },
+    options,
+  ).then((message): GeminiVisibleProcessResult => {
+    if (message.type !== "done" && message.type !== "skipped") {
+      throw new Error("Gemini worker returned an invalid process response");
+    }
+
+    return {
+      detection: message.detection,
+      imageData: message.imageData,
+      skipped: message.type === "skipped",
+    };
+  });
+}
+
+function runGeminiWorkerJob(
+  requestTemplate: GeminiWorkerRequest,
+  options: {
+    signal?: AbortSignal;
+    onProgress?: (stage: GeminiWorkerProgressStage) => void;
+  } = {},
+) {
+  return new Promise<GeminiWorkerTerminalResponse>((resolve, reject) => {
     if (options.signal?.aborted) {
       reject(createAbortError());
       return;
@@ -58,14 +115,13 @@ export function processGeminiVisibleWatermark(
 
     options.signal?.addEventListener("abort", abortListener, { once: true });
 
-    const request: GeminiWorkerRequest = {
-      type: "process",
+    const request = {
+      ...requestTemplate,
       jobId,
-      imageData,
-    };
+    } satisfies GeminiWorkerRequest;
 
     try {
-      activeWorker.postMessage(request, [imageData.data.buffer]);
+      activeWorker.postMessage(request, [request.imageData.data.buffer]);
     } catch (error) {
       cleanupPendingJob(jobId, pendingJobs.get(jobId));
       reject(
@@ -102,11 +158,7 @@ function getGeminiWorker() {
         return;
       }
 
-      pending.resolve({
-        detection: message.detection,
-        imageData: message.imageData,
-        skipped: message.type === "skipped",
-      });
+      pending.resolve(message);
     },
   );
 

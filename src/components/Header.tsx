@@ -19,7 +19,7 @@ export function Header({ className }: { className?: string }) {
           </span>
         </h1>
         <p className="text-muted-foreground max-w-132 text-2xl leading-tight font-bold tracking-[-0.04em] sm:text-[1.55rem]">
-          Remove invisible AI watermarks.
+          Analyze, remove, and verify AI watermarks.
           <br />
           <span className="text-primary">100% client-side.</span>{" "}
           <span className="text-muted-foreground">
@@ -65,9 +65,7 @@ function Feature({
         <div className="text-foreground text-sm leading-tight font-extrabold sm:text-base">
           {title}
         </div>
-        <div className="text-muted-foreground text-ui-body">
-          {body}
-        </div>
+        <div className="text-muted-foreground text-ui-body">{body}</div>
       </div>
     </div>
   );

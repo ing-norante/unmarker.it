@@ -1,7 +1,9 @@
 import { Button } from "./ui/button";
 import {
   ArrowClockwiseIcon,
+  DownloadSimpleIcon,
   FileImageIcon,
+  FileSearchIcon,
   LightningIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
@@ -9,41 +11,75 @@ import { Spinner } from "./ui/spinner";
 import { usePostHog } from "posthog-js/react";
 import { trackAction } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import type { WorkflowPhase } from "@/lib/types";
 
 interface ActionBarProps {
   fileName: string;
-  isProcessing: boolean;
+  phase: WorkflowPhase;
   hasProcessedImage: boolean;
+  processedImageUrl: string | null;
+  processedFileName: string | null;
+  canCleanMetadata: boolean;
+  isMetadataCleaning: boolean;
+  canProcess: boolean;
   onReset: () => void;
   onCancel: () => void;
-  onProcess: () => void;
+  onRetry: () => void;
+  onReprocess: () => void;
+  onDownloadCleanMetadata: () => void;
   className?: string;
 }
 
 export function ActionBar({
   fileName,
-  isProcessing,
+  phase,
   hasProcessedImage,
+  processedImageUrl,
+  processedFileName,
+  canCleanMetadata,
+  isMetadataCleaning,
+  canProcess,
   onReset,
   onCancel,
-  onProcess,
+  onRetry,
+  onReprocess,
+  onDownloadCleanMetadata,
   className,
 }: ActionBarProps) {
   const posthog = usePostHog();
+  const isBusy =
+    phase === "preflight-scanning" ||
+    phase === "processing" ||
+    phase === "postflight-scanning";
+  const canCancel =
+    phase === "preflight-scanning" ||
+    phase === "processing" ||
+    phase === "postflight-scanning";
+  const canRetry = phase === "error" || (phase === "cancelled" && canProcess);
+  const canReprocess = phase === "complete" && canProcess;
 
   const handleReset = () => {
     trackAction(posthog, "reset", "action_bar");
     onReset();
   };
 
-  const handleProcess = () => {
+  const handleRetry = () => {
     trackAction(posthog, "process_image", "action_bar");
-    onProcess();
+    onRetry();
+  };
+
+  const handleReprocess = () => {
+    trackAction(posthog, "reprocess_started", "action_bar");
+    onReprocess();
   };
 
   const handleCancel = () => {
     trackAction(posthog, "cancel_processing", "action_bar");
     onCancel();
+  };
+
+  const handleDownload = () => {
+    trackAction(posthog, "download_processed", "action_bar");
   };
 
   return (
@@ -60,28 +96,54 @@ export function ActionBar({
         <span className="truncate">{fileName}</span>
       </div>
       <div className="flex flex-wrap gap-2">
-        {isProcessing && (
+        {canCancel && (
           <Button variant="destructive" onClick={handleCancel}>
             <XCircleIcon data-icon="inline-start" />
             Cancel
           </Button>
         )}
-        <Button variant="outline" onClick={handleReset} disabled={isProcessing}>
+        <Button variant="outline" onClick={handleReset} disabled={isBusy}>
           <ArrowClockwiseIcon data-icon="inline-start" />
           Reset
         </Button>
-        <Button
-          onClick={handleProcess}
-          disabled={isProcessing || hasProcessedImage}
-          className={cn("font-black", hasProcessedImage && "opacity-50")}
-        >
-          {isProcessing ? (
-            <Spinner data-icon="inline-start" />
-          ) : (
+        {canRetry && (
+          <Button onClick={handleRetry} className="font-black">
             <LightningIcon data-icon="inline-start" />
-          )}
-          {isProcessing ? "Processing..." : "UnmarkIt!"}
-        </Button>
+            Retry
+          </Button>
+        )}
+        {canReprocess && (
+          <Button onClick={handleReprocess} className="font-black">
+            <LightningIcon data-icon="inline-start" />
+            Reprocess
+          </Button>
+        )}
+        {processedImageUrl && hasProcessedImage && (
+          <Button asChild>
+            <a
+              href={processedImageUrl}
+              download={processedFileName ?? undefined}
+              onClick={handleDownload}
+            >
+              <DownloadSimpleIcon data-icon="inline-start" />
+              Download JPEG
+            </a>
+          </Button>
+        )}
+        {canCleanMetadata && (
+          <Button
+            variant="outline"
+            onClick={onDownloadCleanMetadata}
+            disabled={isBusy || isMetadataCleaning}
+          >
+            {isMetadataCleaning ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <FileSearchIcon data-icon="inline-start" />
+            )}
+            Clean metadata
+          </Button>
+        )}
       </div>
     </div>
   );
