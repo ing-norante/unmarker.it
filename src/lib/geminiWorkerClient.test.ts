@@ -98,6 +98,50 @@ describe("geminiWorkerClient", () => {
     expect(result.imageData).toBe(resultImage);
     expect(result.skipped).toBe(false);
   });
+
+  it("supports detect-only jobs", async () => {
+    const { detectGeminiVisibleWatermark } =
+      await import("./geminiWorkerClient");
+
+    const promise = detectGeminiVisibleWatermark(makeImageData());
+    const activeWorker = workers[0];
+    const detection = makeDetection();
+
+    activeWorker?.emitMessage({
+      type: "detected",
+      jobId: getJobId(activeWorker),
+      detection,
+    });
+
+    await expect(promise).resolves.toBe(detection);
+    expect(getJobType(activeWorker)).toBe("detect");
+  });
+
+  it("passes detection hints to process jobs", async () => {
+    const { processGeminiVisibleWatermark } =
+      await import("./geminiWorkerClient");
+    const detection = makeDetection();
+
+    const promise = processGeminiVisibleWatermark(makeImageData(), {
+      detectionHint: detection,
+    });
+    const activeWorker = workers[0];
+    const resultImage = makeImageData();
+
+    expect(getJobMessage(activeWorker).detectionHint).toBe(detection);
+
+    activeWorker?.emitMessage({
+      type: "skipped",
+      jobId: getJobId(activeWorker),
+      detection,
+      imageData: resultImage,
+    });
+
+    const result = await promise;
+
+    expect(result.skipped).toBe(true);
+    expect(result.detection).toBe(detection);
+  });
 });
 
 function makeImageData() {
@@ -120,15 +164,27 @@ function makeDetection(): GeminiDetectionResult {
 }
 
 function getJobId(worker: MockWorker) {
+  return getJobMessage(worker).jobId;
+}
+
+function getJobType(worker: MockWorker) {
+  return getJobMessage(worker).type;
+}
+
+function getJobMessage(worker: MockWorker) {
   const [message] = worker.messages;
   if (!isJobMessage(message)) {
     throw new Error("Expected the worker to receive a Gemini job message");
   }
 
-  return message.jobId;
+  return message;
 }
 
-function isJobMessage(message: unknown): message is { jobId: number } {
+function isJobMessage(message: unknown): message is {
+  jobId: number;
+  type: string;
+  detectionHint?: GeminiDetectionResult;
+} {
   return (
     typeof message === "object" &&
     message !== null &&

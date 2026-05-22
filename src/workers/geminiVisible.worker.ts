@@ -143,8 +143,6 @@ ctx.addEventListener("message", (event: MessageEvent<GeminiWorkerRequest>) => {
 });
 
 async function handleMessage(message: GeminiWorkerRequest) {
-  if (message.type !== "process") return;
-
   try {
     postProgress(message.jobId, "loading-opencv");
     const cv = await loadOpenCv();
@@ -154,7 +152,16 @@ async function handleMessage(message: GeminiWorkerRequest) {
     const alphaMaps = await loadAlphaMaps();
 
     postProgress(message.jobId, "detecting");
-    const detection = detectGeminiWatermark(cv, message.imageData, alphaMaps);
+    const detection =
+      message.type === "process" && message.detectionHint
+        ? message.detectionHint
+        : detectGeminiWatermark(cv, message.imageData, alphaMaps);
+
+    if (message.type === "detect") {
+      postProgress(message.jobId, "done");
+      postDetectionResponse(message.jobId, detection);
+      return;
+    }
 
     if (!detection.detected) {
       postProgress(message.jobId, "skipped");
@@ -731,6 +738,13 @@ function postImageResponse(
   postMessageToMain({ type, jobId, detection, imageData }, [
     imageData.data.buffer,
   ]);
+}
+
+function postDetectionResponse(
+  jobId: number,
+  detection: GeminiDetectionResult,
+) {
+  postMessageToMain({ type: "detected", jobId, detection });
 }
 
 function postError(jobId: number, message: string) {

@@ -15,6 +15,7 @@ import {
 } from "@/lib/pipelineSteps";
 import { withObjectUrl } from "@/lib/objectUrl";
 import type {
+  GeminiDetectionResult,
   PipelineStepId,
   PipelineStepState,
   StatusMessage,
@@ -29,6 +30,25 @@ interface UseUnmarkPipelineOptions {
   setStatusMessage: SetStatusMessage;
 }
 
+export type PipelineRunResult =
+  | {
+      ok: true;
+      blob: Blob;
+      fileName: string;
+      objectUrl: string | null;
+      detection: GeminiDetectionResult;
+      skippedVisibleRestore: boolean;
+    }
+  | {
+      ok: false;
+      reason: "cancelled" | "error";
+    };
+
+export interface ProcessPipelineOptions {
+  file?: File;
+  detectionHint?: GeminiDetectionResult | null;
+}
+
 export function useUnmarkPipeline({
   originalImage,
   setStatusMessage,
@@ -36,6 +56,7 @@ export function useUnmarkPipeline({
   const [processedFileName, setProcessedFileName] = useState<string | null>(
     null,
   );
+  const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [crushQuality, setCrushQuality] = useState(
     DEFAULT_OPTIONS.crush!.quality,
@@ -70,6 +91,7 @@ export function useUnmarkPipeline({
   const clearProcessedImage = useCallback(() => {
     clearProcessedObjectUrl();
     setProcessedFileName(null);
+    setProcessedBlob(null);
   }, [clearProcessedObjectUrl]);
 
   const cancelProcessing = useCallback(() => {
@@ -84,117 +106,138 @@ export function useUnmarkPipeline({
     resetSteps();
   }, [clearProcessedImage, resetSteps]);
 
-  const processPipeline = useCallback(async () => {
-    if (!originalImage || !canvasRef.current || isProcessing) {
-      return;
-    }
+  const processPipeline = useCallback(
+    async (
+      options: ProcessPipelineOptions = {},
+    ): Promise<PipelineRunResult> => {
+      const sourceFile = options.file ?? originalImage;
 
-    setStatusMessage(null);
-    setIsProcessing(true);
-    clearProcessedImage();
-    resetSteps();
-
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-    const { signal } = abortController;
-
-    try {
-      const img = await loadImageFromFile(originalImage, signal);
-
-      const canvas = canvasRef.current;
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-      if (!ctx) {
-        throw new Error("Could not get canvas context");
+      if (!sourceFile || !canvasRef.current || isProcessing) {
+        return { ok: false, reason: "error" };
       }
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      setStatusMessage(null);
+      setIsProcessing(true);
+      clearProcessedImage();
+      resetSteps();
 
-      updateStep("gemini-detect", { status: "running", progress: 10 });
-      const geminiResult = await processGeminiVisibleWatermark(
-        ctx.getImageData(0, 0, canvas.width, canvas.height),
-        {
-          signal,
-          onProgress: (stage) => {
-            updateGeminiProgress(stage, updateStep);
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      const { signal } = abortController;
+
+      try {
+        const img = await loadImageFromFile(sourceFile, signal);
+
+        const canvas = canvasRef.current;
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+        if (!ctx) {
+          throw new Error("Could not get canvas context");
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        updateStep("gemini-detect", { status: "running", progress: 10 });
+        const geminiResult = await processGeminiVisibleWatermark(
+          ctx.getImageData(0, 0, canvas.width, canvas.height),
+          {
+            detectionHint: options.detectionHint,
+            signal,
+            onProgress: (stage) => {
+              updateGeminiProgress(stage, updateStep);
+            },
           },
-        },
-      );
-      assertNotAborted(signal);
+        );
+        assertNotAborted(signal);
 
-      ctx.putImageData(geminiResult.imageData, 0, 0);
-      updateStep("gemini-detect", { status: "done", progress: 100 });
-      updateStep("gemini-restore", {
-        status: geminiResult.skipped ? "skipped" : "done",
-        progress: 100,
-      });
-
-      updateStep("shake", { status: "running", progress: 10 });
-      await delay(500, signal);
-
-      const shakeSource = createCanvasSnapshot(canvas);
-      await applyShake(ctx, shakeSource, DEFAULT_OPTIONS.shake, signal);
-      updateStep("shake", { status: "done", progress: 100 });
-
-      updateStep("stir", { status: "running", progress: 10 });
-      await delay(500, signal);
-
-      await applyStir(ctx, DEFAULT_OPTIONS.stir, signal);
-      updateStep("stir", { status: "done", progress: 100 });
-
-      updateStep("crush", { status: "running", progress: 10 });
-      await delay(500, signal);
-
-      const resultBlob = await applyCrush(
-        canvas,
-        { quality: crushQuality },
-        signal,
-      );
-      assertNotAborted(signal);
-
-      setProcessedObjectUrl(resultBlob);
-      setProcessedFileName(generateCameraLikeFilename());
-      updateStep("crush", { status: "done", progress: 100 });
-      toast.success("Image processed.");
-    } catch (error) {
-      if (isAbortError(error)) {
-        setStatusMessage({
-          variant: "default",
-          title: "Processing cancelled",
-          description: "You can adjust the image and run the pipeline again.",
+        ctx.putImageData(geminiResult.imageData, 0, 0);
+        updateStep("gemini-detect", { status: "done", progress: 100 });
+        updateStep("gemini-restore", {
+          status: geminiResult.skipped ? "skipped" : "done",
+          progress: 100,
         });
-        toast("Processing cancelled.");
-        setSteps(resetRunningPipelineSteps);
-      } else {
-        console.error("Pipeline failed", error);
-        setStatusMessage({
-          variant: "destructive",
-          title: "Could not process image",
-          description:
-            "Try a smaller or different file. If this keeps happening, reload and retry.",
-        });
-        toast.error("Could not process image.");
-        setSteps(markRunningPipelineStepsAsError);
+
+        updateStep("shake", { status: "running", progress: 10 });
+        await delay(500, signal);
+
+        const shakeSource = createCanvasSnapshot(canvas);
+        await applyShake(ctx, shakeSource, DEFAULT_OPTIONS.shake, signal);
+        updateStep("shake", { status: "done", progress: 100 });
+
+        updateStep("stir", { status: "running", progress: 10 });
+        await delay(500, signal);
+
+        await applyStir(ctx, DEFAULT_OPTIONS.stir, signal);
+        updateStep("stir", { status: "done", progress: 100 });
+
+        updateStep("crush", { status: "running", progress: 10 });
+        await delay(500, signal);
+
+        const resultBlob = await applyCrush(
+          canvas,
+          { quality: crushQuality },
+          signal,
+        );
+        assertNotAborted(signal);
+
+        const fileName = generateCameraLikeFilename();
+        const objectUrl = setProcessedObjectUrl(resultBlob);
+
+        setProcessedBlob(resultBlob);
+        setProcessedFileName(fileName);
+        updateStep("crush", { status: "done", progress: 100 });
+        toast.success("Image processed.");
+        return {
+          ok: true,
+          blob: resultBlob,
+          fileName,
+          objectUrl,
+          detection: geminiResult.detection,
+          skippedVisibleRestore: geminiResult.skipped,
+        };
+      } catch (error) {
+        if (isAbortError(error)) {
+          setStatusMessage({
+            variant: "default",
+            title: "Processing cancelled",
+            description: "You can adjust the image and run the pipeline again.",
+          });
+          toast("Processing cancelled.");
+          setSteps(resetRunningPipelineSteps);
+          return { ok: false, reason: "cancelled" };
+        } else {
+          console.error("Pipeline failed", error);
+          setStatusMessage({
+            variant: "destructive",
+            title: "Could not process image",
+            description:
+              "Try a smaller or different file. If this keeps happening, reload and retry.",
+          });
+          toast.error("Could not process image.");
+          setSteps(markRunningPipelineStepsAsError);
+          return { ok: false, reason: "error" };
+        }
+      } finally {
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
+        setIsProcessing(false);
       }
-    } finally {
-      if (abortControllerRef.current === abortController) {
-        abortControllerRef.current = null;
-      }
-      setIsProcessing(false);
-    }
-  }, [
-    clearProcessedImage,
-    crushQuality,
-    isProcessing,
-    originalImage,
-    resetSteps,
-    setProcessedObjectUrl,
-    setStatusMessage,
-    updateStep,
-  ]);
+    },
+    [
+      clearProcessedImage,
+      crushQuality,
+      isProcessing,
+      originalImage,
+      resetSteps,
+      setProcessedObjectUrl,
+      setStatusMessage,
+      updateStep,
+    ],
+  );
 
   useEffect(() => {
     return () => {
@@ -204,6 +247,7 @@ export function useUnmarkPipeline({
 
   return {
     canvasRef,
+    processedBlob,
     processedImageUrl,
     processedFileName,
     isProcessing,

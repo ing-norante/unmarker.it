@@ -1,19 +1,28 @@
 # Unmarker.it
 
-> Unmarker.it is a browser-based image processing tool for disrupting invisible AI watermark signals. Images are processed locally in the user's browser with Canvas API operations and are not uploaded to Unmarker.it servers.
+> Unmarker.it is a browser-based image analysis and processing tool for detecting local AI provenance signals, disrupting watermark traces, and verifying the generated JPEG output. Images are processed locally in the user's browser with Canvas API operations and are not uploaded to Unmarker.it servers.
 
 ## Core Facts
 
 - Official URL: https://www.unmarker.it/
 - Category: browser-based image processing tool
-- Main use case: disrupt invisible AI watermark signals in generated or edited images
+- Main use case: analyze local AI provenance signals, remove supported visible marks, disrupt invisible watermark traces, and verify the processed result
 - Processing model: 100% client-side in the browser
 - Account requirement: no account required
 - Upload policy: images stay in the browser and are not uploaded for processing
-- Input limit: browser-decodable image files up to 40 megapixels
-- Output format: lossy JPEG
+- Input limit: browser-decodable image files up to 40 megapixels for processing
+- Analysis-only formats: PNG, JPEG, WebP, AVIF, HEIF, and JXL metadata can be scanned when processing is not available
+- Output format: lossy JPEG for the full watermark disruption workflow
+- Secondary output: metadata-clean original-format copy when removable metadata cleanup is supported
 
-## Processing Pipeline
+## Unified Workflow
+
+1. Preflight Analysis: scans metadata, checks for a visible Gemini / Nano Banana watermark when pixels are decodable, estimates a local AI provenance score, and reports hidden watermark risk.
+2. Automatic Processing: runs the local disruption pipeline when the browser can decode the image into canvas pixels.
+3. Postflight Verification: scans the generated JPEG again and shows a before/after summary for metadata, visible watermark status, and hidden watermark disruption status.
+4. Analysis-only Mode: for supported metadata formats that are not canvas-decodable, the app shows metadata and AI provenance analysis without running the image processing pipeline.
+
+## Processing Pipeline Steps
 
 1. Gemini Scan: scans the bottom-right corner for the visible Gemini / Nano Banana sparkle watermark with an OpenCV.js Web Worker.
 2. Gemini Restore: when a mark is detected, reverses the logo alpha blend and repairs residual sparkle edges with local inpainting; this step is skipped when no mark is detected.
@@ -24,16 +33,20 @@
 ## Technical Notes
 
 - Gemini Scan uses OpenCV.js locally in a browser Web Worker.
+- The Gemini worker supports separate detect and process requests; processing can reuse a preflight detection hint.
+- AI provenance scoring is heuristic and local. It uses metadata markers, provider hints, C2PA-style provenance, and visible Gemini watermark confidence.
 - Production deployments require a CSP that allows `'unsafe-eval'` and `'wasm-unsafe-eval'` for the OpenCV.js worker.
 - The app does not call a Gemini API or any server-side image processing endpoint.
 
 ## Limitations
 
 - Unmarker.it does not guarantee that every invisible watermark will be removed or made undetectable.
-- Gemini Scan targets a visible Gemini / Nano Banana sparkle mark and does not guarantee removal of invisible provenance metadata or invisible watermarking systems.
+- Gemini Scan targets a visible Gemini / Nano Banana sparkle mark.
+- The AI provenance score is not a general-purpose AI image detector and does not prove that an image is human-made or AI-made.
+- Hidden watermark status after processing is "neutralized, not independently verified" because no universal local detector exists for every invisible watermarking system.
 - Results depend on the watermarking method, input image, detector, compression level, and downstream reuse.
-- The output is a lossy JPEG, so metadata and original file format are not preserved.
-- Images above 40 megapixels are rejected before processing, and unsupported image files may fail local browser decoding.
+- The full processing output is a lossy JPEG, so original format and metadata are not preserved in that output.
+- Images above 40 megapixels are not processed, and unsupported image files may fail local browser decoding.
 
 ## Responsible Use
 

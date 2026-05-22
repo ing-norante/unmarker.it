@@ -1,5 +1,15 @@
 export type AppMode = "unmark" | "metadata";
 
+export type WorkflowPhase =
+  | "idle"
+  | "preflight-scanning"
+  | "analysis-only"
+  | "processing"
+  | "postflight-scanning"
+  | "complete"
+  | "error"
+  | "cancelled";
+
 export type StatusMessage = {
   variant: "default" | "destructive";
   title: string;
@@ -83,6 +93,77 @@ export interface MetadataCleanResult {
   warnings: string[];
 }
 
+export type ImageAuditStage = "preflight" | "postflight";
+
+export type VisibleWatermarkStatus =
+  | "not-scanned"
+  | "detected"
+  | "not-detected"
+  | "scan-failed";
+
+export interface VisibleWatermarkAudit {
+  status: VisibleWatermarkStatus;
+  detection: GeminiDetectionResult | null;
+  confidence: number | null;
+  label: string;
+  description: string;
+}
+
+export type HiddenWatermarkStatus =
+  | "pending"
+  | "at-risk"
+  | "neutralized-unverified"
+  | "unverified";
+
+export interface HiddenWatermarkAudit {
+  status: HiddenWatermarkStatus;
+  label: string;
+  description: string;
+}
+
+export interface AiProvenanceScore {
+  percentage: number;
+  label: string;
+  provider: string | null;
+  evidence: string[];
+  confidence: "high" | "medium" | "low";
+  description: string;
+}
+
+export interface ImageAuditResult {
+  stage: ImageAuditStage;
+  metadataScan: MetadataScanResult | null;
+  visibleWatermark: VisibleWatermarkAudit;
+  hiddenWatermark: HiddenWatermarkAudit;
+  aiScore: AiProvenanceScore;
+  warnings: string[];
+}
+
+export interface ImageVerificationDiff {
+  metadataBeforeCount: number | null;
+  metadataAfterCount: number | null;
+  visibleBefore: VisibleWatermarkStatus;
+  visibleAfter: VisibleWatermarkStatus | null;
+  hiddenAfter: HiddenWatermarkStatus;
+  warnings: string[];
+}
+
+export interface ImageWorkflowCapabilities {
+  canProcess: boolean;
+  canCleanMetadata: boolean;
+}
+
+export interface ImageWorkflowState {
+  phase: WorkflowPhase;
+  preflightAudit: ImageAuditResult | null;
+  postflightAudit: ImageAuditResult | null;
+  detectionHint: GeminiDetectionResult | null;
+  processedBlob: Blob | null;
+  processedImageUrl: string | null;
+  processedFileName: string | null;
+  capabilities: ImageWorkflowCapabilities;
+}
+
 export interface GeminiWatermarkRegion {
   x: number;
   y: number;
@@ -109,17 +190,29 @@ export type GeminiWorkerProgressStage =
   | "skipped"
   | "error";
 
-export type GeminiWorkerRequest = {
-  type: "process";
-  jobId: number;
-  imageData: ImageData;
-};
+export type GeminiWorkerRequest =
+  | {
+      type: "detect";
+      jobId: number;
+      imageData: ImageData;
+    }
+  | {
+      type: "process";
+      jobId: number;
+      imageData: ImageData;
+      detectionHint?: GeminiDetectionResult;
+    };
 
 export type GeminiWorkerResponse =
   | {
       type: "progress";
       jobId: number;
       stage: GeminiWorkerProgressStage;
+    }
+  | {
+      type: "detected";
+      jobId: number;
+      detection: GeminiDetectionResult;
     }
   | {
       type: "done";
