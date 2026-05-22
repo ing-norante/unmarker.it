@@ -74,12 +74,12 @@ function App() {
     state.phase === "postflight-scanning";
 
   return (
-    <div className="bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex min-h-dvh p-0 font-sans lg:px-8">
-      <div className="bg-background mx-auto flex min-h-dvh w-full max-w-[1500px] flex-col overflow-hidden">
-        <div className="relative flex flex-col px-6 py-8 lg:min-h-0 lg:px-12 lg:py-10">
+    <div className="bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex min-h-dvh p-0 font-sans">
+      <div className="bg-background flex min-h-dvh w-full flex-col overflow-hidden">
+        <div className="relative flex flex-col px-[var(--page-gutter)] py-8 lg:min-h-0 lg:py-10 2xl:py-12">
           <main
             role="main"
-            className="relative z-10 mx-auto grid w-full max-w-[1340px] grid-cols-1 content-start gap-8 lg:min-h-0 lg:grid-cols-[minmax(30rem,34rem)_minmax(0,1fr)] lg:items-start lg:gap-x-12"
+            className="wide-display-grid relative z-10 grid w-full grid-cols-1 content-start gap-8 lg:min-h-0 lg:grid-cols-[minmax(28rem,42%)_minmax(0,1fr)] lg:items-start lg:gap-x-10 xl:grid-cols-[minmax(34rem,45%)_minmax(0,1fr)] xl:gap-x-12 2xl:gap-x-16"
           >
             {/* Hero + pipeline: one column on desktop; hero pinned, steps scroll below */}
             <div className="contents lg:col-start-1 lg:flex lg:min-h-0 lg:flex-col lg:gap-4">
@@ -87,7 +87,7 @@ function App() {
 
               <aside className="order-3 flex min-h-0 flex-col gap-4 lg:order-0 lg:flex-1">
                 <div className="flex items-center gap-4">
-                  <h2 className="text-muted-foreground shrink-0 text-base font-black tracking-[-0.02em] sm:text-lg">
+                  <h2 className="text-muted-foreground shrink-0 text-base font-black sm:text-lg 2xl:text-xl">
                     WORKFLOW
                   </h2>
                   <Separator className="flex-1" />
@@ -133,7 +133,7 @@ function App() {
               )}
 
               {!originalImage && (
-                <div className="flex min-h-[min(62vh,50rem)] flex-col lg:min-h-[min(70vh,50rem)] lg:flex-1">
+                <div className="flex min-h-[min(62vh,50rem)] flex-col lg:min-h-[min(70vh,50rem)] lg:flex-1 2xl:min-h-[min(72vh,56rem)]">
                   <ImageUploader
                     onImageSelect={selectImage}
                     accept={filePolicy.accept}
@@ -142,7 +142,7 @@ function App() {
                       "Drop it here to analyze local AI signals, then remove watermarks automatically when processing is available."
                     }
                     details={<FilePolicyDetails policy={filePolicy} />}
-                    className="min-h-[min(62vh,50rem)] flex-1 lg:min-h-[min(70vh,50rem)]"
+                    className="min-h-[min(62vh,50rem)] flex-1 lg:min-h-[min(70vh,50rem)] 2xl:min-h-[min(72vh,56rem)]"
                   />
                 </div>
               )}
@@ -183,10 +183,10 @@ function App() {
             </section>
           </main>
         </div>
-        <div className="px-6 pb-8 lg:px-12">
+        <div className="px-[var(--page-gutter)] pb-8">
           <HomepageFacts />
         </div>
-        <div className="px-6 pb-6 lg:px-12 lg:pb-8">
+        <div className="px-[var(--page-gutter)] pb-6 lg:pb-8">
           <Footer />
         </div>
       </div>
@@ -200,19 +200,19 @@ function HomepageFacts() {
   return (
     <section
       aria-labelledby="homepage-facts-heading"
-      className="mx-auto w-full max-w-[1340px] border-t pt-8"
+      className="w-full border-t pt-8"
     >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-10">
+      <div className="grid gap-6 lg:grid-cols-[minmax(22rem,0.75fr)_minmax(0,1.25fr)] lg:gap-10 2xl:grid-cols-[minmax(34rem,0.7fr)_minmax(0,1.3fr)] 2xl:gap-14">
         <div className="flex flex-col gap-3">
           <p className="text-muted-foreground text-ui-overline">Core facts</p>
           <h2
             id="homepage-facts-heading"
-            className="text-foreground text-2xl leading-tight font-black sm:text-3xl"
+            className="text-foreground text-2xl leading-tight font-black sm:text-3xl xl:text-4xl 2xl:text-5xl"
           >
             Client-side AI watermark analysis and removal, with no image
             uploads.
           </h2>
-          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed font-medium sm:text-base">
+          <p className="text-muted-foreground text-sm leading-relaxed font-medium sm:text-base 2xl:text-lg">
             Unmarker.it is a privacy-first browser tool that analyzes local AI
             provenance signals, removes supported visible marks, disrupts hidden
             watermark patterns, and verifies the generated JPEG again in your
@@ -220,16 +220,16 @@ function HomepageFacts() {
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 2xl:gap-4">
           {HOMEPAGE_FACTS.map((fact) => (
             <article
               key={fact.title}
-              className="bg-card text-card-foreground flex min-h-36 flex-col gap-2 border p-4"
+              className="bg-card text-card-foreground flex min-h-36 flex-col gap-2 border p-4 2xl:min-h-44 2xl:p-5"
             >
-              <h3 className="text-base leading-tight font-black sm:text-lg">
+              <h3 className="text-base leading-tight font-black sm:text-lg 2xl:text-2xl">
                 {fact.title}
               </h3>
-              <p className="text-muted-foreground text-sm leading-relaxed font-medium sm:text-base">
+              <p className="text-muted-foreground text-sm leading-relaxed font-medium sm:text-base 2xl:text-lg">
                 {fact.body}
               </p>
             </article>
