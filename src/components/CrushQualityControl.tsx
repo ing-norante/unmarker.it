@@ -23,16 +23,16 @@ export function CrushQualityControl({
 
   return (
     <Card size="sm" className="bg-card/95 mt-2 border py-0">
-      <CardContent className="flex flex-col gap-3 p-2.5">
+      <CardContent className="flex flex-col gap-3 p-3 lg:p-3.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-foreground text-[0.84rem] font-extrabold tracking-[-0.02em]">
+          <span className="text-foreground text-ui-title">
             Crush JPEG quality
           </span>
-          <span className="text-muted-foreground text-[0.68rem] font-bold tabular-nums">
+          <span className="text-muted-foreground text-ui-body font-bold tabular-nums">
             {percent}%
           </span>
         </div>
-        <p className="text-muted-foreground text-[0.68rem] leading-tight font-medium">
+        <p className="text-muted-foreground text-ui-body">
           Lower quality applies more JPEG compression and can remove more
           watermark residue; higher keeps more detail.
         </p>
@@ -45,7 +45,7 @@ export function CrushQualityControl({
           disabled={disabled}
           aria-label="JPEG output quality"
         />
-        <div className="text-muted-foreground flex justify-between text-[0.64rem] font-medium">
+        <div className="text-muted-foreground text-ui-caption flex justify-between">
           <span>More compression</span>
           <span>More detail</span>
         </div>

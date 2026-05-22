@@ -27,39 +27,43 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
           key={step.id}
           size="sm"
           className={cn(
-            "bg-card/95 overflow-hidden border py-0 transition-colors",
+            "bg-card/95 overflow-visible border py-0 transition-colors",
             step.status === "running"
               ? "border-primary bg-primary/10"
               : "hover:bg-muted/40",
           )}
         >
-          <CardContent className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-2.5 p-2.5 sm:grid-cols-[3.25rem_minmax(0,1fr)_4.35rem] sm:gap-3">
-            <div className="bg-muted text-foreground flex size-12 items-center justify-center border">
-              <StepGlyph id={step.id} status={step.status} />
-            </div>
+          <CardContent className="flex flex-col gap-2 p-3 lg:p-3.5">
+            <div className="flex items-start gap-2.5 sm:gap-3">
+              <div className="bg-muted text-foreground flex size-12 shrink-0 items-center justify-center border">
+                <StepGlyph id={step.id} status={step.status} />
+              </div>
 
-            <div className="flex min-w-0 flex-col gap-1">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="text-foreground truncate text-[0.84rem] font-extrabold tracking-[-0.02em]">
-                  {step.label}
-                </span>
-                {step.status === "done" && (
-                  <CheckIcon
-                    className="text-chart-2 size-4 shrink-0"
-                    weight="bold"
-                  />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="text-foreground text-ui-title">
+                      {step.label}
+                    </span>
+                    {step.status === "done" && (
+                      <CheckIcon
+                        className="text-chart-2 size-4 shrink-0"
+                        weight="bold"
+                      />
+                    )}
+                  </div>
+                  <StatusBadge status={step.status} />
+                </div>
+                {step.description && (
+                  <p className="text-muted-foreground text-ui-body text-pretty wrap-break-word">
+                    {step.description}
+                  </p>
                 )}
               </div>
-              {step.description && (
-                <p className="text-muted-foreground line-clamp-2 text-[0.68rem] leading-tight font-medium">
-                  {step.description}
-                </p>
-              )}
             </div>
 
-            <StatusBadge status={step.status} />
             {step.status === "running" && (
-              <Progress className="col-span-full h-1" value={step.progress} />
+              <Progress className="h-1 w-full" value={step.progress} />
             )}
           </CardContent>
         </Card>
@@ -101,7 +105,7 @@ function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
   switch (status) {
     case "done":
       return (
-        <Badge className="border-chart-2/20 bg-chart-2/10 text-chart-2 justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end">
+        <Badge className="border-chart-2/20 bg-chart-2/10 text-chart-2 text-ui-caption shrink-0 font-bold uppercase">
           <span className="bg-chart-2 size-1.5" />
           Done
         </Badge>
@@ -110,7 +114,7 @@ function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
       return (
         <Badge
           variant="outline"
-          className="bg-muted text-muted-foreground justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end"
+          className="bg-muted text-muted-foreground text-ui-caption shrink-0 font-bold uppercase"
         >
           <span className="bg-muted-foreground/40 size-1.5" />
           Skip
@@ -118,7 +122,7 @@ function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
       );
     case "running":
       return (
-        <Badge className="border-primary/30 bg-primary/10 text-primary justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end">
+        <Badge className="border-primary/30 bg-primary/10 text-primary text-ui-caption shrink-0 font-bold uppercase">
           <Spinner data-icon="inline-start" />
           Run
         </Badge>
@@ -127,7 +131,7 @@ function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
       return (
         <Badge
           variant="destructive"
-          className="justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end"
+          className="text-ui-caption shrink-0 font-bold uppercase"
         >
           <span className="bg-destructive size-1.5" />
           Error
@@ -137,7 +141,7 @@ function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
       return (
         <Badge
           variant="outline"
-          className="bg-muted/60 text-muted-foreground justify-self-start text-[0.64rem] font-bold uppercase sm:justify-self-end"
+          className="bg-muted/60 text-muted-foreground text-ui-caption shrink-0 font-bold uppercase"
         >
           <span className="bg-muted-foreground/30 size-1.5" />
           Idle

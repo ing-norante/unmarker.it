@@ -76,7 +76,7 @@ export function MetadataPanel({
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 flex flex-col gap-4 duration-500 lg:min-h-0 lg:flex-1">
       <div className="bg-card/95 text-card-foreground flex flex-col justify-between gap-4 border p-4 lg:sticky lg:top-0 lg:z-10 lg:flex-row lg:items-center">
-        <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-medium sm:text-base">
           <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center border">
             <FileImageIcon weight="bold" />
           </span>
@@ -152,7 +152,7 @@ export function MetadataPanel({
             </div>
 
             <section className="flex flex-col gap-2">
-              <h3 className="text-xs font-black tracking-wide uppercase">
+              <h3 className="text-ui-overline">
                 Categories
               </h3>
               {categories.length > 0 ? (
@@ -164,7 +164,7 @@ export function MetadataPanel({
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground border border-dashed p-3 text-sm">
+                <p className="text-muted-foreground border border-dashed p-3 text-sm sm:text-base">
                   {isScanning ? "Scanning..." : "No metadata categories found."}
                 </p>
               )}
@@ -172,7 +172,7 @@ export function MetadataPanel({
 
             {scanResult && scanResult.signals.length > 0 && (
               <section className="flex flex-col gap-2">
-                <h3 className="text-xs font-black tracking-wide uppercase">
+                <h3 className="text-ui-overline">
                   Signals
                 </h3>
                 <div className="flex flex-col gap-2">
@@ -182,7 +182,7 @@ export function MetadataPanel({
                       className="bg-muted/40 flex min-w-0 flex-col gap-1 border p-2"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-bold">
+                        <span className="truncate text-sm font-bold sm:text-base">
                           {signal.label}
                         </span>
                         <Badge
@@ -191,7 +191,7 @@ export function MetadataPanel({
                           {signal.removable ? "removable" : "scan only"}
                         </Badge>
                       </div>
-                      <p className="text-muted-foreground truncate font-mono text-xs">
+                      <p className="text-muted-foreground truncate font-mono text-xs sm:text-sm">
                         {signal.location}
                         {signal.marker ? ` / ${signal.marker}` : ""}
                       </p>
@@ -202,7 +202,7 @@ export function MetadataPanel({
             )}
 
             {cleanResult && cleanResult.removedCount > 0 && (
-              <div className="bg-primary/10 text-primary flex items-start gap-2 border p-3 text-sm font-bold">
+              <div className="bg-primary/10 text-primary flex items-start gap-2 border p-3 text-sm font-bold sm:text-base">
                 <CheckCircleIcon className="mt-0.5 shrink-0" weight="bold" />
                 <p>
                   Clean copy ready: {cleanResult.removedCount} item
@@ -213,14 +213,14 @@ export function MetadataPanel({
 
             {scanResult && scanResult.warnings.length > 0 && (
               <section className="flex flex-col gap-2">
-                <h3 className="text-xs font-black tracking-wide uppercase">
+                <h3 className="text-ui-overline">
                   Warnings
                 </h3>
                 <ul className="flex flex-col gap-2">
                   {scanResult.warnings.map((warning) => (
                     <li
                       key={warning}
-                      className="bg-muted/50 text-muted-foreground border p-2 text-sm"
+                      className="bg-muted/50 text-muted-foreground border p-2 text-sm sm:text-base"
                     >
                       {warning}
                     </li>
@@ -243,7 +243,7 @@ function FileFallback({ file }: { file: File }) {
         <p className="text-foreground max-w-[16rem] truncate font-bold">
           {file.name}
         </p>
-        <p className="font-mono text-xs uppercase">
+        <p className="font-mono text-xs uppercase sm:text-sm">
           {file.type || "unknown type"} / {formatBytes(file.size)}
         </p>
       </div>

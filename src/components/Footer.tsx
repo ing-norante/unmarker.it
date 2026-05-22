@@ -34,7 +34,7 @@ export function Footer() {
     <footer className="bg-background shrink-0 border-t px-7 py-8">
       <div className="flex flex-col items-center justify-between gap-5 md:flex-row">
         <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
-          <span className="text-muted-foreground text-sm font-semibold">
+          <span className="text-muted-foreground text-sm font-semibold sm:text-base">
             Built with
           </span>
           <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
@@ -108,7 +108,7 @@ export function Footer() {
             </a>
           </Button>
           <Separator orientation="vertical" className="h-8" />
-          <span className="text-muted-foreground text-sm font-semibold">
+          <span className="text-muted-foreground text-sm font-semibold sm:text-base">
             Crafted by
           </span>
           <Button asChild variant="secondary" className="h-10 px-5 font-black">

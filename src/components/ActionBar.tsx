@@ -53,7 +53,7 @@ export function ActionBar({
         className,
       )}
     >
-      <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+      <div className="flex min-w-0 items-center gap-2 text-sm font-medium sm:text-base">
         <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center border">
           <FileImageIcon className="size-4" weight="bold" />
         </span>

@@ -62,10 +62,10 @@ function Feature({
     <div className="flex items-center gap-3">
       <Icon className="text-foreground size-5 shrink-0" weight="bold" />
       <div className="min-w-0">
-        <div className="text-foreground text-xs leading-tight font-extrabold">
+        <div className="text-foreground text-sm leading-tight font-extrabold sm:text-base">
           {title}
         </div>
-        <div className="text-muted-foreground text-[0.68rem] leading-tight font-medium">
+        <div className="text-muted-foreground text-ui-body">
           {body}
         </div>
       </div>

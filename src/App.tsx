@@ -168,7 +168,7 @@ function App() {
 
               <aside className="order-3 flex min-h-0 flex-col gap-4 lg:order-0 lg:flex-1">
                 <div className="flex items-center gap-4">
-                  <h2 className="text-muted-foreground shrink-0 text-base font-black tracking-[-0.02em]">
+                  <h2 className="text-muted-foreground shrink-0 text-base font-black tracking-[-0.02em] sm:text-lg">
                     {appMode === "unmark" ? "PIPELINE" : "METADATA"}
                   </h2>
                   <Separator className="flex-1" />
@@ -185,7 +185,7 @@ function App() {
                       />
 
                       {isProcessing && (
-                        <div className="bg-card text-card-foreground mt-4 flex flex-col gap-2 border p-3 text-sm">
+                        <div className="bg-card text-card-foreground mt-4 flex flex-col gap-2 border p-3 text-sm sm:p-4 sm:text-base">
                           <span>Processing in progress...</span>
                           <Skeleton className="h-1 w-full" />
                         </div>
@@ -293,9 +293,7 @@ function HomepageFacts() {
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-10">
         <div className="flex flex-col gap-3">
-          <p className="text-muted-foreground text-xs font-black uppercase">
-            Core facts
-          </p>
+          <p className="text-muted-foreground text-ui-overline">Core facts</p>
           <h2
             id="homepage-facts-heading"
             className="text-foreground text-2xl leading-tight font-black sm:text-3xl"
@@ -303,10 +301,14 @@ function HomepageFacts() {
             Client-side AI watermark removal, with no image uploads.
           </h2>
           <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed font-medium sm:text-base">
-            Unmarker.it is a browser-based image processing tool for disrupting
-            invisible AI watermark signals. The app runs locally, exports a
-            lossy JPEG, and does not call any API or server-side image
-            processing endpoint.
+            Unmarker.it is a privacy-first browser tool that neutralizes
+            invisible AI watermark signals embedded in images — no uploads, no
+            servers, no data leaving your device. Built on adversarial
+            disruption techniques from recent computer vision research, it
+            applies targeted, mathematically precise perturbations directly in
+            your browser to break machine-readable watermark patterns without
+            visible degradation. Your image stays local; the output is a
+            standard JPEG, stripped of tracking signals and ready to use.
           </p>
         </div>
 
@@ -316,8 +318,10 @@ function HomepageFacts() {
               key={fact.title}
               className="bg-card text-card-foreground flex min-h-36 flex-col gap-2 border p-4"
             >
-              <h3 className="text-sm leading-tight font-black">{fact.title}</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed font-medium">
+              <h3 className="text-base leading-tight font-black sm:text-lg">
+                {fact.title}
+              </h3>
+              <p className="text-muted-foreground text-sm leading-relaxed font-medium sm:text-base">
                 {fact.body}
               </p>
             </article>
@@ -330,7 +334,7 @@ function HomepageFacts() {
 
 function FilePolicyDetails({ policy }: { policy: FileModePolicy }) {
   return (
-    <div className="text-muted-foreground text-xs leading-6 font-medium sm:text-sm">
+    <div className="text-muted-foreground text-ui-body leading-6 sm:leading-7">
       <span>{policy.supportedCopy}</span>
       {policy.limitCopy.map((limit) => (
         <span key={limit} className="block">
@@ -351,14 +355,14 @@ function MetadataSidebar({
   const signalCount = result?.signals.length ?? 0;
 
   return (
-    <div className="bg-card text-card-foreground flex flex-col gap-3 border p-3 text-sm">
+    <div className="bg-card text-card-foreground flex flex-col gap-3 border p-3 text-sm sm:p-4 sm:text-base">
       <div className="flex items-center justify-between gap-3">
         <span className="font-bold">
           {isScanning ? "Scanning" : result ? "Scan complete" : "Idle"}
         </span>
         <Badge variant="outline">{result?.format ?? "none"}</Badge>
       </div>
-      <p className="text-muted-foreground text-xs leading-relaxed">
+      <p className="text-muted-foreground text-ui-body">
         {result
           ? `${signalCount} AI metadata signal${signalCount === 1 ? "" : "s"} found.`
           : "Upload a file to scan."}

@@ -123,10 +123,32 @@
   }
 
   html {
-    @apply scroll-smooth font-mono antialiased;
+    @apply scroll-smooth font-mono text-[15px] antialiased sm:text-base;
   }
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Card/step titles — replaces ~0.84rem (~13px) */
+  .text-ui-title {
+    @apply text-sm font-extrabold tracking-[-0.02em] sm:text-base;
+  }
+
+  /* Secondary descriptions — replaces ~0.68rem (~11px) */
+  .text-ui-body {
+    @apply text-xs leading-snug font-medium sm:text-sm sm:leading-normal;
+  }
+
+  /* Badges, hints, fine print — replaces ~0.64rem (~10px) */
+  .text-ui-caption {
+    @apply text-xs font-medium sm:text-sm;
+  }
+
+  /* Section overlines and eyebrow labels */
+  .text-ui-overline {
+    @apply text-xs font-black tracking-wide uppercase sm:text-sm;
   }
 }

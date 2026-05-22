@@ -24,12 +24,12 @@ export function ModeSelector({
       }}
       className={cn("w-full", className)}
     >
-      <TabsList className="grid h-9 w-full grid-cols-2">
-        <TabsTrigger value="unmark" disabled={disabled} className="min-w-0">
+      <TabsList className="grid h-10 w-full grid-cols-2 sm:h-11">
+        <TabsTrigger value="unmark" disabled={disabled} className="min-w-0 text-sm sm:text-base">
           <LightningIcon data-icon="inline-start" weight="bold" />
           <span className="truncate">Watermark remover</span>
         </TabsTrigger>
-        <TabsTrigger value="metadata" disabled={disabled} className="min-w-0">
+        <TabsTrigger value="metadata" disabled={disabled} className="min-w-0 text-sm sm:text-base">
           <FileSearchIcon data-icon="inline-start" weight="bold" />
           <span className="truncate">Metadata analyzer</span>
         </TabsTrigger>

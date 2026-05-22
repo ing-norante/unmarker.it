@@ -178,9 +178,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             {details}
           </div>
 
-          <div className="bg-background/70 text-muted-foreground mt-8 flex w-full max-w-lg min-w-0 items-start justify-center gap-2 px-3 py-2 text-center text-[11px] font-semibold sm:mt-12 sm:px-4 sm:text-xs lg:mt-20">
+          <div className="bg-background/70 text-muted-foreground text-ui-caption mt-8 flex w-full max-w-lg min-w-0 items-start justify-center gap-2 px-3 py-2.5 text-center font-semibold sm:mt-12 sm:px-4 lg:mt-20">
             <LockKeyIcon
-              className="mt-0.5 size-3.5 shrink-0 sm:size-4"
+              className="mt-0.5 size-4 shrink-0 sm:size-4.5"
               weight="bold"
             />
             <span className="text-pretty">
