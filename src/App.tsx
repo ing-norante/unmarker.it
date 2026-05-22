@@ -10,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import {
   getWorkflowFilePolicy,
   type FileModePolicy,
@@ -75,7 +76,7 @@ function App() {
 
   return (
     <div className="bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex min-h-dvh p-0 font-sans">
-      <div className="bg-background flex min-h-dvh w-full flex-col overflow-hidden">
+      <div className="bg-background flex min-h-dvh w-full flex-col overflow-x-clip">
         <div className="relative flex flex-col px-[var(--page-gutter)] py-8 lg:min-h-0 lg:py-10 2xl:py-12">
           <main
             role="main"
@@ -119,7 +120,12 @@ function App() {
             </div>
 
             {/* Workspace before pipeline on mobile; full-height right column on desktop */}
-            <section className="order-2 flex min-w-0 flex-col lg:col-start-2 lg:min-h-0">
+            <section
+              className={cn(
+                "order-2 flex min-w-0 flex-col lg:col-start-2 lg:min-h-0",
+                !originalImage && "sticky-uploader-column",
+              )}
+            >
               {statusMessage && (
                 <Alert
                   variant={statusMessage.variant}

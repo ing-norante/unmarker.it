@@ -145,6 +145,15 @@
   }
 }
 
+@media (min-width: 1439px) {
+  .sticky-uploader-column {
+    position: sticky;
+    top: var(--page-gutter);
+    z-index: 30;
+    align-self: start;
+  }
+}
+
 @layer utilities {
   /* Card/step titles — replaces ~0.84rem (~13px) */
   .text-ui-title {

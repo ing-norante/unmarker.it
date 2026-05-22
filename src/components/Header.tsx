@@ -15,8 +15,10 @@ export function Header({ className }: { className?: string }) {
     >
       <div className="relative flex flex-col gap-3 2xl:gap-5">
         {/* <Sparkles className="fill-primary text-primary absolute top-0 right-10 size-5 sm:right-16" /> */}
-        <h1 className="wide-hero-title text-foreground text-5xl leading-none font-black tracking-normal break-words sm:text-6xl lg:text-7xl xl:text-8xl">
-          <span className="block uppercase">Unmarker.it</span>
+        <h1 className="wide-hero-title text-foreground text-5xl leading-none font-black tracking-normal wrap-break-word sm:text-6xl lg:text-7xl xl:text-[5rem] 2xl:text-8xl">
+          <span className="block uppercase xl:whitespace-nowrap">
+            Unmarker.it
+          </span>
           <span className="text-primary block text-2xl leading-tight font-black sm:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl">
             AI Watermark Remover
           </span>
