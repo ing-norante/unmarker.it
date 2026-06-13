@@ -2,6 +2,9 @@ import { StrictMode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import { initAnalytics } from "@/lib/analytics";
+
+initAnalytics();
 
 const app = (
   <StrictMode>

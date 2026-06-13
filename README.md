@@ -77,6 +77,10 @@ VITE_PUBLIC_POSTHOG_KEY=...
 VITE_PUBLIC_POSTHOG_HOST=...
 ```
 
+`VITE_PUBLIC_POSTHOG_HOST` is kept as the default capture endpoint variable.
+`VITE_PUBLIC_POSTHOG_API_HOST` and `VITE_PUBLIC_POSTHOG_UI_HOST` are also
+supported when the capture and app hosts need to be configured separately.
+
 Without these, image processing still works locally.
 
 ## Deployment Notes

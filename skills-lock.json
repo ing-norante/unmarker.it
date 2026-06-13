@@ -1,6 +1,30 @@
 {
   "version": 1,
   "skills": {
+    "implementing-agent-modes": {
+      "source": "posthog/posthog",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/implementing-agent-modes/SKILL.md",
+      "computedHash": "5375c3b7e9b0408b5c579ca3270e63cc1c655244ae65c59d8bdff750e56cb656"
+    },
+    "monitoring-ingestion-pipeline": {
+      "source": "posthog/posthog",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/monitoring-ingestion-pipeline/SKILL.md",
+      "computedHash": "d87c5a04375ea555a4c00524e6bdac784a18a971c5d1e19a1b599eba88a7a644"
+    },
+    "react-doctor": {
+      "source": "posthog/posthog",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/react-doctor/SKILL.md",
+      "computedHash": "acfe81f4b916b822e7a9e7be90e6a60a1b5b01779a8a5ee445e941c59638f917"
+    },
+    "run-posthog": {
+      "source": "posthog/posthog",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/run-posthog/SKILL.md",
+      "computedHash": "aefad3c6a9ab1d542fe4bb2d12944b2f4585b7f31ef894f1f2acc98b16314253"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",

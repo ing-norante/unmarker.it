@@ -34,25 +34,42 @@ function getPostHog() {
   }
 
   const apiKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
-  const apiHost = import.meta.env.VITE_PUBLIC_POSTHOG_API_HOST;
+  const apiHost =
+    import.meta.env.VITE_PUBLIC_POSTHOG_API_HOST ||
+    import.meta.env.VITE_PUBLIC_POSTHOG_HOST;
   const uiHost = import.meta.env.VITE_PUBLIC_POSTHOG_UI_HOST;
   if (!apiKey) {
     return Promise.resolve(null);
   }
 
-  posthogPromise ??= import("posthog-js").then(({ default: posthog }) => {
-    posthog.init(apiKey, {
-      ...(apiHost ? { api_host: apiHost } : {}),
-      ...(uiHost ? { ui_host: uiHost } : {}),
-      defaults: "2025-05-24",
-      capture_exceptions: true,
-      debug: import.meta.env.MODE === "development",
+  posthogPromise ??= import("posthog-js")
+    .then(({ default: posthog }) => {
+      posthog.init(apiKey, {
+        ...(apiHost ? { api_host: apiHost } : {}),
+        ...(uiHost ? { ui_host: uiHost } : {}),
+        defaults: "2025-05-24",
+        capture_pageview: true,
+        capture_exceptions: true,
+        debug: import.meta.env.MODE === "development",
+      });
+
+      return posthog;
+    })
+    .catch((error: unknown) => {
+      posthogPromise = null;
+
+      if (import.meta.env.MODE === "development") {
+        console.warn("PostHog failed to initialize", error);
+      }
+
+      return null;
     });
 
-    return posthog;
-  });
-
   return posthogPromise;
+}
+
+export function initAnalytics() {
+  void getPostHog();
 }
 
 export function trackAction(
