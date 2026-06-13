@@ -80,12 +80,14 @@ VITE_PUBLIC_POSTHOG_HOST=...
 `VITE_PUBLIC_POSTHOG_HOST` is kept as the default capture endpoint variable.
 `VITE_PUBLIC_POSTHOG_API_HOST` and `VITE_PUBLIC_POSTHOG_UI_HOST` are also
 supported when the capture and app hosts need to be configured separately.
+Set these variables in the Vercel project environment before building; Vite
+embeds `VITE_*` values into the production bundle at build time.
 
 Without these, image processing still works locally.
 
 ## Deployment Notes
 
-The production CSP in `vercel.json` intentionally allows `'unsafe-eval'` and `'wasm-unsafe-eval'` because the OpenCV.js worker used by Gemini Scan creates functions dynamically at runtime. Removing `'unsafe-eval'` will cause Gemini Scan to fail in production with a browser CSP `EvalError`.
+The production CSP in `vercel.json` intentionally allows `'unsafe-eval'`, `'wasm-unsafe-eval'`, and `connect-src data:` because the OpenCV.js worker used by Gemini Scan creates functions dynamically and fetches its generated WebAssembly payload from a data URL. Removing these will cause Gemini Scan to fail in production with browser CSP errors.
 
 Vercel Live is also included in `script-src`, `connect-src`, and `frame-src` so Vercel preview/feedback tooling does not produce CSP noise during production debugging.
 
