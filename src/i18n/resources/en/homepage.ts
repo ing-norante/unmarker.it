@@ -21,6 +21,12 @@ export const homepage = {
     preparing: "Preparing {{fileName}}",
     description: "Loading the local image workflow...",
   },
+  loadError: {
+    title: "Update available",
+    description:
+      "This tab is out of date after a new release. Reload the page to continue.",
+    action: "Reload",
+  },
   facts: {
     eyebrow: "Core facts",
     heading: "Client-side AI watermark analysis and removal, with no image uploads.",

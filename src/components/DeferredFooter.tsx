@@ -1,6 +1,8 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
+import { lazyWithReload } from "@/lib/lazyWithReload";
 
-const Footer = lazy(() =>
+const Footer = lazyWithReload("footer", () =>
   import("@/components/Footer").then((module) => ({ default: module.Footer })),
 );
 
@@ -61,9 +63,11 @@ export function DeferredFooter() {
   return (
     <div ref={anchorRef}>
       {shouldRender && (
-        <Suspense fallback={null}>
-          <Footer />
-        </Suspense>
+        <ChunkErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <Footer />
+          </Suspense>
+        </ChunkErrorBoundary>
       )}
     </div>
   );

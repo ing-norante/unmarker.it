@@ -12,6 +12,11 @@ const emptyNodeModule = path.resolve(
 export default defineConfig({
   base: '/',
   plugins: [react(), tailwindcss()],
+  // Match the dev worker format to production so an ESM worker loads the same
+  // way in both. The client creates it with { type: "module" }.
+  worker: {
+    format: 'es',
+  },
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),
