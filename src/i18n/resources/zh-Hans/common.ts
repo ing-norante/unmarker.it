@@ -35,6 +35,11 @@ export const common = {
     medium: "中",
     low: "低",
   },
+  errorBoundary: {
+    title: "出现错误",
+    description: "页面未能正确加载。浏览器翻译工具可能导致此问题。请重新加载页面以继续。",
+    reload: "重新加载页面",
+  },
   generic: {
     noProvider: "未识别提供方",
     partial: "部分完成",

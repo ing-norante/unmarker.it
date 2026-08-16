@@ -96,6 +96,11 @@ export function trackAction(
   });
 }
 
+export async function captureException(error: unknown) {
+  const posthog = await getPostHog();
+  posthog?.captureException(error);
+}
+
 export async function registerAnalyticsLocale(locale: SupportedLocale) {
   const posthog = await getPostHog();
   posthog?.register({ locale });
