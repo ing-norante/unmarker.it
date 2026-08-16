@@ -3,6 +3,7 @@ import type {
   MetadataImageFormat,
   MetadataScanResult,
   MetadataSignal,
+  MetadataWarning,
 } from "@/lib/types";
 import {
   addWarning,
@@ -40,7 +41,7 @@ export function scanWebpMetadata(
   format: MetadataImageFormat,
 ): MetadataScanResult {
   const signals: MetadataSignal[] = [];
-  const warnings: string[] = [];
+  const warnings: MetadataWarning[] = [];
   const chunks = walkRiffChunks(bytes, warnings);
 
   for (const chunk of chunks) {
@@ -57,7 +58,7 @@ export function cleanWebpMetadata(
   file: File,
   bytes: Uint8Array,
 ): MetadataCleanResult {
-  const warnings: string[] = [];
+  const warnings: MetadataWarning[] = [];
   const chunks = walkRiffChunks(bytes, warnings);
 
   if (chunks.length === 0 || warnings.length > 0) {
@@ -102,15 +103,18 @@ function getWebpChunkSignal(chunk: RiffChunk): MetadataSignal | null {
 
   return createSignal(
     "webp-metadata",
-    "WebP metadata AI marker",
+    "metadata:signals.webp",
     `WebP ${chunk.type.trim()}`,
     markers[0],
   );
 }
 
-function walkRiffChunks(bytes: Uint8Array, warnings: string[]): RiffChunk[] {
+function walkRiffChunks(
+  bytes: Uint8Array,
+  warnings: MetadataWarning[],
+): RiffChunk[] {
   if (!isWebpBytes(bytes)) {
-    addWarning(warnings, "Malformed WebP RIFF header.");
+    addWarning(warnings, "malformed-webp-header");
     return [];
   }
 
@@ -120,13 +124,13 @@ function walkRiffChunks(bytes: Uint8Array, warnings: string[]): RiffChunk[] {
   let offset = 12;
 
   if (riffEnd > bytes.length) {
-    addWarning(warnings, "WebP RIFF size exceeds file length.");
+    addWarning(warnings, "webp-size-exceeds-file");
     return chunks;
   }
 
   while (offset < riffEnd) {
     if (offset + 8 > riffEnd) {
-      addWarning(warnings, "Malformed WebP chunk table.");
+      addWarning(warnings, "malformed-webp-table");
       return chunks;
     }
 
@@ -137,7 +141,7 @@ function walkRiffChunks(bytes: Uint8Array, warnings: string[]): RiffChunk[] {
     const end = dataEnd + (size % 2);
 
     if (end > riffEnd) {
-      addWarning(warnings, `Malformed WebP ${type.trim()} chunk length.`);
+      addWarning(warnings, "malformed-webp-chunk", { type: type.trim() });
       return chunks;
     }
 

@@ -22,6 +22,8 @@ import type {
 } from "@/lib/types";
 import { generateCameraLikeFilename } from "@/lib/utils";
 import { processGeminiVisibleWatermark } from "@/lib/geminiWorkerClient";
+import { message } from "@/i18n/messages";
+import { useTranslation } from "react-i18next";
 
 type SetStatusMessage = (message: StatusMessage | null) => void;
 
@@ -53,6 +55,7 @@ export function useUnmarkPipeline({
   originalImage,
   setStatusMessage,
 }: UseUnmarkPipelineOptions) {
+  const { t } = useTranslation("workflow");
   const [processedFileName, setProcessedFileName] = useState<string | null>(
     null,
   );
@@ -189,7 +192,7 @@ export function useUnmarkPipeline({
         setProcessedBlob(resultBlob);
         setProcessedFileName(fileName);
         updateStep("crush", { status: "done", progress: 100 });
-        toast.success("Image processed.");
+        toast.success(t("toasts.processed"));
         return {
           ok: true,
           blob: resultBlob,
@@ -202,21 +205,20 @@ export function useUnmarkPipeline({
         if (isAbortError(error)) {
           setStatusMessage({
             variant: "default",
-            title: "Processing cancelled",
-            description: "You can adjust the image and run the pipeline again.",
+            title: message("workflow:messages.processingCancelled.title"),
+            description: message("workflow:messages.processingCancelled.description"),
           });
-          toast("Processing cancelled.");
+          toast(t("toasts.processingCancelled"));
           setSteps(resetRunningPipelineSteps);
           return { ok: false, reason: "cancelled" };
         } else {
           console.error("Pipeline failed", error);
           setStatusMessage({
             variant: "destructive",
-            title: "Could not process image",
-            description:
-              "Try a smaller or different file. If this keeps happening, reload and retry.",
+            title: message("workflow:messages.processingFailed.title"),
+            description: message("workflow:messages.processingFailed.description"),
           });
-          toast.error("Could not process image.");
+          toast.error(t("toasts.processingFailed"));
           setSteps(markRunningPipelineStepsAsError);
           return { ok: false, reason: "error" };
         }
@@ -235,6 +237,7 @@ export function useUnmarkPipeline({
       resetSteps,
       setProcessedObjectUrl,
       setStatusMessage,
+      t,
       updateStep,
     ],
   );

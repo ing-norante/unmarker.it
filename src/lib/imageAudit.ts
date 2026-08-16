@@ -1,4 +1,5 @@
 import { inferAiProvenanceScore } from "@/lib/aiProvenanceScore";
+import type { MessageDescriptor } from "@/i18n/messages";
 import type {
   GeminiDetectionResult,
   HiddenWatermarkAudit,
@@ -14,7 +15,7 @@ type BuildImageAuditOptions = {
   metadataScan: MetadataScanResult | null;
   visibleDetection?: GeminiDetectionResult | null;
   visibleScanStatus?: "scanned" | "not-scanned" | "failed";
-  warnings?: string[];
+  warnings?: MessageDescriptor[];
 };
 
 export function buildImageAudit({
@@ -35,14 +36,14 @@ export function buildImageAudit({
     visibleWatermark,
     hiddenWatermark: createHiddenWatermarkAudit(stage),
     aiScore: inferAiProvenanceScore(metadataScan, visibleDetection),
-    warnings: [...(metadataScan?.warnings ?? []), ...warnings],
+    warnings,
   };
 }
 
 export function createVerificationDiff(
   preflightAudit: ImageAuditResult | null,
   postflightAudit: ImageAuditResult | null,
-  warnings: string[] = [],
+  warnings: MessageDescriptor[] = [],
 ): ImageVerificationDiff | null {
   if (!preflightAudit) {
     return null;
@@ -68,9 +69,6 @@ function createVisibleWatermarkAudit(
       status: "not-scanned",
       detection: null,
       confidence: null,
-      label: "Not scanned",
-      description:
-        "Visible watermark detection needs browser-decoded pixels, so this file was metadata-only.",
     };
   }
 
@@ -79,9 +77,6 @@ function createVisibleWatermarkAudit(
       status: "scan-failed",
       detection: null,
       confidence: null,
-      label: "Scan incomplete",
-      description:
-        "The visible watermark check did not complete. Processing can still continue with the fallback detector.",
     };
   }
 
@@ -90,9 +85,6 @@ function createVisibleWatermarkAudit(
       status: "detected",
       detection,
       confidence: detection.confidence,
-      label: "Gemini watermark detected",
-      description:
-        "A Gemini-style sparkle watermark was detected in the image pixels.",
     };
   }
 
@@ -100,9 +92,6 @@ function createVisibleWatermarkAudit(
     status: "not-detected",
     detection,
     confidence: detection?.confidence ?? 0,
-    label: "No visible watermark detected",
-    description:
-      "The local visible watermark scan did not find a Gemini-style mark.",
   };
 }
 
@@ -112,16 +101,10 @@ function createHiddenWatermarkAudit(
   if (stage === "postflight") {
     return {
       status: "neutralized-unverified",
-      label: "Neutralized, not independently verified",
-      description:
-        "The shake, stir, and crush stages were applied to disrupt hidden statistical watermarks. There is no universal local detector to prove removal.",
     };
   }
 
   return {
     status: "at-risk",
-    label: "Possible hidden watermark risk",
-    description:
-      "Invisible AI watermark signals may exist even when no metadata marker is present.",
   };
 }

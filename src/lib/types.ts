@@ -1,3 +1,5 @@
+import type { MessageDescriptor, MessageValues } from "@/i18n/messages";
+
 export type AppMode = "unmark" | "metadata";
 
 export type WorkflowPhase =
@@ -12,8 +14,8 @@ export type WorkflowPhase =
 
 export type StatusMessage = {
   variant: "default" | "destructive";
-  title: string;
-  description: string;
+  title: MessageDescriptor;
+  description: MessageDescriptor;
 };
 
 export type PipelineStepId =
@@ -32,11 +34,9 @@ export type PipelineStepStatus =
 
 export interface PipelineStepState {
   id: PipelineStepId;
-  label: string;
-  description?: string;
   status: PipelineStepStatus;
   progress: number; // 0–100
-  error?: string;
+  errorCode?: "pipeline-failed";
 }
 
 export interface ProcessingOptions {
@@ -61,6 +61,36 @@ export type MetadataSignalType =
   | "isobmff-box"
   | "binary-marker";
 
+export type MetadataWarningCode =
+  | "unsupported-clean"
+  | "unsupported-scan"
+  | "malformed-webp-header"
+  | "webp-size-exceeds-file"
+  | "malformed-webp-table"
+  | "malformed-webp-chunk"
+  | "malformed-jpeg-signature"
+  | "malformed-jpeg-marker"
+  | "malformed-jpeg-run"
+  | "malformed-jpeg-length"
+  | "malformed-jpeg-size"
+  | "malformed-jpeg-payload"
+  | "malformed-png-signature"
+  | "malformed-png-table"
+  | "malformed-png-length"
+  | "missing-png-end"
+  | "png-compressed-scan-only"
+  | "png-decode-partial"
+  | "incomplete-box-table"
+  | "incomplete-extended-box"
+  | "malformed-box-length"
+  | "jxl-codestream-scan-only"
+  | "container-not-walkable";
+
+export interface MetadataWarning {
+  code: MetadataWarningCode;
+  values?: MessageValues;
+}
+
 export type MetadataImageFormat =
   | "png"
   | "jpeg"
@@ -72,7 +102,7 @@ export type MetadataImageFormat =
 
 export interface MetadataSignal {
   type: MetadataSignalType;
-  label: string;
+  label: MessageDescriptor;
   location: string;
   marker?: string;
   removable: boolean;
@@ -82,7 +112,7 @@ export interface MetadataScanResult {
   hasAiMetadata: boolean;
   format: MetadataImageFormat;
   signals: MetadataSignal[];
-  warnings: string[];
+  warnings: MetadataWarning[];
 }
 
 export interface MetadataCleanResult {
@@ -90,7 +120,7 @@ export interface MetadataCleanResult {
   fileName: string;
   format: MetadataImageFormat;
   removedCount: number;
-  warnings: string[];
+  warnings: MetadataWarning[];
 }
 
 export type ImageAuditStage = "preflight" | "postflight";
@@ -105,8 +135,6 @@ export interface VisibleWatermarkAudit {
   status: VisibleWatermarkStatus;
   detection: GeminiDetectionResult | null;
   confidence: number | null;
-  label: string;
-  description: string;
 }
 
 export type HiddenWatermarkStatus =
@@ -117,17 +145,14 @@ export type HiddenWatermarkStatus =
 
 export interface HiddenWatermarkAudit {
   status: HiddenWatermarkStatus;
-  label: string;
-  description: string;
 }
 
 export interface AiProvenanceScore {
   percentage: number;
-  label: string;
+  kind: "strong" | "metadata" | "visible" | "none";
   provider: string | null;
-  evidence: string[];
+  evidence: MessageDescriptor[];
   confidence: "high" | "medium" | "low";
-  description: string;
 }
 
 export interface ImageAuditResult {
@@ -136,7 +161,7 @@ export interface ImageAuditResult {
   visibleWatermark: VisibleWatermarkAudit;
   hiddenWatermark: HiddenWatermarkAudit;
   aiScore: AiProvenanceScore;
-  warnings: string[];
+  warnings: MessageDescriptor[];
 }
 
 export interface ImageVerificationDiff {
@@ -145,7 +170,7 @@ export interface ImageVerificationDiff {
   visibleBefore: VisibleWatermarkStatus;
   visibleAfter: VisibleWatermarkStatus | null;
   hiddenAfter: HiddenWatermarkStatus;
-  warnings: string[];
+  warnings: MessageDescriptor[];
 }
 
 export interface ImageWorkflowCapabilities {
@@ -229,5 +254,6 @@ export type GeminiWorkerResponse =
   | {
       type: "error";
       jobId: number;
-      message: string;
+      errorCode: "gemini-worker-failed";
+      debugMessage?: string;
     };

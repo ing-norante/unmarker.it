@@ -3,6 +3,7 @@ import type {
   MetadataImageFormat,
   MetadataScanResult,
   MetadataSignal,
+  MetadataWarning,
 } from "@/lib/types";
 import {
   addWarning,
@@ -72,7 +73,7 @@ export function scanBoxContainerMetadata(
   format: MetadataImageFormat,
 ): MetadataScanResult {
   const signals: MetadataSignal[] = [];
-  const warnings: string[] = [];
+  const warnings: MetadataWarning[] = [];
   const startOffset = getBoxStartOffset(bytes, format, warnings);
 
   if (startOffset === null) {
@@ -96,7 +97,7 @@ export function cleanBoxContainerMetadata(
   bytes: Uint8Array,
   format: MetadataImageFormat,
 ): MetadataCleanResult {
-  const warnings: string[] = [];
+  const warnings: MetadataWarning[] = [];
   const startOffset = getBoxStartOffset(bytes, format, warnings);
 
   if (startOffset === null) {
@@ -131,7 +132,7 @@ export function cleanBoxContainerMetadata(
 function walkBoxes(
   bytes: Uint8Array,
   startOffset: number,
-  warnings: string[],
+  warnings: MetadataWarning[],
 ): Box[] {
   const view = toDataView(bytes);
   const boxes: Box[] = [];
@@ -139,7 +140,7 @@ function walkBoxes(
 
   while (offset < bytes.length) {
     if (offset + 8 > bytes.length) {
-      addWarning(warnings, "Container box table is incomplete.");
+      addWarning(warnings, "incomplete-box-table");
       return boxes;
     }
 
@@ -150,7 +151,7 @@ function walkBoxes(
 
     if (size32 === 1) {
       if (offset + 16 > bytes.length) {
-        addWarning(warnings, `Extended-size ${type} box is incomplete.`);
+        addWarning(warnings, "incomplete-extended-box", { type });
         return boxes;
       }
 
@@ -161,7 +162,9 @@ function walkBoxes(
     }
 
     if (size < headerSize || offset + size > bytes.length) {
-      addWarning(warnings, `Malformed ${type || "container"} box length.`);
+      addWarning(warnings, "malformed-box-length", {
+        type: type || "container",
+      });
       return boxes;
     }
 
@@ -183,7 +186,7 @@ function walkBoxes(
 function getBoxStartOffset(
   bytes: Uint8Array,
   format: MetadataImageFormat,
-  warnings: string[],
+  warnings: MetadataWarning[],
 ) {
   if (format === "jxl") {
     if (
@@ -203,7 +206,7 @@ function getBoxStartOffset(
     ) {
       addWarning(
         warnings,
-        "JPEG XL codestream is scan-only; box cleaning is available for JXL containers only.",
+        "jxl-codestream-scan-only",
       );
       return null;
     }
@@ -215,7 +218,7 @@ function getBoxStartOffset(
 
   addWarning(
     warnings,
-    "Container is not box-walkable; scan is partial and cleaning is disabled.",
+    "container-not-walkable",
   );
   return null;
 }
@@ -226,13 +229,18 @@ function getBoxSignal(box: Box): MetadataSignal | null {
     box.data.length >= C2PA_UUID.length &&
     bytesEqual(box.data.subarray(0, C2PA_UUID.length), C2PA_UUID)
   ) {
-    return createSignal("c2pa", "C2PA UUID box", "ISOBMFF uuid", "c2pa");
+    return createSignal(
+      "c2pa",
+      "metadata:signals.uuid",
+      "ISOBMFF uuid",
+      "c2pa",
+    );
   }
 
   if (box.type === "jumb") {
     return createSignal(
       "isobmff-box",
-      "JUMBF metadata box",
+      "metadata:signals.jumbf",
       "ISOBMFF jumb",
       "jumb",
     );

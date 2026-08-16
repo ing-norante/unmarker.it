@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildImageAudit, createVerificationDiff } from "./imageAudit";
 import type { GeminiDetectionResult, MetadataScanResult } from "./types";
+import { message } from "@/i18n/messages";
 
 describe("imageAudit", () => {
   it("marks visible watermark as not scanned for analysis-only files", () => {
@@ -31,7 +32,7 @@ describe("imageAudit", () => {
       visibleDetection: detected(),
     });
     const diff = createVerificationDiff(preflight, null, [
-      "Postflight metadata scan failed.",
+      message("workflow:warnings.postflightMetadata"),
     ]);
 
     expect(diff).toMatchObject({
@@ -40,7 +41,7 @@ describe("imageAudit", () => {
       visibleBefore: "detected",
       visibleAfter: null,
       hiddenAfter: "neutralized-unverified",
-      warnings: ["Postflight metadata scan failed."],
+      warnings: [message("workflow:warnings.postflightMetadata")],
     });
   });
 });
@@ -55,7 +56,7 @@ function scanWithSignals(count: number): MetadataScanResult {
     format: "jpeg",
     signals: Array.from({ length: count }, (_, index) => ({
       type: "xmp" as const,
-      label: `Signal ${index + 1}`,
+      label: message("metadata:signals.xmp", { index: index + 1 }),
       location: "test",
       marker: "openai",
       removable: true,

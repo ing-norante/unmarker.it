@@ -60,7 +60,7 @@ export async function cleanImageMetadata(
       return cleanBoxContainerMetadata(file, bytes, format);
     default:
       return originalCleanResult(file, format, [
-        "Unsupported format; cleaning is disabled for this file.",
+        { code: "unsupported-clean" },
       ]);
   }
 }
@@ -96,13 +96,13 @@ function scanUnknown(
   format: MetadataImageFormat,
 ): MetadataScanResult {
   const warnings = [
-    "Unsupported format; scan is byte-signature only and cleaning is disabled.",
+    { code: "unsupported-scan" as const },
   ];
   const markers = findAiMarkers(bytes);
   const signals = markers.map((marker) =>
     createSignal(
       marker === "C2PA UUID" ? "c2pa" : "binary-marker",
-      "Binary AI marker",
+      "metadata:signals.binary",
       "file bytes",
       marker,
       false,

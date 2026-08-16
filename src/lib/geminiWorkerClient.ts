@@ -154,7 +154,9 @@ function getGeminiWorker() {
       cleanupPendingJob(message.jobId, pending);
 
       if (message.type === "error") {
-        pending.reject(new Error(message.message));
+        pending.reject(
+          new Error(message.debugMessage ?? message.errorCode),
+        );
         return;
       }
 

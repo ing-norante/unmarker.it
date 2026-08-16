@@ -747,8 +747,13 @@ function postDetectionResponse(
   postMessageToMain({ type: "detected", jobId, detection });
 }
 
-function postError(jobId: number, message: string) {
-  postMessageToMain({ type: "error", jobId, message });
+function postError(jobId: number, debugMessage: string) {
+  postMessageToMain({
+    type: "error",
+    jobId,
+    errorCode: "gemini-worker-failed",
+    debugMessage,
+  });
 }
 
 function postMessageToMain(

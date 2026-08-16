@@ -4,6 +4,7 @@ import type {
   MetadataScanResult,
   MetadataSignal,
   MetadataSignalType,
+  MetadataWarning,
 } from "@/lib/types";
 import {
   addWarning,
@@ -41,7 +42,7 @@ export function scanJpegMetadata(
   format: MetadataImageFormat,
 ): MetadataScanResult {
   const signals: MetadataSignal[] = [];
-  const warnings: string[] = [];
+  const warnings: MetadataWarning[] = [];
   const segments = walkJpegSegments(bytes, warnings);
 
   for (const segment of segments) {
@@ -58,7 +59,7 @@ export function cleanJpegMetadata(
   file: File,
   bytes: Uint8Array,
 ): MetadataCleanResult {
-  const warnings: string[] = [];
+  const warnings: MetadataWarning[] = [];
   const segments = walkJpegSegments(bytes, warnings);
 
   if (segments.length === 0 || warnings.length > 0) {
@@ -103,7 +104,7 @@ function getJpegSegmentSignal(segment: JpegSegment): MetadataSignal | null {
   if (segment.marker === 0xeb && markersContainC2pa(markers)) {
     return createSignal(
       "c2pa",
-      "JPEG APP11 C2PA segment",
+      "metadata:signals.jpegC2pa",
       "JPEG APP11",
       "c2pa",
     );
@@ -113,7 +114,7 @@ function getJpegSegmentSignal(segment: JpegSegment): MetadataSignal | null {
     const type = getJpegApp1SignalType(segment.payload);
     return createSignal(
       type,
-      type === "xmp" ? "XMP AI marker" : "EXIF AI marker",
+      type === "xmp" ? "metadata:signals.xmp" : "metadata:signals.exif",
       type === "xmp" ? "JPEG APP1 XMP" : "JPEG APP1 EXIF",
       markers[0],
     );
@@ -122,7 +123,7 @@ function getJpegSegmentSignal(segment: JpegSegment): MetadataSignal | null {
   if (segment.marker === 0xed && markers.length > 0) {
     return createSignal(
       "binary-marker",
-      "IPTC AI marker",
+      "metadata:signals.iptc",
       "JPEG APP13 IPTC",
       markers[0],
     );
@@ -147,10 +148,10 @@ function getJpegApp1SignalType(payload: Uint8Array): MetadataSignalType {
 
 function walkJpegSegments(
   bytes: Uint8Array,
-  warnings: string[],
+  warnings: MetadataWarning[],
 ): JpegSegment[] {
   if (!isJpegBytes(bytes)) {
-    addWarning(warnings, "Malformed JPEG signature.");
+    addWarning(warnings, "malformed-jpeg-signature");
     return [];
   }
 
@@ -160,7 +161,7 @@ function walkJpegSegments(
 
   while (offset < bytes.length) {
     if (bytes[offset] !== 0xff) {
-      addWarning(warnings, "Malformed JPEG segment marker.");
+      addWarning(warnings, "malformed-jpeg-marker");
       return segments;
     }
 
@@ -170,7 +171,7 @@ function walkJpegSegments(
     }
 
     if (offset >= bytes.length) {
-      addWarning(warnings, "Malformed JPEG marker run.");
+      addWarning(warnings, "malformed-jpeg-run");
       return segments;
     }
 
@@ -182,13 +183,13 @@ function walkJpegSegments(
     }
 
     if (offset + 2 > bytes.length) {
-      addWarning(warnings, "Malformed JPEG segment length.");
+      addWarning(warnings, "malformed-jpeg-length");
       return segments;
     }
 
     const length = view.getUint16(offset);
     if (length < 2) {
-      addWarning(warnings, "Malformed JPEG segment size.");
+      addWarning(warnings, "malformed-jpeg-size");
       return segments;
     }
 
@@ -197,7 +198,7 @@ function walkJpegSegments(
     const end = payloadEnd;
 
     if (end > bytes.length) {
-      addWarning(warnings, "Malformed JPEG segment payload.");
+      addWarning(warnings, "malformed-jpeg-payload");
       return segments;
     }
 

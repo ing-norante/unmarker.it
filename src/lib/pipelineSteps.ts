@@ -7,41 +7,26 @@ import type {
 export const PIPELINE_STEPS: PipelineStepState[] = [
   {
     id: "gemini-detect",
-    label: "Gemini Scan",
-    description:
-      "We scan the bottom-right corner for the Gemini / Nano Banana sparkle logo using a local OpenCV.js worker.",
     status: "idle",
     progress: 0,
   },
   {
     id: "gemini-restore",
-    label: "Gemini Restore",
-    description:
-      "When detected, we reverse the logo alpha blend and repair residual sparkle edges with local inpainting.",
     status: "idle",
     progress: 0,
   },
   {
     id: "shake",
-    label: "Shake (Geometry)",
-    description:
-      "We apply a tiny random rotation (±0.5°) and a subtle zoom-in. This breaks the pixel grid alignment many invisible watermarks depend on.",
     status: "idle",
     progress: 0,
   },
   {
     id: "stir",
-    label: "Stir (Noise)",
-    description:
-      "We inject low-amplitude RGB noise across the image to disturb the statistical patterns used by watermark detectors.",
     status: "idle",
     progress: 0,
   },
   {
     id: "crush",
-    label: "Crush (Quantization)",
-    description:
-      "We recompress the image as JPEG to crush remaining high-frequency watermark signals.",
     status: "idle",
     progress: 0,
   },
@@ -54,7 +39,7 @@ export function createInitialPipelineSteps() {
 export function resetRunningPipelineSteps(steps: PipelineStepState[]) {
   return steps.map((step) =>
     step.status === "running"
-      ? { ...step, status: "idle" as const, progress: 0, error: undefined }
+      ? { ...step, status: "idle" as const, progress: 0, errorCode: undefined }
       : step,
   );
 }
@@ -62,7 +47,7 @@ export function resetRunningPipelineSteps(steps: PipelineStepState[]) {
 export function markRunningPipelineStepsAsError(steps: PipelineStepState[]) {
   return steps.map((step) =>
     step.status === "running"
-      ? { ...step, status: "error" as const, error: "Failed" }
+      ? { ...step, status: "error" as const, errorCode: "pipeline-failed" as const }
       : step,
   );
 }
@@ -102,5 +87,5 @@ export function updateGeminiProgress(
 }
 
 function resetPipelineStep(step: PipelineStepState): PipelineStepState {
-  return { ...step, status: "idle", progress: 0, error: undefined };
+  return { ...step, status: "idle", progress: 0, errorCode: undefined };
 }

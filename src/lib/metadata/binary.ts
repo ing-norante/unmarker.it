@@ -1,11 +1,17 @@
-import type { MetadataCleanResult, MetadataImageFormat } from "@/lib/types";
+import type {
+  MetadataCleanResult,
+  MetadataImageFormat,
+  MetadataWarning,
+  MetadataWarningCode,
+} from "@/lib/types";
+import type { MessageValues } from "@/i18n/messages";
 
 export function buildCleanResult(
   file: File,
   format: MetadataImageFormat,
   parts: Uint8Array[],
   removedCount: number,
-  warnings: string[],
+  warnings: MetadataWarning[],
 ): MetadataCleanResult {
   const output = concatUint8Arrays(parts);
   return {
@@ -15,21 +21,21 @@ export function buildCleanResult(
     fileName: getCleanFileName(file, format),
     format,
     removedCount,
-    warnings: unique(warnings),
+    warnings: uniqueWarnings(warnings),
   };
 }
 
 export function originalCleanResult(
   file: File,
   format: MetadataImageFormat,
-  warnings: string[],
+  warnings: MetadataWarning[],
 ): MetadataCleanResult {
   return {
     blob: file,
     fileName: getCleanFileName(file, format),
     format,
     removedCount: 0,
-    warnings: unique(warnings),
+    warnings: uniqueWarnings(warnings),
   };
 }
 
@@ -52,8 +58,14 @@ export function toArrayBuffer(bytes: Uint8Array) {
   return buffer;
 }
 
-export function addWarning(warnings: string[], warning: string) {
-  if (!warnings.includes(warning)) {
+export function addWarning(
+  warnings: MetadataWarning[],
+  code: MetadataWarningCode,
+  values?: MessageValues,
+) {
+  const warning = values ? { code, values } : { code };
+  const id = warningId(warning);
+  if (!warnings.some((item) => warningId(item) === id)) {
     warnings.push(warning);
   }
 }
@@ -150,6 +162,18 @@ export function getLowerExtension(fileName: string) {
 
 export function unique<T>(values: T[]) {
   return [...new Set(values)];
+}
+
+function uniqueWarnings(warnings: MetadataWarning[]) {
+  return warnings.filter(
+    (warning, index) =>
+      warnings.findIndex((candidate) => warningId(candidate) === warningId(warning)) ===
+      index,
+  );
+}
+
+function warningId(warning: MetadataWarning) {
+  return `${warning.code}:${JSON.stringify(warning.values ?? {})}`;
 }
 
 function getCleanFileName(file: File, format: MetadataImageFormat) {

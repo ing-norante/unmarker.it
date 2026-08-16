@@ -4,6 +4,7 @@ import {
   CRUSH_QUALITY_MAX,
   CRUSH_QUALITY_MIN,
 } from "@/lib/pipeline";
+import { useTranslation } from "react-i18next";
 
 const MIN_PERCENT = Math.round(CRUSH_QUALITY_MIN * 100);
 const MAX_PERCENT = Math.round(CRUSH_QUALITY_MAX * 100);
@@ -19,6 +20,7 @@ export function CrushQualityControl({
   onChange,
   disabled = false,
 }: CrushQualityControlProps) {
+  const { t } = useTranslation("workflow");
   const percent = Math.round(value * 100);
 
   return (
@@ -26,15 +28,14 @@ export function CrushQualityControl({
       <CardContent className="flex flex-col gap-3 p-3 lg:p-3.5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-foreground text-ui-title">
-            Crush JPEG quality
+            {t("quality.title")}
           </span>
           <span className="text-muted-foreground text-ui-body font-bold tabular-nums">
             {percent}%
           </span>
         </div>
         <p className="text-muted-foreground text-ui-body">
-          Lower quality applies more JPEG compression and can remove more
-          watermark residue; higher keeps more detail.
+          {t("quality.description")}
         </p>
         <Slider
           min={MIN_PERCENT}
@@ -43,11 +44,11 @@ export function CrushQualityControl({
           value={[percent]}
           onValueChange={([next]) => onChange(next / 100)}
           disabled={disabled}
-          aria-label="JPEG output quality"
+          aria-label={t("quality.aria")}
         />
         <div className="text-muted-foreground text-ui-caption flex justify-between">
-          <span>More compression</span>
-          <span>More detail</span>
+          <span>{t("quality.compression")}</span>
+          <span>{t("quality.detail")}</span>
         </div>
       </CardContent>
     </Card>

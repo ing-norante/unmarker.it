@@ -15,10 +15,14 @@ import {
   validateWorkflowFile,
 } from "@/lib/fileValidation";
 import type { StatusMessage } from "@/lib/types";
+import { useTranslation } from "react-i18next";
+import { translateMessage } from "@/i18n/messages";
+import { LocaleSuggestion } from "@/components/LocaleSuggestion";
 
 const WorkflowApp = lazy(() => import("@/WorkflowApp"));
 
 function App() {
+  const { t } = useTranslation(["homepage", "workflow"]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
@@ -62,7 +66,7 @@ function App() {
               <aside className="order-3 flex min-h-0 flex-col gap-4 lg:order-0 lg:flex-1">
                 <div className="flex items-center gap-4">
                   <h2 className="text-muted-foreground shrink-0 text-base font-black sm:text-lg 2xl:text-xl">
-                    WORKFLOW
+                    {t("homepage:workflowHeading")}
                   </h2>
                   <Separator className="flex-1" />
                 </div>
@@ -77,9 +81,9 @@ function App() {
                   variant={statusMessage.variant}
                   className="mb-4 shrink-0"
                 >
-                  <AlertTitle>{statusMessage.title}</AlertTitle>
+                  <AlertTitle>{translateMessage(t, statusMessage.title)}</AlertTitle>
                   <AlertDescription>
-                    {statusMessage.description}
+                    {translateMessage(t, statusMessage.description)}
                   </AlertDescription>
                 </Alert>
               )}
@@ -88,10 +92,8 @@ function App() {
                 <ImageUploader
                   onImageSelect={selectImage}
                   accept={filePolicy.accept}
-                  title="Drag an image"
-                  description={
-                    "Drop it here to analyze local AI signals, then remove watermarks automatically when processing is available."
-                  }
+                  title={t("homepage:uploader.title")}
+                  description={t("homepage:uploader.description")}
                   details={<FilePolicyDetails policy={filePolicy} />}
                   className="min-h-[min(62vh,50rem)] flex-1 lg:min-h-[min(70vh,50rem)] 2xl:min-h-[min(72vh,56rem)]"
                 />
@@ -105,6 +107,7 @@ function App() {
         <div className="px-(--page-gutter) pb-6 lg:pb-8">
           <DeferredFooter />
         </div>
+        <LocaleSuggestion />
       </div>
     </div>
   );
@@ -113,6 +116,7 @@ function App() {
 export default App;
 
 function LoadingShell({ fileName }: { fileName: string }) {
+  const { t } = useTranslation(["homepage", "workflow"]);
   return (
     <div className="bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex min-h-dvh p-0 font-sans">
       <div className="bg-background flex min-h-dvh w-full flex-col overflow-x-clip">
@@ -126,7 +130,7 @@ function LoadingShell({ fileName }: { fileName: string }) {
               <aside className="order-3 flex min-h-0 flex-col gap-4 lg:order-0 lg:flex-1">
                 <div className="flex items-center gap-4">
                   <h2 className="text-muted-foreground shrink-0 text-base font-black sm:text-lg 2xl:text-xl">
-                    WORKFLOW
+                    {t("homepage:workflowHeading")}
                   </h2>
                   <Separator className="flex-1" />
                 </div>
@@ -138,10 +142,10 @@ function LoadingShell({ fileName }: { fileName: string }) {
               <div className="bg-card text-card-foreground flex min-h-[min(62vh,50rem)] flex-col justify-center gap-4 border p-6 lg:min-h-[min(70vh,50rem)]">
                 <div className="flex min-w-0 flex-col gap-2">
                   <p className="text-foreground truncate text-xl leading-tight font-black sm:text-2xl">
-                    Preparing {fileName}
+                    {t("homepage:loading.preparing", { fileName })}
                   </p>
                   <p className="text-muted-foreground text-sm font-medium sm:text-base">
-                    Loading the local image workflow...
+                    {t("homepage:loading.description")}
                   </p>
                 </div>
                 <Skeleton className="h-1 w-full" />

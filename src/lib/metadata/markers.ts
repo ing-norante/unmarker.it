@@ -3,7 +3,10 @@ import type {
   MetadataScanResult,
   MetadataSignal,
   MetadataSignalType,
+  MetadataWarning,
 } from "@/lib/types";
+import type { MessageKey } from "@/i18n/messages";
+import { message } from "@/i18n/messages";
 import { containsByteSequence, unique } from "./binary";
 
 export const C2PA_UUID = new Uint8Array([
@@ -79,14 +82,14 @@ export function bytesToSearchText(bytes: Uint8Array) {
 
 export function createSignal(
   type: MetadataSignalType,
-  label: string,
+  label: MessageKey,
   location: string,
   marker?: string,
   removable = true,
 ): MetadataSignal {
   return {
     type,
-    label,
+    label: message(label),
     location,
     marker,
     removable,
@@ -96,13 +99,13 @@ export function createSignal(
 export function toScanResult(
   format: MetadataImageFormat,
   signals: MetadataSignal[],
-  warnings: string[],
+  warnings: MetadataWarning[],
 ): MetadataScanResult {
   return {
     hasAiMetadata: signals.length > 0,
     format,
     signals,
-    warnings: unique(warnings),
+    warnings,
   };
 }
 
@@ -110,12 +113,8 @@ export function markersContainC2pa(markers: string[]) {
   return markers.some((marker) => marker.toLowerCase().includes("c2pa"));
 }
 
-export function hasBlockingCleanWarning(warnings: string[]) {
-  return warnings.some((warning) =>
-    /unsupported|scan-only|malformed|not box-walkable|incomplete|exceeds file length/i.test(
-      warning,
-    ),
-  );
+export function hasBlockingCleanWarning(warnings: MetadataWarning[]) {
+  return warnings.length > 0;
 }
 
 function normalizeMarkerText(value: string) {

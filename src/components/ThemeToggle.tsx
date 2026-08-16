@@ -6,11 +6,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useTranslation } from "react-i18next";
 
 export function ThemeToggle() {
+  const { t } = useTranslation("common");
   const { theme = "light", setTheme } = useTheme();
   const isDark = theme === "dark";
-  const label = isDark ? "Switch to light mode" : "Switch to dark mode";
+  const label = isDark ? t("theme.light") : t("theme.dark");
 
   return (
     <Tooltip>

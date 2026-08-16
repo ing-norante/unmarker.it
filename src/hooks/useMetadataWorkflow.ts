@@ -12,6 +12,8 @@ import type {
   MetadataScanResult,
   StatusMessage,
 } from "@/lib/types";
+import { message } from "@/i18n/messages";
+import { useTranslation } from "react-i18next";
 
 type SetStatusMessage = (message: StatusMessage | null) => void;
 
@@ -24,6 +26,7 @@ export function useMetadataWorkflow({
   originalImage,
   setStatusMessage,
 }: UseMetadataWorkflowOptions) {
+  const { t } = useTranslation("workflow");
   const [metadataScanResult, setMetadataScanResult] =
     useState<MetadataScanResult | null>(null);
   const [metadataCleanResult, setMetadataCleanResult] =
@@ -64,7 +67,7 @@ export function useMetadataWorkflow({
         }
 
         setMetadataScanResult(result);
-        toast.success("Metadata scan complete.");
+        toast.success(t("toasts.metadataScanned"));
       } catch (error) {
         if (metadataScanJobRef.current !== scanJob) {
           return;
@@ -73,18 +76,17 @@ export function useMetadataWorkflow({
         console.error("Metadata scan failed", error);
         setStatusMessage({
           variant: "destructive",
-          title: "Could not scan metadata",
-          description:
-            "This file could not be read safely. Try another image and retry.",
+          title: message("workflow:messages.scanFailed.title"),
+          description: message("workflow:messages.scanFailed.description"),
         });
-        toast.error("Could not scan metadata.");
+        toast.error(t("toasts.metadataScanFailed"));
       } finally {
         if (metadataScanJobRef.current === scanJob) {
           setIsMetadataScanning(false);
         }
       }
     },
-    [clearMetadataCleanObjectUrl, setStatusMessage],
+    [clearMetadataCleanObjectUrl, setStatusMessage, t],
   );
 
   const downloadCleanCopy = useCallback(async () => {
@@ -103,11 +105,10 @@ export function useMetadataWorkflow({
       if (result.removedCount === 0) {
         setStatusMessage({
           variant: "default",
-          title: "No cleanup needed",
-          description:
-            "No removable AI metadata was found for this file and format.",
+          title: message("workflow:messages.cleanupNone.title"),
+          description: message("workflow:messages.cleanupNone.description"),
         });
-        toast("No cleanup needed.");
+        toast(t("toasts.cleanupNone"));
         return;
       }
 
@@ -117,16 +118,15 @@ export function useMetadataWorkflow({
       if (objectUrl) {
         triggerBrowserDownload(objectUrl, result.fileName);
       }
-      toast.success("Clean copy downloaded.");
+      toast.success(t("toasts.cleanDownloaded"));
     } catch (error) {
       console.error("Metadata clean failed", error);
       setStatusMessage({
         variant: "destructive",
-        title: "Could not clean metadata",
-        description:
-          "The metadata cleaner could not produce a safe clean copy for this file.",
+        title: message("workflow:messages.cleanupFailed.title"),
+        description: message("workflow:messages.cleanupFailed.description"),
       });
-      toast.error("Could not clean metadata.");
+      toast.error(t("toasts.cleanupFailed"));
     } finally {
       setIsMetadataCleaning(false);
     }
@@ -137,6 +137,7 @@ export function useMetadataWorkflow({
     originalImage,
     setMetadataCleanObjectUrl,
     setStatusMessage,
+    t,
   ]);
 
   return {

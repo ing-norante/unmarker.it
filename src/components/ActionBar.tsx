@@ -11,6 +11,7 @@ import { Spinner } from "./ui/spinner";
 import { trackAction } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import type { WorkflowPhase } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 interface ActionBarProps {
   fileName: string;
@@ -45,6 +46,7 @@ export function ActionBar({
   onDownloadCleanMetadata,
   className,
 }: ActionBarProps) {
+  const { t } = useTranslation("common");
   const isBusy =
     phase === "preflight-scanning" ||
     phase === "processing" ||
@@ -97,23 +99,23 @@ export function ActionBar({
         {canCancel && (
           <Button variant="destructive" onClick={handleCancel}>
             <XCircleIcon data-icon="inline-start" />
-            Cancel
+            {t("actions.cancel")}
           </Button>
         )}
         <Button variant="outline" onClick={handleReset} disabled={isBusy}>
           <ArrowClockwiseIcon data-icon="inline-start" />
-          Reset
+          {t("actions.reset")}
         </Button>
         {canRetry && (
           <Button onClick={handleRetry} className="font-black">
             <LightningIcon data-icon="inline-start" />
-            Retry
+            {t("actions.retry")}
           </Button>
         )}
         {canReprocess && (
           <Button onClick={handleReprocess} className="font-black">
             <LightningIcon data-icon="inline-start" />
-            Reprocess
+            {t("actions.reprocess")}
           </Button>
         )}
         {processedImageUrl && hasProcessedImage && (
@@ -124,7 +126,7 @@ export function ActionBar({
               onClick={handleDownload}
             >
               <DownloadSimpleIcon data-icon="inline-start" />
-              Download JPEG
+              {t("actions.downloadJpeg")}
             </a>
           </Button>
         )}
@@ -139,7 +141,7 @@ export function ActionBar({
             ) : (
               <FileSearchIcon data-icon="inline-start" />
             )}
-            Clean metadata
+            {t("actions.cleanMetadata")}
           </Button>
         )}
       </div>

@@ -3,6 +3,7 @@ import type {
   MetadataImageFormat,
   MetadataScanResult,
   MetadataSignal,
+  MetadataWarning,
 } from "@/lib/types";
 import {
   addWarning,
@@ -41,13 +42,18 @@ export async function scanPngMetadata(
   format: MetadataImageFormat,
 ): Promise<MetadataScanResult> {
   const signals: MetadataSignal[] = [];
-  const warnings: string[] = [];
+  const warnings: MetadataWarning[] = [];
   const chunks = walkPngChunks(bytes, warnings);
 
   for (const chunk of chunks) {
     if (C2PA_PNG_CHUNKS.has(chunk.type)) {
       signals.push(
-        createSignal("c2pa", "C2PA PNG chunk", `PNG ${chunk.type}`, "c2pa"),
+        createSignal(
+          "c2pa",
+          "metadata:signals.pngC2pa",
+          `PNG ${chunk.type}`,
+          "c2pa",
+        ),
       );
       continue;
     }
@@ -61,7 +67,7 @@ export async function scanPngMetadata(
       signals.push(
         createSignal(
           "png-text",
-          "PNG text AI marker",
+          "metadata:signals.pngText",
           `PNG ${chunk.type}`,
           markers[0],
         ),
@@ -76,7 +82,7 @@ export async function cleanPngMetadata(
   file: File,
   bytes: Uint8Array,
 ): Promise<MetadataCleanResult> {
-  const warnings: string[] = [];
+  const warnings: MetadataWarning[] = [];
   const chunks = walkPngChunks(bytes, warnings);
 
   if (chunks.length === 0 || warnings.length > 0) {
@@ -105,7 +111,7 @@ export async function cleanPngMetadata(
 
 async function findPngTextMarkers(
   chunk: PngChunk,
-  warnings: string[],
+  warnings: MetadataWarning[],
 ): Promise<string[]> {
   const candidates = [chunk.data];
   const keyEnd = chunk.data.indexOf(0);
@@ -168,13 +174,14 @@ function getItxtTextBytes(data: Uint8Array) {
 
 async function inflatePngText(
   data: Uint8Array,
-  warnings: string[],
+  warnings: MetadataWarning[],
   label: string,
 ): Promise<Uint8Array | null> {
   if (typeof DecompressionStream === "undefined") {
     addWarning(
       warnings,
-      `${label} is compressed; this browser cannot inflate it, so only visible chunk bytes were scanned.`,
+      "png-compressed-scan-only",
+      { type: label },
     );
     return null;
   }
@@ -187,15 +194,16 @@ async function inflatePngText(
   } catch {
     addWarning(
       warnings,
-      `${label} could not be inflated; only visible chunk bytes were scanned.`,
+      "png-decode-partial",
+      { type: label },
     );
     return null;
   }
 }
 
-function walkPngChunks(bytes: Uint8Array, warnings: string[]): PngChunk[] {
+function walkPngChunks(bytes: Uint8Array, warnings: MetadataWarning[]): PngChunk[] {
   if (!isPngBytes(bytes)) {
-    addWarning(warnings, "Malformed PNG signature.");
+    addWarning(warnings, "malformed-png-signature");
     return [];
   }
 
@@ -206,7 +214,7 @@ function walkPngChunks(bytes: Uint8Array, warnings: string[]): PngChunk[] {
 
   while (offset < bytes.length) {
     if (offset + 12 > bytes.length) {
-      addWarning(warnings, "Malformed PNG chunk table.");
+      addWarning(warnings, "malformed-png-table");
       return chunks;
     }
 
@@ -217,7 +225,7 @@ function walkPngChunks(bytes: Uint8Array, warnings: string[]): PngChunk[] {
     const end = dataEnd + 4;
 
     if (end > bytes.length) {
-      addWarning(warnings, `Malformed PNG ${type || "chunk"} length.`);
+      addWarning(warnings, "malformed-png-length", { type: type || "chunk" });
       return chunks;
     }
 
@@ -239,7 +247,7 @@ function walkPngChunks(bytes: Uint8Array, warnings: string[]): PngChunk[] {
   }
 
   if (!sawIend) {
-    addWarning(warnings, "Malformed PNG is missing an IEND chunk.");
+    addWarning(warnings, "missing-png-end");
   }
 
   return chunks;

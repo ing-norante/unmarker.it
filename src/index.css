@@ -53,7 +53,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-heading: var(--font-mono);
+  --font-sans: var(--locale-font-body);
+  --font-heading: var(--locale-font-heading);
   --font-mono: "Geist Mono Variable", monospace;
   --radius-2xl: var(--radius);
   --radius-3xl: var(--radius);
@@ -61,6 +62,8 @@
 }
 
 :root {
+  --locale-font-body: "Geist Mono Variable", monospace;
+  --locale-font-heading: "Geist Mono Variable", monospace;
   --page-gutter: clamp(1.25rem, 3vw, 1cm);
   --radius: 0;
   --background: oklch(1 0 0);
@@ -136,7 +139,7 @@
   }
 
   html {
-    @apply scroll-smooth font-mono antialiased;
+    @apply scroll-smooth font-sans antialiased;
     font-size: 15px;
   }
 
@@ -144,6 +147,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+html[data-locale="zh-Hans"] {
+  --locale-font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --locale-font-heading: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  line-break: strict;
+  word-break: normal;
+}
+
+html[data-locale="zh-Hans"] body { line-height: 1.65; }
+html[data-locale="zh-Hans"] .uppercase:not(.font-mono) { text-transform: none; }
+html[data-locale="zh-Hans"] .wide-hero-title { font-size: clamp(3rem, 6vw, 6.5rem); line-height: 1.08; }
+html[data-locale="zh-Hans"] .locale-hero-subtitle { font-size: clamp(1.5rem, 3vw, 3rem); line-height: 1.25; }
+html[data-locale="zh-Hans"] .locale-hero-copy { font-size: clamp(1.125rem, 2vw, 1.875rem); line-height: 1.5; }
+html[data-locale="zh-Hans"] .locale-facts-heading { font-size: clamp(1.25rem, 2.5vw, 2.25rem); line-height: 1.4; }
+html[data-locale="zh-Hans"] .locale-fact-title { font-size: clamp(0.875rem, 1.4vw, 1.25rem); line-height: 1.45; }
 
 @media (min-width: 640px) {
   html {

@@ -18,9 +18,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { getWorkflowFilePolicy } from "@/lib/fileValidation";
-import { getBusyCopy } from "@/lib/workflowCopy";
 import { useImageWorkflow } from "@/hooks/useImageWorkflow";
 import type { StatusMessage } from "@/lib/types";
+import type { MessageDescriptor } from "@/i18n/messages";
+import { translateMessage } from "@/i18n/messages";
+import { useTranslation } from "react-i18next";
+import { LocaleSuggestion } from "@/components/LocaleSuggestion";
 
 interface WorkflowAppProps {
   initialFile: File;
@@ -156,7 +159,7 @@ function WorkflowLayout({
   processedFileName: string | null;
   isProcessing: boolean;
   isMetadataCleaning: boolean;
-  workflowWarnings: string[];
+  workflowWarnings: MessageDescriptor[];
   crushQuality: number;
   setCrushQuality: (value: number) => void;
   steps: ReturnType<typeof useImageWorkflow>["steps"];
@@ -172,6 +175,7 @@ function WorkflowLayout({
   reprocess: () => void;
   downloadMetadataClean: () => void;
 }) {
+  const { t } = useTranslation(["homepage", "workflow"]);
   return (
     <div className="bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex min-h-dvh p-0 font-sans">
       <div className="bg-background flex min-h-dvh w-full flex-col overflow-x-clip">
@@ -186,7 +190,7 @@ function WorkflowLayout({
               <aside className="order-3 flex min-h-0 flex-col gap-4 lg:order-0 lg:flex-1">
                 <div className="flex items-center gap-4">
                   <h2 className="text-muted-foreground shrink-0 text-base font-black sm:text-lg 2xl:text-xl">
-                    WORKFLOW
+                    {t("homepage:workflowHeading")}
                   </h2>
                   <Separator className="flex-1" />
                 </div>
@@ -207,7 +211,7 @@ function WorkflowLayout({
 
                     {workflowBusy && (
                       <div className="bg-card text-card-foreground flex flex-col gap-2 border p-3 text-sm sm:p-4 sm:text-base">
-                        <span>{getBusyCopy(state.phase)}</span>
+                        <span>{t(`workflow:busy.${state.phase}`, { defaultValue: t("workflow:busy.fallback") })}</span>
                         <Skeleton className="h-1 w-full" />
                       </div>
                     )}
@@ -227,9 +231,9 @@ function WorkflowLayout({
                   variant={statusMessage.variant}
                   className="mb-4 shrink-0"
                 >
-                  <AlertTitle>{statusMessage.title}</AlertTitle>
+                  <AlertTitle>{translateMessage(t, statusMessage.title)}</AlertTitle>
                   <AlertDescription>
-                    {statusMessage.description}
+                    {translateMessage(t, statusMessage.description)}
                   </AlertDescription>
                 </Alert>
               )}
@@ -239,10 +243,8 @@ function WorkflowLayout({
                   <ImageUploader
                     onImageSelect={selectImage}
                     accept={filePolicy.accept}
-                    title="Drag an image"
-                    description={
-                      "Drop it here to analyze local AI signals, then remove watermarks automatically when processing is available."
-                    }
+                    title={t("homepage:uploader.title")}
+                    description={t("homepage:uploader.description")}
                     details={<FilePolicyDetails policy={filePolicy} />}
                     className="min-h-[min(62vh,50rem)] flex-1 lg:min-h-[min(70vh,50rem)] 2xl:min-h-[min(72vh,56rem)]"
                   />
@@ -291,6 +293,7 @@ function WorkflowLayout({
         <div className="px-(--page-gutter) pb-6 lg:pb-8">
           <DeferredFooter />
         </div>
+        <LocaleSuggestion />
       </div>
     </div>
   );

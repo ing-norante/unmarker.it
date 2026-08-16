@@ -1,3 +1,5 @@
+import type { SupportedLocale } from "@/i18n/locales";
+
 export type TrackingAction =
   | "cancel_processing"
   | "download_processed"
@@ -16,12 +18,18 @@ export type TrackingAction =
   | "upload_image"
   | "workflow_cancelled"
   | "workflow_error"
-  | "workflow_started";
+  | "workflow_started"
+  | "locale_switched"
+  | "locale_suggestion_shown"
+  | "locale_suggestion_accepted"
+  | "locale_suggestion_dismissed";
 
 export type TrackingComponent =
   | "action_bar"
   | "footer"
   | "image_comparison"
+  | "language_switcher"
+  | "locale_suggestion"
   | "uploader"
   | "workflow";
 
@@ -48,7 +56,7 @@ function getPostHog() {
         ...(apiHost ? { api_host: apiHost } : {}),
         ...(uiHost ? { ui_host: uiHost } : {}),
         defaults: "2025-05-24",
-        capture_pageview: true,
+        capture_pageview: false,
         capture_exceptions: true,
         debug: import.meta.env.MODE === "development",
       });
@@ -68,8 +76,10 @@ function getPostHog() {
   return posthogPromise;
 }
 
-export function initAnalytics() {
-  void getPostHog();
+export async function initAnalytics(locale: SupportedLocale) {
+  const posthog = await getPostHog();
+  posthog?.register({ locale });
+  posthog?.capture("$pageview");
 }
 
 export function trackAction(
@@ -84,4 +94,26 @@ export function trackAction(
       component,
     });
   });
+}
+
+export async function registerAnalyticsLocale(locale: SupportedLocale) {
+  const posthog = await getPostHog();
+  posthog?.register({ locale });
+}
+
+export async function capturePageview() {
+  const posthog = await getPostHog();
+  posthog?.capture("$pageview");
+}
+
+export async function trackLocaleAction(
+  action:
+    | "locale_switched"
+    | "locale_suggestion_shown"
+    | "locale_suggestion_accepted"
+    | "locale_suggestion_dismissed",
+  component: "language_switcher" | "locale_suggestion",
+) {
+  const posthog = await getPostHog();
+  posthog?.capture("action_clicked", { action, component });
 }

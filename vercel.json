@@ -1,4 +1,11 @@
 {
+  "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/zh-hans", "destination": "/zh-hans/", "statusCode": 301 },
+    { "source": "/zh-Hans", "destination": "/zh-hans/", "statusCode": 301 },
+    { "source": "/zh-Hans/", "destination": "/zh-hans/", "statusCode": 301 },
+    { "source": "/zh-hans/index.html", "destination": "/zh-hans/", "statusCode": 301 }
+  ],
   "headers": [
     {
       "source": "/(.*)",

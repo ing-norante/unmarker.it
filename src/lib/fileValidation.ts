@@ -1,4 +1,5 @@
 import { withObjectUrl } from "./objectUrl";
+import { message, type MessageDescriptor } from "@/i18n/messages";
 import type { AppMode, StatusMessage } from "./types";
 
 export const MAX_FILE_SIZE_MB = 25;
@@ -52,8 +53,8 @@ type FileValidator = (
 
 export interface FileModePolicy {
   accept: string;
-  supportedCopy: string;
-  limitCopy: string[];
+  supportedCopy: MessageDescriptor;
+  limitCopy: MessageDescriptor[];
   validate: FileValidator;
 }
 
@@ -69,17 +70,17 @@ export interface WorkflowImageDecodeResult {
 export const FILE_MODE_POLICIES: Record<AppMode, FileModePolicy> = {
   unmark: {
     accept: "image/*",
-    supportedCopy: "Supports browser-readable image files",
+    supportedCopy: message("workflow:filePolicy.browser"),
     limitCopy: [
-      `Max resolution: ${MAX_MEGAPIXELS} MPixels`,
-      `Max file size: ${MAX_FILE_SIZE_MB} MB`,
+      message("workflow:filePolicy.maxResolution", { count: MAX_MEGAPIXELS }),
+      message("workflow:filePolicy.maxFileSize", { count: MAX_FILE_SIZE_MB }),
     ],
     validate: validateUnmarkFile,
   },
   metadata: {
     accept: METADATA_ACCEPT_VALUES.join(","),
-    supportedCopy: "Supports PNG, JPEG, WebP, AVIF, HEIF, JXL",
-    limitCopy: [`Max file size: ${MAX_FILE_SIZE_MB} MB`],
+    supportedCopy: message("workflow:filePolicy.metadata"),
+    limitCopy: [message("workflow:filePolicy.maxFileSize", { count: MAX_FILE_SIZE_MB })],
     validate: validateMetadataFile,
   },
 };
@@ -91,11 +92,10 @@ export function getFileModePolicy(mode: AppMode) {
 export function getWorkflowFilePolicy(): FileModePolicy {
   return {
     accept: WORKFLOW_ACCEPT,
-    supportedCopy:
-      "Supports browser-readable images, plus PNG, JPEG, WebP, AVIF, HEIF, and JXL metadata analysis",
+    supportedCopy: message("workflow:filePolicy.workflow"),
     limitCopy: [
-      `Max processing resolution: ${MAX_MEGAPIXELS} MPixels`,
-      `Max file size: ${MAX_FILE_SIZE_MB} MB`,
+      message("workflow:filePolicy.maxProcessingResolution", { count: MAX_MEGAPIXELS }),
+      message("workflow:filePolicy.maxFileSize", { count: MAX_FILE_SIZE_MB }),
     ],
     validate: validateWorkflowFile,
   };
@@ -116,8 +116,8 @@ export function validateWorkflowFile(file: File): FileValidationResult {
   }
 
   return invalidFile(
-    "Unsupported file type",
-    "Please select an image file or a PNG, JPEG, WebP, AVIF, HEIF, or JXL file for metadata analysis.",
+    message("workflow:messages.unsupportedType.title"),
+    message("workflow:messages.unsupportedType.description"),
   );
 }
 
@@ -126,8 +126,8 @@ export async function validateUnmarkFile(
 ): Promise<FileValidationResult> {
   if (!file.type.startsWith("image/")) {
     return invalidFile(
-      "Unsupported file type",
-      "Please select a valid image file.",
+      message("workflow:messages.invalidImageType.title"),
+      message("workflow:messages.invalidImageType.description"),
     );
   }
 
@@ -141,16 +141,16 @@ export async function validateUnmarkFile(
     dimensions = await loadImageDimensions(file);
   } catch {
     return invalidFile(
-      "Could not read image",
-      "This file could not be decoded. Try another image and retry.",
+      message("workflow:messages.unreadableImage.title"),
+      message("workflow:messages.unreadableImage.description"),
     );
   }
 
   const megapixels = (dimensions.width * dimensions.height) / 1_000_000;
   if (megapixels > MAX_MEGAPIXELS) {
     return invalidFile(
-      "Image resolution is too high",
-      `Please use an image up to ${MAX_MEGAPIXELS} megapixels.`,
+      message("workflow:messages.resolutionHigh.title"),
+      message("workflow:messages.resolutionHigh.description", { count: MAX_MEGAPIXELS }),
     );
   }
 
@@ -160,8 +160,8 @@ export async function validateUnmarkFile(
 export function validateMetadataFile(file: File): FileValidationResult {
   if (!isMetadataFileCandidate(file)) {
     return invalidFile(
-      "Unsupported file type",
-      "Please select a PNG, JPEG, WebP, AVIF, HEIF, or JXL image file.",
+    message("workflow:messages.invalidMetadataType.title"),
+    message("workflow:messages.invalidMetadataType.description"),
     );
   }
 
@@ -204,8 +204,8 @@ export async function inspectBrowserImageDecode(
         reason: "too-large",
         statusMessage: {
           variant: "destructive",
-          title: "Image resolution is too high",
-          description: `Please use an image up to ${MAX_MEGAPIXELS} megapixels for processing.`,
+          title: message("workflow:messages.resolutionHighProcessing.title"),
+          description: message("workflow:messages.resolutionHighProcessing.description", { count: MAX_MEGAPIXELS }),
         },
       };
     }
@@ -233,8 +233,8 @@ function validateFileSize(file: File): FileValidationResult {
   }
 
   return invalidFile(
-    "File is too large",
-    `Please use an image up to ${MAX_FILE_SIZE_MB} MB.`,
+    message("workflow:messages.fileLarge.title"),
+    message("workflow:messages.fileLarge.description", { count: MAX_FILE_SIZE_MB }),
   );
 }
 

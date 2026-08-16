@@ -1,7 +1,19 @@
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://www.unmarker.it/</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-08-16</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.unmarker.it/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://www.unmarker.it/zh-hans/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.unmarker.it/" />
+    <changefreq>monthly</changefreq>
+    <priority>1</priority>
+  </url>
+  <url>
+    <loc>https://www.unmarker.it/zh-hans/</loc>
+    <lastmod>2026-08-16</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.unmarker.it/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://www.unmarker.it/zh-hans/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.unmarker.it/" />
     <changefreq>monthly</changefreq>
     <priority>1</priority>
   </url>

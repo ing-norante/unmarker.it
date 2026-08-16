@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { inferAiProvenanceScore } from "./aiProvenanceScore";
 import type { MetadataScanResult } from "./types";
+import { message } from "@/i18n/messages";
 
 describe("aiProvenanceScore", () => {
   it("uses the strongest band for C2PA provenance", () => {
@@ -43,7 +44,7 @@ describe("aiProvenanceScore", () => {
     const score = inferAiProvenanceScore(emptyScan(), null);
 
     expect(score.percentage).toBe(12);
-    expect(score.label).toBe("No local AI signals found");
+    expect(score.kind).toBe("none");
     expect(score.provider).toBeNull();
   });
 });
@@ -59,7 +60,7 @@ function scanWithSignal(
     signals: [
       {
         type,
-        label,
+        label: message("metadata:signals.binary", { label }),
         location: "test",
         marker,
         removable: true,

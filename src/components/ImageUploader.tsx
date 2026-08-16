@@ -7,6 +7,7 @@ import { trackAction } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 
 interface ImageUploaderProps {
   onImageSelect: (file: File) => void;
@@ -27,6 +28,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   description,
   details,
 }) => {
+  const { t } = useTranslation(["homepage", "common"]);
   const fileInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -158,11 +160,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
           <div className="flex w-full min-w-0 flex-col items-center gap-3 sm:gap-4 2xl:gap-5">
             <p className="text-foreground text-xl leading-tight font-black sm:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl">
-              {isDragging ? "Drop your image" : (title ?? "Drag an image")}
+              {isDragging ? t("homepage:uploader.dragging") : (title ?? t("homepage:uploader.title"))}
             </p>
             <p className="text-muted-foreground text-sm leading-relaxed font-medium text-pretty sm:text-base lg:text-lg 2xl:text-xl">
               {description ??
-                "Drop it here, or click to select a file from your device."}
+                t("homepage:uploader.defaultDescription")}
             </p>
 
             <Button
@@ -171,7 +173,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               disabled={disabled}
             >
               <ImageSquareIcon data-icon="inline-start" />
-              Choose Image
+              {t("common:actions.chooseImage")}
             </Button>
 
             {details}
@@ -183,8 +185,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               weight="bold"
             />
             <span className="text-pretty">
-              Your image is never uploaded. Everything runs locally in your
-              browser.
+              {t("homepage:uploader.privacy")}
             </span>
           </div>
         </div>

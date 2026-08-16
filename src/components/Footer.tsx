@@ -11,6 +11,7 @@ import {
   NewspaperIcon,
 } from "@phosphor-icons/react";
 import { trackAction } from "@/lib/analytics";
+import { useTranslation } from "react-i18next";
 
 export function Footer() {
   return (
@@ -28,6 +29,7 @@ export function Footer() {
 }
 
 function FooterContent() {
+  const { t } = useTranslation("common");
   const handleFeatureBoardClick = () => {
     trackAction("feature_board_link", "footer");
   };
@@ -49,7 +51,7 @@ function FooterContent() {
       <div className="flex flex-col items-center justify-between gap-5 md:flex-row">
         <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
           <span className="text-muted-foreground text-sm font-semibold sm:text-base">
-            Built with
+            {t("footer.builtWith")}
           </span>
           <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
             <Button asChild variant="outline" className="h-10">
@@ -88,7 +90,7 @@ function FooterContent() {
                 href="https://arxiv.org/abs/2405.08363"
                 target="_blank"
                 rel="noopener noreferrer"
-                title="UnMarker: A Universal Attack on Defensive Image Watermarking"
+                title={t("footer.arxivTitle")}
                 onClick={handleArxivClick}
               >
                 <BookOpenIcon data-icon="inline-start" />
@@ -100,7 +102,7 @@ function FooterContent() {
                 href="https://uwaterloo.ca/news/media/watermarks-offer-no-defense-against-deepfakes"
                 target="_blank"
                 rel="noopener noreferrer"
-                title="Watermarks offer no defense against deepfakes"
+                title={t("footer.waterlooTitle")}
                 onClick={handleWaterlooClick}
               >
                 <NewspaperIcon data-icon="inline-start" />
@@ -118,12 +120,12 @@ function FooterContent() {
               rel="noopener noreferrer"
               onClick={handleFeatureBoardClick}
             >
-              Feedback
+              {t("footer.feedback")}
             </a>
           </Button>
           <Separator orientation="vertical" className="h-8" />
           <span className="text-muted-foreground text-sm font-semibold sm:text-base">
-            Crafted by
+            {t("footer.craftedBy")}
           </span>
           <Button asChild variant="secondary" className="h-10 px-5 font-black">
             <a

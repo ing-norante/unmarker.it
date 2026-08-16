@@ -16,6 +16,8 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MetadataSignalsList } from "@/components/MetadataSignalsList";
 import type { ImageAuditResult, WorkflowPhase } from "@/lib/types";
+import { useTranslation } from "react-i18next";
+import { messageId, translateMessage } from "@/i18n/messages";
 
 interface AnalysisPanelProps {
   audit: ImageAuditResult | null;
@@ -23,6 +25,7 @@ interface AnalysisPanelProps {
 }
 
 export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
+  const { t } = useTranslation(["workflow", "common"]);
   if (!audit) {
     return <AnalysisSkeleton phase={phase} />;
   }
@@ -33,11 +36,11 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <CardTitle>AI provenance</CardTitle>
-              <CardDescription>{audit.aiScore.description}</CardDescription>
+              <CardTitle>{t("workflow:analysis.provenance")}</CardTitle>
+              <CardDescription>{t(`workflow:audit.score.${audit.aiScore.kind}.description`)}</CardDescription>
             </div>
             <Badge variant={scoreBadgeVariant(audit.aiScore.confidence)}>
-              {audit.aiScore.confidence}
+              {t(`common:confidence.${audit.aiScore.confidence}`)}
             </Badge>
           </div>
         </CardHeader>
@@ -48,21 +51,24 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
                 {audit.aiScore.percentage}%
               </p>
               <p className="text-muted-foreground text-sm font-medium sm:text-base">
-                {audit.aiScore.label}
+                {t(`workflow:audit.score.${audit.aiScore.kind}.label`)}
               </p>
             </div>
             <Badge variant="outline">
-              {audit.aiScore.provider ?? "No provider"}
+              {audit.aiScore.provider ??
+                (audit.aiScore.kind === "none"
+                  ? t("common:generic.noProvider")
+                  : t("workflow:audit.score.unknownProvider"))}
             </Badge>
           </div>
           <Progress value={audit.aiScore.percentage} />
           <div className="flex flex-col gap-2">
             {audit.aiScore.evidence.slice(0, 4).map((item) => (
               <p
-                key={item}
+                key={messageId(item)}
                 className="bg-muted/40 text-muted-foreground border p-2 text-sm sm:text-base"
               >
-                {item}
+                {translateMessage(t, item)}
               </p>
             ))}
           </div>
@@ -71,26 +77,25 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
 
       <Card className="bg-card/95">
         <CardHeader>
-          <CardTitle>Watermark scan</CardTitle>
+          <CardTitle>{t("workflow:analysis.watermarkScan")}</CardTitle>
           <CardDescription>
-            Visible marks are scanned locally; hidden marks are treated as a
-            disruption target, not a verified-clean claim.
+            {t("workflow:analysis.watermarkDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <SignalStatus
             icon="visible"
-            title="Visible watermark"
-            label={audit.visibleWatermark.label}
-            description={audit.visibleWatermark.description}
+            title={t("workflow:analysis.visible")}
+            label={t(`workflow:audit.visible.${visibleKey(audit.visibleWatermark.status)}.label`)}
+            description={t(`workflow:audit.visible.${visibleKey(audit.visibleWatermark.status)}.description`)}
             tone={visibleTone(audit)}
-            badge={formatConfidence(audit.visibleWatermark.confidence)}
+            badge={formatConfidence(audit.visibleWatermark.confidence, t("common:generic.notScanned"))}
           />
           <SignalStatus
             icon="hidden"
-            title="Hidden watermark"
-            label={audit.hiddenWatermark.label}
-            description={audit.hiddenWatermark.description}
+            title={t("workflow:analysis.hidden")}
+            label={t(`workflow:audit.hidden.${audit.hiddenWatermark.status === "neutralized-unverified" ? "neutralized" : "risk"}.label`)}
+            description={t(`workflow:audit.hidden.${audit.hiddenWatermark.status === "neutralized-unverified" ? "neutralized" : "risk"}.description`)}
             tone={
               audit.hiddenWatermark.status === "neutralized-unverified"
                 ? "ok"
@@ -98,8 +103,8 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
             }
             badge={
               audit.hiddenWatermark.status === "neutralized-unverified"
-                ? "processed"
-                : "pending"
+                ? t("common:generic.processed")
+                : t("common:generic.pending")
             }
           />
         </CardContent>
@@ -109,17 +114,15 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <CardTitle>Metadata</CardTitle>
+              <CardTitle>{t("workflow:analysis.metadata")}</CardTitle>
               <CardDescription>
                 {audit.metadataScan
-                  ? `${audit.metadataScan.signals.length} local metadata signal${
-                      audit.metadataScan.signals.length === 1 ? "" : "s"
-                    } found in ${audit.metadataScan.format.toUpperCase()}.`
-                  : "Metadata could not be read for this verification pass."}
+                  ? t("workflow:analysis.metadataCount", { count: audit.metadataScan.signals.length, format: audit.metadataScan.format.toUpperCase() })
+                  : t("workflow:analysis.metadataUnavailable")}
               </CardDescription>
             </div>
             <Badge variant="outline">
-              {audit.metadataScan?.format ?? "partial"}
+              {audit.metadataScan?.format ?? t("common:generic.partial")}
             </Badge>
           </div>
         </CardHeader>
@@ -131,16 +134,16 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
       {audit.warnings.length > 0 && (
         <Card className="bg-card/95 lg:col-span-2">
           <CardHeader>
-            <CardTitle>Workflow warnings</CardTitle>
+            <CardTitle>{t("workflow:analysis.warnings")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="flex flex-col gap-2">
               {audit.warnings.map((warning) => (
                 <li
-                  key={warning}
+                  key={messageId(warning)}
                   className="bg-muted/50 text-muted-foreground border p-2 text-sm sm:text-base"
                 >
-                  {warning}
+                  {translateMessage(t, warning)}
                 </li>
               ))}
             </ul>
@@ -152,6 +155,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
 }
 
 function AnalysisSkeleton({ phase }: { phase: WorkflowPhase }) {
+  const { t } = useTranslation("workflow");
   return (
     <Card className="bg-card/95">
       <CardHeader>
@@ -160,11 +164,11 @@ function AnalysisSkeleton({ phase }: { phase: WorkflowPhase }) {
           <div className="min-w-0">
             <CardTitle>
               {phase === "preflight-scanning"
-                ? "Analyzing image"
-                : "Waiting for analysis"}
+                ? t("analysis.analyzing")
+                : t("analysis.waiting")}
             </CardTitle>
             <CardDescription>
-              Reading metadata and scanning local pixels.
+              {t("analysis.reading")}
             </CardDescription>
           </div>
         </div>
@@ -232,9 +236,13 @@ function visibleTone(audit: ImageAuditResult) {
   }
 }
 
-function formatConfidence(confidence: number | null) {
+function visibleKey(status: ImageAuditResult["visibleWatermark"]["status"]) {
+  return status === "not-scanned" ? "notScanned" : status === "scan-failed" ? "failed" : status === "detected" ? "detected" : "clear";
+}
+
+function formatConfidence(confidence: number | null, notScanned: string) {
   if (confidence === null) {
-    return "not scanned";
+    return notScanned;
   }
 
   return `${Math.round(confidence * 100)}%`;

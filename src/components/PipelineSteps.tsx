@@ -14,12 +14,14 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface PipelineStepsProps {
   steps: PipelineStepState[];
 }
 
 export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
+  const { t } = useTranslation("workflow");
   return (
     <div className="flex w-full flex-col gap-2">
       {steps.map((step) => (
@@ -43,7 +45,7 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="text-foreground text-ui-title">
-                      {step.label}
+                      {t(`steps.${step.id}.label`)}
                     </span>
                     {step.status === "done" && (
                       <CheckIcon
@@ -52,13 +54,11 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
                       />
                     )}
                   </div>
-                  <StatusBadge status={step.status} />
+                  <StatusBadge status={step.status} label={t(`stepStatus.${step.status}`)} />
                 </div>
-                {step.description && (
-                  <p className="text-muted-foreground text-ui-body text-pretty wrap-break-word">
-                    {step.description}
-                  </p>
-                )}
+                <p className="text-muted-foreground text-ui-body text-pretty wrap-break-word">
+                  {t(`steps.${step.id}.description`)}
+                </p>
               </div>
             </div>
 
@@ -101,13 +101,13 @@ function StepGlyph({
   }
 }
 
-function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
+function StatusBadge({ status, label }: { status: PipelineStepState["status"]; label: string }) {
   switch (status) {
     case "done":
       return (
         <Badge className="border-chart-2/20 bg-chart-2/10 text-chart-2 text-ui-caption shrink-0 font-bold uppercase">
           <span className="bg-chart-2 size-1.5" />
-          Done
+          {label}
         </Badge>
       );
     case "skipped":
@@ -117,14 +117,14 @@ function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
           className="bg-muted text-muted-foreground text-ui-caption shrink-0 font-bold uppercase"
         >
           <span className="bg-muted-foreground/40 size-1.5" />
-          Skip
+          {label}
         </Badge>
       );
     case "running":
       return (
         <Badge className="border-primary/30 bg-primary/10 text-primary text-ui-caption shrink-0 font-bold uppercase">
           <Spinner data-icon="inline-start" />
-          Run
+          {label}
         </Badge>
       );
     case "error":
@@ -134,7 +134,7 @@ function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
           className="text-ui-caption shrink-0 font-bold uppercase"
         >
           <span className="bg-destructive size-1.5" />
-          Error
+          {label}
         </Badge>
       );
     default:
@@ -144,7 +144,7 @@ function StatusBadge({ status }: { status: PipelineStepState["status"] }) {
           className="bg-muted/60 text-muted-foreground text-ui-caption shrink-0 font-bold uppercase"
         >
           <span className="bg-muted-foreground/30 size-1.5" />
-          Idle
+          {label}
         </Badge>
       );
   }

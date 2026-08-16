@@ -11,7 +11,7 @@ describe("file validation policies", () => {
   it("exposes mode-specific accept policies", () => {
     expect(FILE_MODE_POLICIES.unmark.accept).toBe("image/*");
     expect(FILE_MODE_POLICIES.metadata.accept).toContain(".jxl");
-    expect(FILE_MODE_POLICIES.metadata.supportedCopy).toContain("AVIF");
+    expect(FILE_MODE_POLICIES.metadata.supportedCopy.key).toBe("workflow:filePolicy.metadata");
     expect(getWorkflowFilePolicy().accept).toContain("image/*");
     expect(getWorkflowFilePolicy().accept).toContain(".heic");
   });

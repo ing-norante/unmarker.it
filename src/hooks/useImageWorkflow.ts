@@ -25,6 +25,8 @@ import type {
   StatusMessage,
   WorkflowPhase,
 } from "@/lib/types";
+import { message, type MessageDescriptor } from "@/i18n/messages";
+import { useTranslation } from "react-i18next";
 
 type SetStatusMessage = (message: StatusMessage | null) => void;
 
@@ -40,6 +42,7 @@ const EMPTY_CAPABILITIES: ImageWorkflowCapabilities = {
 export function useImageWorkflow({
   setStatusMessage,
 }: UseImageWorkflowOptions) {
+  const { t } = useTranslation("workflow");
   const [originalImage, setOriginalImage] = useState<File | null>(null);
   const [phase, setPhase] = useState<WorkflowPhase>("idle");
   const [preflightAudit, setPreflightAudit] = useState<ImageAuditResult | null>(
@@ -51,7 +54,7 @@ export function useImageWorkflow({
     useState<GeminiDetectionResult | null>(null);
   const [capabilities, setCapabilities] =
     useState<ImageWorkflowCapabilities>(EMPTY_CAPABILITIES);
-  const [workflowWarnings, setWorkflowWarnings] = useState<string[]>([]);
+  const [workflowWarnings, setWorkflowWarnings] = useState<MessageDescriptor[]>([]);
   const [isMetadataCleaning, setIsMetadataCleaning] = useState(false);
   const {
     url: originalImageUrl,
@@ -97,7 +100,7 @@ export function useImageWorkflow({
   ]);
 
   const setWorkflowError = useCallback(
-    (title: string, description: string) => {
+    (title: MessageDescriptor, description: MessageDescriptor) => {
       setPhase("error");
       setStatusMessage({
         variant: "destructive",
@@ -138,18 +141,18 @@ export function useImageWorkflow({
         activeAbortControllerRef.current = null;
       }
 
-      const warnings: string[] = [];
+      const warnings: MessageDescriptor[] = [];
       const metadataScan =
         metadataResult.status === "fulfilled" ? metadataResult.value : null;
       const visibleDetection =
         visibleResult.status === "fulfilled" ? visibleResult.value : null;
 
       if (metadataResult.status === "rejected") {
-        warnings.push("Postflight metadata scan did not complete.");
+        warnings.push(message("workflow:warnings.postflightMetadata"));
       }
 
       if (visibleResult.status === "rejected") {
-        warnings.push("Postflight visible watermark scan did not complete.");
+        warnings.push(message("workflow:warnings.postflightVisible"));
       }
 
       return buildImageAudit({
@@ -222,7 +225,10 @@ export function useImageWorkflow({
 
         setPreflightAudit(audit);
         setPostflightAudit(null);
-        setWorkflowWarnings(["Postflight verification did not complete."]);
+        setWorkflowWarnings([
+          message("workflow:warnings.postflightMetadata"),
+          message("workflow:warnings.postflightVisible"),
+        ]);
         setPhase("complete");
         trackAction("postflight_complete", "workflow");
       }
@@ -264,7 +270,7 @@ export function useImageWorkflow({
         let visibleDetection: GeminiDetectionResult | null = null;
         let visibleScanStatus: "scanned" | "not-scanned" | "failed" =
           "not-scanned";
-        const warnings: string[] = [];
+        const warnings: MessageDescriptor[] = [];
         const hasMetadataOnlyPath =
           isMetadataFileCandidate(file) || decodeResult.reason === "too-large";
 
@@ -284,7 +290,7 @@ export function useImageWorkflow({
             }
 
             visibleScanStatus = "failed";
-            warnings.push("Visible watermark scan did not complete.");
+            warnings.push(message("workflow:warnings.visibleScan"));
           }
         }
 
@@ -298,8 +304,8 @@ export function useImageWorkflow({
         if (!decodeResult.canDecode && !hasMetadataOnlyPath) {
           preflightValidRef.current = false;
           setWorkflowError(
-            "Could not decode image",
-            "This file could not be decoded for processing or metadata-only analysis.",
+            message("workflow:messages.decodeFailed.title"),
+            message("workflow:messages.decodeFailed.description"),
           );
           return;
         }
@@ -349,8 +355,8 @@ export function useImageWorkflow({
         console.error("Preflight failed", error);
         preflightValidRef.current = false;
         setWorkflowError(
-          "Could not analyze image",
-          "The metadata scan could not complete safely. Try another image and retry.",
+          message("workflow:messages.analyzeFailed.title"),
+          message("workflow:messages.analyzeFailed.description"),
         );
       } finally {
         if (activeAbortControllerRef.current === abortController) {
@@ -402,8 +408,8 @@ export function useImageWorkflow({
     setPhase("cancelled");
     setStatusMessage({
       variant: "default",
-      title: "Workflow cancelled",
-      description: "Reset the image or retry when you are ready.",
+      title: message("workflow:messages.workflowCancelled.title"),
+      description: message("workflow:messages.workflowCancelled.description"),
     });
     trackAction("workflow_cancelled", "workflow");
   }, [phase, pipeline, setStatusMessage]);
@@ -466,11 +472,10 @@ export function useImageWorkflow({
       if (result.removedCount === 0) {
         setStatusMessage({
           variant: "default",
-          title: "No metadata cleanup needed",
-          description:
-            "No removable AI metadata was found for this file and format.",
+          title: message("workflow:messages.cleanupNone.title"),
+          description: message("workflow:messages.cleanupNone.description"),
         });
-        toast("No metadata cleanup needed.");
+        toast(t("toasts.cleanupNone"));
         return;
       }
 
@@ -480,16 +485,15 @@ export function useImageWorkflow({
       }
 
       trackAction("download_metadata_clean", "workflow");
-      toast.success("Metadata-clean copy downloaded.");
+      toast.success(t("toasts.cleanDownloaded"));
     } catch (error) {
       console.error("Metadata clean failed", error);
       setStatusMessage({
         variant: "destructive",
-        title: "Could not clean metadata",
-        description:
-          "The metadata cleaner could not produce a safe clean copy for this file.",
+        title: message("workflow:messages.cleanupFailed.title"),
+        description: message("workflow:messages.cleanupFailed.description"),
       });
-      toast.error("Could not clean metadata.");
+      toast.error(t("toasts.cleanupFailed"));
     } finally {
       setIsMetadataCleaning(false);
     }
@@ -501,6 +505,7 @@ export function useImageWorkflow({
     preflightAudit?.metadataScan,
     setMetadataCleanObjectUrl,
     setStatusMessage,
+    t,
   ]);
 
   useEffect(() => {

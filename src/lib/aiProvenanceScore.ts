@@ -4,6 +4,7 @@ import type {
   MetadataScanResult,
   MetadataSignal,
 } from "@/lib/types";
+import { message } from "@/i18n/messages";
 
 type ProviderMatch = {
   provider: string;
@@ -49,24 +50,20 @@ export function inferAiProvenanceScore(
   if (hasStrongProvenance) {
     return {
       percentage: providerMatch ? 98 : 96,
-      label: "Strong local AI evidence",
-      provider: providerMatch?.provider ?? "Unknown AI tool",
+      kind: "strong",
+      provider: providerMatch?.provider ?? null,
       evidence,
       confidence: "high",
-      description:
-        "Local provenance or C2PA-style AI metadata was found in the file.",
     };
   }
 
   if (providerMatch || hasMetadataSignal) {
     return {
       percentage: providerMatch ? 88 : 78,
-      label: "AI metadata signals found",
-      provider: providerMatch?.provider ?? "Unknown AI tool",
+      kind: "metadata",
+      provider: providerMatch?.provider ?? null,
       evidence,
       confidence: "medium",
-      description:
-        "Local metadata markers suggest this image passed through an AI generation workflow.",
     };
   }
 
@@ -78,23 +75,19 @@ export function inferAiProvenanceScore(
 
     return {
       percentage,
-      label: "Visible AI watermark evidence",
+      kind: "visible",
       provider: "Google/Gemini",
       evidence,
       confidence: "medium",
-      description:
-        "A Gemini-style visible watermark was detected locally. No strong metadata provenance was found.",
     };
   }
 
   return {
     percentage: 12,
-    label: "No local AI signals found",
+    kind: "none",
     provider: null,
     evidence,
     confidence: "low",
-    description:
-      "This does not prove the image is human-made; it only means local metadata and visible watermark checks found no AI signal.",
   };
 }
 
@@ -102,20 +95,16 @@ function createEvidence(
   signals: MetadataSignal[],
   geminiDetection: GeminiDetectionResult | null,
 ) {
-  const evidence = signals.map((signal) =>
-    signal.marker
-      ? `${signal.label}: ${signal.marker}`
-      : `${signal.label} in ${signal.location}`,
-  );
+  const evidence = signals.map((signal) => signal.label);
 
   if (geminiDetection?.detected) {
-    evidence.push(
-      `Gemini visible watermark (${Math.round(geminiDetection.confidence * 100)}%)`,
-    );
+    evidence.push(message("workflow:audit.score.evidenceGemini", {
+      confidence: Math.round(geminiDetection.confidence * 100),
+    }));
   }
 
   if (evidence.length === 0) {
-    evidence.push("No local metadata or visible watermark signal detected");
+    evidence.push(message("workflow:audit.score.evidenceNone"));
   }
 
   return evidence;
@@ -138,7 +127,7 @@ function findProvider(signals: MetadataSignal[]): ProviderMatch | null {
 }
 
 function signalText(signal: MetadataSignal) {
-  return [signal.type, signal.label, signal.location, signal.marker]
+  return [signal.type, signal.location, signal.marker]
     .filter(Boolean)
     .join(" ");
 }
