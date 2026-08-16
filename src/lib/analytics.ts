@@ -10,14 +10,18 @@ export type TrackingAction =
   | "research_waterloo_link"
   | "process_image"
   | "analysis_only"
+  | "preflight_started"
   | "postflight_complete"
   | "preflight_complete"
+  | "processing_started"
   | "processing_complete"
   | "reprocess_started"
   | "reset"
   | "upload_image"
   | "workflow_cancelled"
   | "workflow_error"
+  | "workflow_validation_failed"
+  | "workflow_completed"
   | "workflow_started"
   | "locale_switched"
   | "locale_suggestion_shown"
@@ -32,6 +36,44 @@ export type TrackingComponent =
   | "locale_suggestion"
   | "uploader"
   | "workflow";
+
+export type AnalyticsProperty = string | number | boolean | null;
+export type AnalyticsProperties = Record<string, AnalyticsProperty>;
+
+export const ANALYTICS_SCHEMA_VERSION = 2;
+
+const semanticEvents: Record<TrackingAction, string> = {
+  analysis_only: "analysis_only_completed",
+  cancel_processing: "processing_cancel_requested",
+  download_metadata_clean: "metadata_clean_downloaded",
+  download_processed: "processed_image_downloaded",
+  feature_board_link: "outbound_link_clicked",
+  github_repo_link: "outbound_link_clicked",
+  locale_suggestion_accepted: "locale_suggestion_accepted",
+  locale_suggestion_dismissed: "locale_suggestion_dismissed",
+  locale_suggestion_shown: "locale_suggestion_shown",
+  locale_switched: "locale_changed",
+  postflight_complete: "postflight_completed",
+  preflight_complete: "preflight_completed",
+  preflight_started: "preflight_started",
+  process_image: "retry_started",
+  processing_complete: "processing_completed",
+  processing_started: "processing_started",
+  reprocess_started: "reprocess_started",
+  research_arxiv_link: "outbound_link_clicked",
+  research_waterloo_link: "outbound_link_clicked",
+  reset: "workflow_reset",
+  upload_image: "upload_selected",
+  workflow_cancelled: "workflow_cancelled",
+  workflow_completed: "workflow_completed",
+  workflow_error: "workflow_failed",
+  workflow_started: "workflow_started",
+  workflow_validation_failed: "workflow_validation_failed",
+};
+
+export function getSemanticEventName(action: TrackingAction) {
+  return semanticEvents[action];
+}
 
 let posthogPromise: Promise<typeof import("posthog-js").default | null> | null =
   null;
@@ -85,14 +127,36 @@ export async function initAnalytics(locale: SupportedLocale) {
 export function trackAction(
   action: TrackingAction,
   component: TrackingComponent,
+  properties: AnalyticsProperties = {},
 ) {
   // Keep analytics file-agnostic: action events must not include file names,
   // MIME types, dimensions, hashes, or other image-derived values.
   void getPostHog().then((posthog) => {
-    posthog?.capture("action_clicked", {
-      action,
-      component,
-    });
+    captureAction(posthog, action, component, properties);
+  });
+}
+
+function captureAction(
+  posthog: typeof import("posthog-js").default | null,
+  action: TrackingAction,
+  component: TrackingComponent,
+  properties: AnalyticsProperties,
+) {
+  if (!posthog) return;
+
+  const eventProperties = {
+    ...properties,
+    action,
+    component,
+    analytics_schema_version: ANALYTICS_SCHEMA_VERSION,
+  };
+
+  // Semantic events are the canonical v2 taxonomy. Keep the legacy envelope
+  // during migration so existing PostHog insights retain their history.
+  posthog.capture(getSemanticEventName(action), eventProperties);
+  posthog.capture("action_clicked", {
+    ...eventProperties,
+    legacy_compatibility_event: true,
   });
 }
 
@@ -113,7 +177,8 @@ export async function trackLocaleAction(
     | "locale_suggestion_accepted"
     | "locale_suggestion_dismissed",
   component: "language_switcher" | "locale_suggestion",
+  properties: AnalyticsProperties = {},
 ) {
   const posthog = await getPostHog();
-  posthog?.capture("action_clicked", { action, component });
+  captureAction(posthog, action, component, properties);
 }
