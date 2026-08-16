@@ -78,8 +78,23 @@ export function getSemanticEventName(action: TrackingAction) {
 let posthogPromise: Promise<typeof import("posthog-js").default | null> | null =
   null;
 
+function isLocalhost() {
+  const { hostname } = window.location;
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]"
+  );
+}
+
 function getPostHog() {
   if (typeof window === "undefined") {
+    return Promise.resolve(null);
+  }
+
+  // Skip PostHog on localhost so local exceptions do not reach production
+  // error tracking as if they were real user errors.
+  if (isLocalhost()) {
     return Promise.resolve(null);
   }
 

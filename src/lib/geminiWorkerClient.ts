@@ -136,6 +136,7 @@ function getGeminiWorker() {
 
   const nextWorker = new Worker(
     new URL("../workers/geminiVisible.worker.ts", import.meta.url),
+    { type: "module" },
   );
   worker = nextWorker;
 

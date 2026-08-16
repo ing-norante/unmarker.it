@@ -1,8 +1,11 @@
-import { lazy, Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { ImageUploader } from "@/components/ImageUploader";
 import { Header } from "@/components/Header";
 import { HomepageFacts } from "@/components/HomepageFacts";
 import { DeferredFooter } from "@/components/DeferredFooter";
+import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
+import { ChunkReloadNotice } from "@/components/ChunkReloadNotice";
+import { lazyWithReload } from "@/lib/lazyWithReload";
 import {
   FilePolicyDetails,
   WorkflowSummary,
@@ -19,7 +22,10 @@ import { useTranslation } from "react-i18next";
 import { translateMessage } from "@/i18n/messages";
 import { LocaleSuggestion } from "@/components/LocaleSuggestion";
 
-const WorkflowApp = lazy(() => import("@/WorkflowApp"));
+const WorkflowApp = lazyWithReload(
+  "workflow-app",
+  () => import("@/WorkflowApp"),
+);
 
 function App() {
   const { t } = useTranslation(["homepage", "workflow"]);
@@ -42,13 +48,15 @@ function App() {
 
   if (selectedFile) {
     return (
-      <Suspense fallback={<LoadingShell fileName={selectedFile.name} />}>
-        <WorkflowApp
-          key={`${selectedFile.name}:${selectedFile.size}:${selectedFile.lastModified}`}
-          initialFile={selectedFile}
-          onResetToShell={() => setSelectedFile(null)}
-        />
-      </Suspense>
+      <ChunkErrorBoundary fallback={<ChunkReloadNotice />}>
+        <Suspense fallback={<LoadingShell fileName={selectedFile.name} />}>
+          <WorkflowApp
+            key={`${selectedFile.name}:${selectedFile.size}:${selectedFile.lastModified}`}
+            initialFile={selectedFile}
+            onResetToShell={() => setSelectedFile(null)}
+          />
+        </Suspense>
+      </ChunkErrorBoundary>
     );
   }
 
