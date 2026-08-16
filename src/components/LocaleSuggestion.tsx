@@ -7,7 +7,10 @@ import { useLocale } from "@/i18n/LocaleProvider";
 import { trackLocaleAction } from "@/lib/analytics";
 
 type IdleWindow = Window & {
-  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+  requestIdleCallback?: (
+    callback: () => void,
+    options?: { timeout: number },
+  ) => number;
   cancelIdleCallback?: (id: number) => void;
 };
 
@@ -35,10 +38,11 @@ export function LocaleSuggestion() {
     const idleWindow = window as IdleWindow;
     const show = () => {
       setVisible(true);
-      void trackLocaleAction(
-        "locale_suggestion_shown",
-        "locale_suggestion",
-      );
+      void trackLocaleAction("locale_suggestion_shown", "locale_suggestion", {
+        from_locale: locale,
+        suggested_locale: "zh-Hans",
+        source: "locale-suggestion",
+      });
     };
     if (idleWindow.requestIdleCallback) {
       const id = idleWindow.requestIdleCallback(show, { timeout: 2500 });
@@ -46,7 +50,7 @@ export function LocaleSuggestion() {
     }
     const id = window.setTimeout(show, 1800);
     return () => window.clearTimeout(id);
-  }, [eligible]);
+  }, [eligible, locale]);
 
   if (!visible || !eligible) return null;
 

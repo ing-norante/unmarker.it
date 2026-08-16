@@ -54,7 +54,9 @@ export function useImageWorkflow({
     useState<GeminiDetectionResult | null>(null);
   const [capabilities, setCapabilities] =
     useState<ImageWorkflowCapabilities>(EMPTY_CAPABILITIES);
-  const [workflowWarnings, setWorkflowWarnings] = useState<MessageDescriptor[]>([]);
+  const [workflowWarnings, setWorkflowWarnings] = useState<MessageDescriptor[]>(
+    [],
+  );
   const [isMetadataCleaning, setIsMetadataCleaning] = useState(false);
   const {
     url: originalImageUrl,
@@ -73,6 +75,9 @@ export function useImageWorkflow({
   });
 
   const workflowJobRef = useRef(0);
+  const workflowIdRef = useRef<string | null>(null);
+  const workflowStartedAtRef = useRef<number | null>(null);
+  const processingAttemptRef = useRef(0);
   const preflightValidRef = useRef(false);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
 
@@ -80,6 +85,9 @@ export function useImageWorkflow({
     workflowJobRef.current += 1;
     activeAbortControllerRef.current?.abort();
     activeAbortControllerRef.current = null;
+    workflowIdRef.current = null;
+    workflowStartedAtRef.current = null;
+    processingAttemptRef.current = 0;
     preflightValidRef.current = false;
     pipeline.resetPipeline();
     clearOriginalObjectUrl();
@@ -100,14 +108,23 @@ export function useImageWorkflow({
   ]);
 
   const setWorkflowError = useCallback(
-    (title: MessageDescriptor, description: MessageDescriptor) => {
+    (
+      title: MessageDescriptor,
+      description: MessageDescriptor,
+      stage: "validation" | "preflight",
+      reasonCode: string,
+    ) => {
       setPhase("error");
       setStatusMessage({
         variant: "destructive",
         title,
         description,
       });
-      trackAction("workflow_error", "workflow");
+      trackAction("workflow_error", "workflow", {
+        workflow_id: workflowIdRef.current,
+        stage,
+        reason_code: reasonCode,
+      });
     },
     [setStatusMessage],
   );
@@ -173,10 +190,18 @@ export function useImageWorkflow({
       audit: ImageAuditResult,
       hint: GeminiDetectionResult | null,
       jobId = ++workflowJobRef.current,
+      trigger: "initial" | "retry" | "reprocess" = "initial",
     ) => {
+      const attempt = ++processingAttemptRef.current;
+      const processingStartedAt = performance.now();
       setPhase("processing");
       setPostflightAudit(null);
       setWorkflowWarnings([]);
+      trackAction("processing_started", "workflow", {
+        workflow_id: workflowIdRef.current,
+        attempt,
+        trigger,
+      });
 
       const result = await pipeline.processPipeline({
         file,
@@ -190,17 +215,34 @@ export function useImageWorkflow({
       if (!result.ok) {
         if (result.reason === "cancelled") {
           setPhase("cancelled");
-          trackAction("workflow_cancelled", "workflow");
+          trackAction("workflow_cancelled", "workflow", {
+            workflow_id: workflowIdRef.current,
+            attempt,
+            phase: "processing",
+            trigger,
+          });
           return;
         }
 
         setPhase("error");
-        trackAction("workflow_error", "workflow");
+        trackAction("workflow_error", "workflow", {
+          workflow_id: workflowIdRef.current,
+          attempt,
+          stage: "processing",
+          reason_code: "pipeline_failed",
+          trigger,
+        });
         return;
       }
 
-      trackAction("processing_complete", "workflow");
+      trackAction("processing_complete", "workflow", {
+        workflow_id: workflowIdRef.current,
+        attempt,
+        duration_ms: Math.round(performance.now() - processingStartedAt),
+        trigger,
+      });
       setPhase("postflight-scanning");
+      const postflightStartedAt = performance.now();
 
       try {
         const postAudit = await runPostflight(
@@ -217,7 +259,25 @@ export function useImageWorkflow({
         setPostflightAudit(postAudit);
         setWorkflowWarnings(postAudit.warnings);
         setPhase("complete");
-        trackAction("postflight_complete", "workflow");
+        const outcome =
+          postAudit.warnings.length > 0
+            ? "completed_with_warnings"
+            : "completed";
+        trackAction("postflight_complete", "workflow", {
+          workflow_id: workflowIdRef.current,
+          attempt,
+          duration_ms: Math.round(performance.now() - postflightStartedAt),
+          outcome,
+          trigger,
+        });
+        trackAction("workflow_completed", "workflow", {
+          workflow_id: workflowIdRef.current,
+          attempt,
+          duration_ms: elapsedWorkflowMs(workflowStartedAtRef.current),
+          outcome:
+            outcome === "completed" ? "processed" : "processed_with_warnings",
+          trigger,
+        });
       } catch (error) {
         if (isAbortError(error) || workflowJobRef.current !== jobId) {
           return;
@@ -230,15 +290,29 @@ export function useImageWorkflow({
           message("workflow:warnings.postflightVisible"),
         ]);
         setPhase("complete");
-        trackAction("postflight_complete", "workflow");
+        trackAction("postflight_complete", "workflow", {
+          workflow_id: workflowIdRef.current,
+          attempt,
+          duration_ms: Math.round(performance.now() - postflightStartedAt),
+          outcome: "verification_failed",
+          trigger,
+        });
+        trackAction("workflow_completed", "workflow", {
+          workflow_id: workflowIdRef.current,
+          attempt,
+          duration_ms: elapsedWorkflowMs(workflowStartedAtRef.current),
+          outcome: "processed_with_verification_failure",
+          trigger,
+        });
       }
     },
     [pipeline, runPostflight],
   );
 
   const runPreflight = useCallback(
-    async (file: File) => {
+    async (file: File, trigger: "initial" | "retry" = "initial") => {
       const jobId = ++workflowJobRef.current;
+      const preflightStartedAt = performance.now();
       const abortController = new AbortController();
       activeAbortControllerRef.current = abortController;
       preflightValidRef.current = false;
@@ -250,6 +324,10 @@ export function useImageWorkflow({
       setCapabilities(EMPTY_CAPABILITIES);
       setWorkflowWarnings([]);
       setStatusMessage(null);
+      trackAction("preflight_started", "workflow", {
+        workflow_id: workflowIdRef.current,
+        trigger,
+      });
 
       try {
         const metadataPromise = scanImageMetadata(file);
@@ -306,6 +384,8 @@ export function useImageWorkflow({
           setWorkflowError(
             message("workflow:messages.decodeFailed.title"),
             message("workflow:messages.decodeFailed.description"),
+            "preflight",
+            "decode_failed",
           );
           return;
         }
@@ -333,11 +413,27 @@ export function useImageWorkflow({
         setDetectionHint(visibleDetection?.detected ? visibleDetection : null);
         setCapabilities(nextCapabilities);
         setWorkflowWarnings(warnings);
-        trackAction("preflight_complete", "workflow");
+        trackAction("preflight_complete", "workflow", {
+          workflow_id: workflowIdRef.current,
+          can_process: nextCapabilities.canProcess,
+          can_clean_metadata: nextCapabilities.canCleanMetadata,
+          duration_ms: Math.round(performance.now() - preflightStartedAt),
+          trigger,
+        });
 
         if (!decodeResult.canDecode) {
           setPhase("analysis-only");
-          trackAction("analysis_only", "workflow");
+          trackAction("analysis_only", "workflow", {
+            workflow_id: workflowIdRef.current,
+            duration_ms: elapsedWorkflowMs(workflowStartedAtRef.current),
+            trigger,
+          });
+          trackAction("workflow_completed", "workflow", {
+            workflow_id: workflowIdRef.current,
+            duration_ms: elapsedWorkflowMs(workflowStartedAtRef.current),
+            outcome: "analysis_only",
+            trigger,
+          });
           return;
         }
 
@@ -346,6 +442,7 @@ export function useImageWorkflow({
           audit,
           visibleDetection?.detected ? visibleDetection : null,
           jobId,
+          trigger,
         );
       } catch (error) {
         if (isAbortError(error) || workflowJobRef.current !== jobId) {
@@ -357,6 +454,8 @@ export function useImageWorkflow({
         setWorkflowError(
           message("workflow:messages.analyzeFailed.title"),
           message("workflow:messages.analyzeFailed.description"),
+          "preflight",
+          "preflight_failed",
         );
       } finally {
         if (activeAbortControllerRef.current === abortController) {
@@ -372,14 +471,22 @@ export function useImageWorkflow({
       const validation = validateWorkflowFile(file);
       if (!validation.ok) {
         setStatusMessage(validation.statusMessage);
+        trackAction("workflow_validation_failed", "workflow", {
+          reason_code: validation.statusMessage.title.key,
+        });
         return;
       }
 
       clearWorkflowState();
+      workflowIdRef.current = createWorkflowId();
+      workflowStartedAtRef.current = performance.now();
       setOriginalImage(file);
       setOriginalObjectUrl(file);
-      trackAction("workflow_started", "workflow");
-      void runPreflight(file);
+      trackAction("workflow_started", "workflow", {
+        workflow_id: workflowIdRef.current,
+        trigger: "initial",
+      });
+      void runPreflight(file, "initial");
     },
     [clearWorkflowState, runPreflight, setOriginalObjectUrl, setStatusMessage],
   );
@@ -411,7 +518,10 @@ export function useImageWorkflow({
       title: message("workflow:messages.workflowCancelled.title"),
       description: message("workflow:messages.workflowCancelled.description"),
     });
-    trackAction("workflow_cancelled", "workflow");
+    trackAction("workflow_cancelled", "workflow", {
+      workflow_id: workflowIdRef.current,
+      phase,
+    });
   }, [phase, pipeline, setStatusMessage]);
 
   const retry = useCallback(() => {
@@ -424,11 +534,25 @@ export function useImageWorkflow({
       preflightAudit &&
       capabilities.canProcess
     ) {
-      void runProcessing(originalImage, preflightAudit, detectionHint);
+      trackAction("process_image", "action_bar", {
+        workflow_id: workflowIdRef.current,
+        retry_stage: "processing",
+      });
+      void runProcessing(
+        originalImage,
+        preflightAudit,
+        detectionHint,
+        undefined,
+        "retry",
+      );
       return;
     }
 
-    void runPreflight(originalImage);
+    trackAction("process_image", "action_bar", {
+      workflow_id: workflowIdRef.current,
+      retry_stage: "preflight",
+    });
+    void runPreflight(originalImage, "retry");
   }, [
     capabilities.canProcess,
     detectionHint,
@@ -442,9 +566,18 @@ export function useImageWorkflow({
   const reprocess = useCallback(() => {
     if (!originalImage || !preflightAudit || !capabilities.canProcess) return;
 
-    trackAction("reprocess_started", "workflow");
+    trackAction("reprocess_started", "workflow", {
+      workflow_id: workflowIdRef.current,
+      next_attempt: processingAttemptRef.current + 1,
+    });
     setStatusMessage(null);
-    void runProcessing(originalImage, preflightAudit, detectionHint);
+    void runProcessing(
+      originalImage,
+      preflightAudit,
+      detectionHint,
+      undefined,
+      "reprocess",
+    );
   }, [
     capabilities.canProcess,
     detectionHint,
@@ -484,7 +617,9 @@ export function useImageWorkflow({
         triggerBrowserDownload(objectUrl, result.fileName);
       }
 
-      trackAction("download_metadata_clean", "workflow");
+      trackAction("download_metadata_clean", "workflow", {
+        workflow_id: workflowIdRef.current,
+      });
       toast.success(t("toasts.cleanDownloaded"));
     } catch (error) {
       console.error("Metadata clean failed", error);
@@ -595,4 +730,15 @@ function assertNotAborted(signal?: AbortSignal) {
   if (signal?.aborted) {
     throw createAbortError();
   }
+}
+
+function createWorkflowId() {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `workflow-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
+}
+
+function elapsedWorkflowMs(startedAt: number | null) {
+  return startedAt === null ? 0 : Math.round(performance.now() - startedAt);
 }

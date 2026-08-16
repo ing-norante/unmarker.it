@@ -73,13 +73,14 @@ export function LocaleProvider({
       await instance.changeLanguage(nextLocale);
       flushSync(() => setLocale(nextLocale));
 
-      if (pushHistory && window.location.pathname !== localeConfigs[nextLocale].path) {
+      if (
+        pushHistory &&
+        window.location.pathname !== localeConfigs[nextLocale].path
+      ) {
         window.history.pushState({}, "", localeConfigs[nextLocale].path);
       }
 
-      applyDocumentMetadataToDom(
-        createDocumentMetadata(nextLocale, instance),
-      );
+      applyDocumentMetadataToDom(createDocumentMetadata(nextLocale, instance));
       await registerAnalyticsLocale(nextLocale);
     },
     [instance],
@@ -88,7 +89,8 @@ export function LocaleProvider({
   const recordPreference = useCallback((nextLocale: SupportedLocale) => {
     localStorage.setItem(PREFERENCE_KEY, nextLocale);
     setExplicitPreference(nextLocale);
-    const suggestionStatus = nextLocale === "zh-Hans" ? "accepted" : "dismissed";
+    const suggestionStatus =
+      nextLocale === "zh-Hans" ? "accepted" : "dismissed";
     localStorage.setItem(SUGGESTION_KEY, suggestionStatus);
     setSuggestionDecision(suggestionStatus);
   }, []);
@@ -98,9 +100,6 @@ export function LocaleProvider({
       recordPreference(nextLocale);
 
       if (nextLocale === locale) {
-        if (source === "language-switcher") {
-          await trackLocaleAction("locale_switched", "language_switcher");
-        }
         return;
       }
 
@@ -112,6 +111,11 @@ export function LocaleProvider({
         source === "locale-suggestion"
           ? "locale_suggestion"
           : "language_switcher",
+        {
+          from_locale: locale,
+          to_locale: nextLocale,
+          source,
+        },
       );
       await capturePageview();
     },
@@ -126,8 +130,13 @@ export function LocaleProvider({
     await trackLocaleAction(
       "locale_suggestion_dismissed",
       "locale_suggestion",
+      {
+        from_locale: locale,
+        suggested_locale: "zh-Hans",
+        source: "locale-suggestion",
+      },
     );
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -158,7 +167,9 @@ export function LocaleProvider({
     ],
   );
 
-  return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
+  return (
+    <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
+  );
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

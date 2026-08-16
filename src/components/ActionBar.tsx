@@ -64,12 +64,10 @@ export function ActionBar({
   };
 
   const handleRetry = () => {
-    trackAction("process_image", "action_bar");
     onRetry();
   };
 
   const handleReprocess = () => {
-    trackAction("reprocess_started", "action_bar");
     onReprocess();
   };
 

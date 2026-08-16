@@ -20,6 +20,11 @@ export const homepage = {
     preparing: "正在准备 {{fileName}}",
     description: "正在加载本地图像处理流程……",
   },
+  loadError: {
+    title: "有可用更新",
+    description: "发布新版本后此标签页已过期。请重新加载页面以继续。",
+    action: "重新加载",
+  },
   facts: {
     eyebrow: "核心信息",
     heading: "在浏览器本地分析并干扰 AI 水印，无需上传图片。",
