@@ -121,7 +121,9 @@ function WorkflowApp({ initialFile, onResetToShell }: WorkflowAppProps) {
         reprocess={reprocess}
         downloadMetadataClean={downloadMetadataClean}
       />
-      <Toaster />
+      <div translate="no">
+        <Toaster />
+      </div>
     </ThemeProvider>
   );
 }
@@ -231,9 +233,11 @@ function WorkflowLayout({
                   variant={statusMessage.variant}
                   className="mb-4 shrink-0"
                 >
-                  <AlertTitle>{translateMessage(t, statusMessage.title)}</AlertTitle>
+                  <AlertTitle>
+                    <span>{translateMessage(t, statusMessage.title)}</span>
+                  </AlertTitle>
                   <AlertDescription>
-                    {translateMessage(t, statusMessage.description)}
+                    <span>{translateMessage(t, statusMessage.description)}</span>
                   </AlertDescription>
                 </Alert>
               )}
@@ -293,7 +297,9 @@ function WorkflowLayout({
         <div className="px-(--page-gutter) pb-6 lg:pb-8">
           <DeferredFooter />
         </div>
-        <LocaleSuggestion />
+        <div translate="no">
+          <LocaleSuggestion />
+        </div>
       </div>
     </div>
   );

@@ -35,6 +35,12 @@ export const common = {
     medium: "medium",
     low: "low",
   },
+  errorBoundary: {
+    title: "Something went wrong",
+    description:
+      "The page did not load correctly. A browser translation tool can cause this. Reload the page to continue.",
+    reload: "Reload page",
+  },
   generic: {
     noProvider: "No provider",
     partial: "partial",
