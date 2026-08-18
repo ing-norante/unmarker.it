@@ -117,7 +117,12 @@ src/
     ImageComparison.tsx   # Analysis, before/after preview, verification diff
     VerificationDiff.tsx  # Postflight before/after verification summary
     Footer.tsx            # Links + theme toggle + analytics events
+research/
+  text-watermark-benchmark/ # Isolated bilingual benchmark for text rewrite research
 ```
+
+The text watermark research harness is documented separately in
+[`research/text-watermark-benchmark/README.md`](research/text-watermark-benchmark/README.md).
 
 ## Limitations
 

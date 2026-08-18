@@ -1,0 +1,35 @@
+{
+  "budgets": [
+    [
+      "conservative",
+      0.15
+    ],
+    [
+      "intermediate",
+      0.35
+    ],
+    [
+      "aggressive",
+      0.65
+    ]
+  ],
+  "fixed_budgets": {
+    "simple_paraphrase": [
+      "fixed",
+      0.65
+    ],
+    "sira": [
+      "paper_default",
+      0.7
+    ],
+    "bira": [
+      "paper_proxy",
+      0.5
+    ]
+  },
+  "cost_per_1k_tokens": {},
+  "calibration_null_keys": 128,
+  "semantic_threshold": 0.9,
+  "nli_threshold": 0.9,
+  "compose_window": 4
+}

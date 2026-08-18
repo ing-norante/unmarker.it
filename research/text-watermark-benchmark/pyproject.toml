@@ -1,0 +1,16 @@
+[project]
+name = "unmarker-text-watermark-benchmark"
+version = "0.1.0"
+description = "Reproducible bilingual benchmark for text watermark rewrite strategies"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[project.scripts]
+unmarker-text-bench = "unmarker_text_bench.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/unmarker_text_bench"]
