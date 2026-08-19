@@ -1,155 +1,232 @@
-# Gate 2: official MarkLLM corpus
+# Remote MarkLLM benchmark
 
-Gate 2 replaces the controlled lexicon with normal model generation and the
-official MarkLLM logits processors and detectors. It currently validates corpus
-generation and detector baselines. It does **not** run rewrite attacks and must
-not be reported as watermark-removal evidence.
+This is the evidence pipeline after the dependency-free Gate 1 harness. Model
+inference and MarkLLM run on Modal GPUs; constrained rewriting runs through
+OpenRouter. No Ollama server or local model weights are required.
 
-The checked-in `datasets/markllm-wikipedia-v1.jsonl` manifest contains 400
-validated unique prompts: 100 calibration and 100 evaluation prompts for each
-of English and Italian. The full 1,000-generation MarkLLM baseline has not yet
-been run or presented as a result.
+The pipeline is deliberately batch-oriented and checkpointed. It is not a
+production text-rewriting backend.
 
 ## Reproducibility boundary
 
-- source: [THU-BPM/MarkLLM](https://github.com/THU-BPM/MarkLLM);
-- pinned commit: `c45ddc40f7b761beabe55a1b8dc4690e531d1c6d`;
-- algorithms: MarkLLM `KGW`, `Unigram`, and `SynthID` with their checked-in
-  configuration files;
-- default evidence model: `Qwen/Qwen2.5-0.5B-Instruct`;
-- generated continuation only: the prompt is not included in detector input;
-- no `VariantLexicon`, synonym groups, or circular composition.
+Pinned components:
 
-The adapter imports MarkLLM from a source checkout rather than copying or
-modifying its algorithms. The source commit and model configuration are written
-to every run's `config.json` and `summary.json`.
+- MarkLLM: `THU-BPM/MarkLLM` at
+  `c45ddc40f7b761beabe55a1b8dc4690e531d1c6d`;
+- corpus generator and target tokenizer: `Qwen/Qwen3-14B` at
+  `40c069824f4251a91eefaf281ebe4c544efd3e18`;
+- causal self-information scorer: `Qwen/Qwen3-8B` at
+  `b968826d9c46dd6066d109eabc6255188de91218`;
+- OpenRouter rewriter: `qwen/qwen3.8-2.4t-a95b`;
+- its logit-bias tokenizer: `Qwen/Qwen3.8-2.4T-A95B` at
+  `207bd685a7e3696cfaff12ded7c6a7ea0f88c996`;
+- semantic model: `paraphrase-multilingual-mpnet-base-v2` at
+  `4328cf26390c98c5e3c738b4460a05b95f4911f5`;
+- multilingual NLI model: `mDeBERTa-v3-base-mnli-xnli` at
+  `8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c`.
 
-## Isolated setup
+The Modal image also pins Python dependencies. Every resumable stage stores an
+input manifest and refuses to combine artifacts whose input hashes or model
+configuration differ.
+
+The SIRA and BIRA stages reproduce the papers' algorithmic procedures while
+adapting inference to one OpenRouter model:
+
+- SIRA: full reference paraphrase, teacher-forced self-information ranking,
+  exact-budget masking, then reference-conditioned reconstruction;
+- BIRA: self-information-ranked source token types encoded with the target
+  rewriter tokenizer and suppressed through `logit_bias`; beta is calibrated
+  on clean calibration texts and adaptively relaxed on degeneration;
+- position-aware BIRA: the same BIRA procedure, with a dispersed first pass
+  through ranked token positions before filling the exact budget.
+
+This is an API-compatible reproduction, not an unmodified execution of the
+authors' model-specific scripts. Provenance is pinned to:
+
+- SIRA: `Allencheng97/Self-information-Rewrite-Attack` at
+  `eeae0b50bc64bed3e9730ef43d48da5a182983a0`;
+- BIRA: `ml-postech/LLM-Watermark-Evasion-via-Bias-Inversion` at
+  `6f62ecce6f3410514fd43a40583a4059822af73a`.
+
+## Experimental design
+
+The corpus contains 400 independent prompts: 100 calibration and 100
+evaluation prompts for each of English and Italian. Evaluation text is
+watermarked independently with MarkLLM KGW, Unigram, and SynthID. Clean
+calibration generations set a separate 1% FPR threshold for every
+algorithm/language cell.
+
+All four attacks are generated at 15%, 35%, and 65% budgets. This produces an
+uncensored fixed-budget grid. Evaluation source prompts are then divided into
+a deterministic 25% development split and a 75% held-out split. Development
+data fits a scalar attack-time surrogate based on weighted self-information
+retention. The progressive policy is identical for every pipeline: try the
+three budgets in order and stop at the first candidate that passes the
+surrogate and all quality gates. Target MarkLLM decisions from held-out prompts
+never participate in selection.
+
+Quality requires all of the following:
+
+- exact multiset preservation of extracted entities, numbers, URLs, email
+  addresses, quotations, and negations;
+- multilingual sentence similarity of at least 0.90;
+- bidirectional multilingual NLI entailment of at least 0.80.
+
+`human-review.csv` is produced with blank blinded rating fields. Human
+evaluation remains required before promotion.
+
+## Setup
 
 From `research/text-watermark-benchmark`:
 
 ```bash
-./scripts/fetch_markllm.sh
 uv venv --python 3.11
-uv pip install -e '.[markllm]'
+uv pip install -e '.[remote,modal]'
+modal setup
 ```
 
-The source checkout, virtual environment, Hugging Face model cache, and
-`results/markllm-latest` are not committed. The React application keeps its
-existing dependency graph.
+`modal setup` is only needed if the machine does not already have an active
+Modal profile. Model weights are cached in the `unmarker-huggingface-cache`
+Modal Volume. Run artifacts are checkpointed in `unmarker-markllm-runs`.
 
-MarkLLM's SynthID module imports its Bayesian detector eagerly even when the
-mean detector is configured, so the isolated extra includes `scikit-learn` in
-addition to MarkLLM's direct runtime dependencies.
+The OpenRouter stage reads `OPENROUTER_API_KEY`. It can be set in the shell or
+loaded from a named env file with `--env-file`; the value is never written to
+an artifact or printed. Do not commit that env file.
 
-## Integration smoke test
-
-The four-row fixture exists only to test installation and API compatibility:
+## 1. Generate and score on Modal
 
 ```bash
-.venv/bin/python -m unmarker_text_bench.markllm_cli \
-  --markllm-root .markllm-source \
-  --prompts datasets/markllm-smoke-prompts.jsonl \
-  --output results/markllm-latest \
-  --model HuggingFaceTB/SmolLM2-135M-Instruct \
-  --device mps \
-  --max-new-tokens 24 \
-  --min-generated-tokens 8 \
-  --allow-small-smoke
+.venv/bin/modal run modal_pipeline.py \
+  --stage prepare \
+  --run-id markllm-qwen3-v1 \
+  --output results/modal-markllm-qwen3-v1
 ```
 
-On 2026-08-19 this completed end-to-end on Apple MPS with official KGW,
-Unigram, and SynthID. Scores from one calibration and one evaluation prompt per
-language are meaningless; for example an empirical FPR can only be 0% or 100%.
-The smoke artifacts are intentionally ignored.
+This runs Qwen3-14B with the official MarkLLM logits processors, calibrates the
+detectors, then uses Qwen3-8B to calculate token self-information. Generated
+continuations exclude their prompts before detection. Thinking is disabled.
 
-Without `--allow-small-smoke`, the runner refuses undersized or malformed
-corpora.
+Inspect `corpus-summary.json` before spending on rewrites. Every
+algorithm/language cell should have adequate length, plausible held-out FPR,
+and strong pre-attack TPR. Manually inspect both languages as well.
 
-## Independent prompt corpus
-
-Each JSONL row must contain:
-
-```json
-{
-  "id": "unique-id",
-  "language": "en",
-  "domain": "encyclopedic",
-  "split": "calibration",
-  "prompt": "A unique model prompt of at least 20 characters."
-}
-```
-
-IDs and normalized prompt texts must be unique. Supported splits are
-`calibration` and `evaluation`. The default minimum is, independently for each
-language:
-
-- 100 calibration prompts;
-- 100 evaluation prompts.
-
-Thus a valid minimum corpus contains 400 source prompts, without overlapping
-windows. This is only a floor. A 100-sample calibration set gives a very coarse
-1% tail estimate; a serious report should use at least 1,000 calibration
-generations per language while retaining an independent evaluation split.
-
-### Reproducible Wikipedia builder
-
-The builder streams cleaned English and Italian Wikipedia articles from the
-`wikimedia/wikipedia` dataset, pinned to revision
-`b04c8d1ceb2f5cd4588862100d08de323dccfbaa`. Each article contributes one unique
-title-derived instruction and source provenance; article bodies are not copied
-into the benchmark.
-
-The first Parquet streaming access can take several minutes and roughly 1 GB of
-RAM even for a tiny sample; subsequent corpus size mostly affects iteration,
-not dependency setup.
+## 2. Estimate OpenRouter calls
 
 ```bash
-.venv/bin/python scripts/build_wikipedia_prompts.py \
-  --output datasets/markllm-wikipedia-v1.jsonl \
-  --calibration-per-language 100 \
-  --evaluation-per-language 100
+.venv/bin/unmarker-remote-bench estimate \
+  --generations results/modal-markllm-qwen3-v1/generations.jsonl
 ```
 
-Wikipedia content is distributed under CC BY-SA 3.0 and GFDL; preserve the
-`source` metadata in downstream artifacts.
+With 200 evaluation prompts and three watermark schemes, the complete grid has
+600 watermark cases. Its theoretical minimum is 7,820 OpenRouter requests:
+13 per case plus 20 clean beta-calibration calls. Adaptive BIRA retries can
+increase this. Always run the estimator and a bounded pilot first.
 
-## Evidence baseline run
+## 3. Run a bounded OpenRouter pilot
 
 ```bash
-.venv/bin/python -m unmarker_text_bench.markllm_cli \
-  --markllm-root .markllm-source \
-  --prompts datasets/markllm-wikipedia-v1.jsonl \
-  --output results/markllm-wikipedia-v1 \
-  --model Qwen/Qwen2.5-0.5B-Instruct \
-  --device mps \
-  --max-new-tokens 192 \
-  --min-generated-tokens 80
+.venv/bin/unmarker-remote-bench attack \
+  --generations results/modal-markllm-qwen3-v1/generations.jsonl \
+  --scores results/modal-markllm-qwen3-v1/token-scores.jsonl \
+  --output results/remote-pilot/attacks \
+  --env-file /absolute/path/to/private.env \
+  --max-evaluation-prompts-per-language 4
 ```
 
-Unwatermarked text is generated once per prompt. For evaluation prompts, each
-watermarked counterpart uses the same model, prompt, decoding configuration,
-and sampling seed. Calibration prompts produce only unwatermarked generations,
-avoiding unnecessary watermarked inference.
+For an even smaller infrastructure smoke, add `--pipelines bira --algorithms
+KGW`. Do not compare algorithms or promote a method from a filtered run.
 
-Thresholds are estimated independently for each algorithm/language from the
-calibration split. FPR and watermarked TPR are then measured only on the
-evaluation split.
+The client performs a live provider capability check before the first paid
+request. The default route is fixed to DeepInfra with fallbacks disabled because
+that endpoint accepts `logit_bias` in a real request. Together currently
+advertises the parameter but rejects it when speculative decoding is active.
+If availability changes, select another provider only after a real smoke call,
+not only the endpoint metadata preflight.
+Actual provider, returned model, request ID, token usage, API cost, latency,
+beta, and a hash of biased token IDs are recorded per call.
 
-## Outputs and promotion gates
+The selected Qwen endpoint requires reasoning. Requests therefore use its
+lowest actually supported `low` effort and exclude the reasoning trace from the
+response; reasoning tokens still count toward usage and cost. This setting is
+recorded in the attack manifest. The completion cap is 4,096 tokens so
+mandatory reasoning cannot consume the whole allowance on a 192-token rewrite;
+only actually used tokens are billed.
 
-- `generations.jsonl`: prompts, provenance, continuations, raw scores, built-in
-  decisions, calibrated decisions, token counts, and latency;
-- `summary.json`: split counts, thresholds, held-out FPR/TPR, length pass rates,
-  and backend metadata;
-- `config.json`: complete Gate 2 and backend configuration.
+The stage resumes from `api-calls.jsonl`, `beta-calibration.json`, and
+`raw-candidates.jsonl`. Reusing an output directory with different inputs or
+configuration is rejected.
 
-Do not connect rewrite attacks until all selected detector-language cells have:
+## 4. Detect and validate on Modal
 
-1. adequate held-out text length;
-2. acceptable held-out FPR near the target;
-3. strong pre-attack TPR;
-4. manually inspected English and Italian generation quality.
+```bash
+.venv/bin/modal run modal_pipeline.py \
+  --stage evaluate \
+  --run-id markllm-qwen3-v1 \
+  --candidates results/remote-pilot/attacks/candidates.jsonl \
+  --output results/remote-pilot/modal
+```
 
-Only after these gates pass should the shared fixed/progressive attack policy be
-run against the stored MarkLLM corpus.
+This uploads only candidate text, runs the pinned official MarkLLM detectors,
+and computes multilingual embedding and NLI quality. The result is
+`candidate-evaluations.jsonl`.
+
+## 5. Finalize held-out metrics
+
+```bash
+.venv/bin/unmarker-remote-bench finalize \
+  --candidates results/remote-pilot/attacks/candidates.jsonl \
+  --evaluations results/remote-pilot/modal/candidate-evaluations.jsonl \
+  --api-calls results/remote-pilot/attacks/api-calls.jsonl \
+  --output results/remote-pilot/report
+```
+
+The report contains fixed-budget and progressive held-out tables with:
+
+- target TPR at the clean-calibrated 1% FPR threshold;
+- conditional and quality-preserving evasion rates;
+- token edit distance and changed-token ratio;
+- exact entity and number preservation;
+- semantic similarity and bidirectional NLI;
+- observed OpenRouter latency, cost, and cost per 1,000 tokens;
+- selected-budget distribution and surrogate pass rate.
+
+Repeat step 3 without the prompt limit only after the pilot artifacts look
+correct. Use a new output directory and, for a formal run, a new immutable run
+ID.
+
+## Artifacts and interpretation
+
+The main files are:
+
+- Modal prepare: `generations.jsonl`, `corpus-summary.json`,
+  `token-scores.jsonl`, and their manifests;
+- OpenRouter attacks: `api-calls.jsonl`, `beta-calibration.json`,
+  `candidates.jsonl`, and `attack-summary.json`;
+- Modal evaluation: `candidate-evaluations.jsonl` and manifest;
+- finalization: `summary.json`, `REPORT.md`,
+  `progressive-selections.jsonl`, `human-review.csv`, and the separate blind
+  key.
+
+The result applies only to the reproduced MarkLLM algorithms and the pinned
+models. It does not establish removal of Claude's watermark or evasion of an
+undisclosed production detector.
+
+## Verified integration smoke
+
+On 2026-08-19, `integration-smoke-20260819` completed the Modal `prepare`
+stage on an L40S with the four-row integration fixture. It produced 12 corpus
+records (four unique clean generations plus six watermarked generations) and
+10 unique Qwen3-8B score records; every generated continuation was 191-192
+tokens. The run also confirmed that Qwen3 declares a 151,936-token model
+vocabulary while `len(tokenizer)` is 151,669. The detector adapter therefore
+uses the pinned model config's vocabulary size, matching watermark generation.
+
+A bounded BIRA/KGW OpenRouter run then completed six candidates from two
+watermark cases plus two beta-calibration calls. All eight responses came from
+DeepInfra with `finish_reason=stop`; observed API cost was $0.04081 and summed
+latency was 79.9 seconds. The candidates completed the Modal MarkLLM and neural
+quality evaluation stage as well. Together advertised `logit_bias` but rejected
+it in combination with speculative decoding, which is why it is not the
+default. The smoke has no held-out prompts and therefore produces no headline
+progressive result. These checks validate integration only; the tiny fixture
+has no statistical meaning.

@@ -9,9 +9,11 @@ This directory contains an isolated research harness for comparing four text rew
 
 The benchmark is deliberately separate from the React application. It is intended to validate algorithmic choices before a backend API or product UI is designed.
 
-Gate 2 setup for official MarkLLM generation and detection is documented in
-[`MARKLLM.md`](MARKLLM.md). It uses an isolated optional environment and does
-not change the application dependencies.
+The complete remote Gate 2/3 workflow is documented in
+[`MARKLLM.md`](MARKLLM.md). It uses Modal for official MarkLLM generation,
+self-information scoring, target detection, and neural quality validation;
+OpenRouter supplies the constrained frontier rewriter. It does not change the
+React application's dependency graph and requires no Ollama process.
 
 ## Current scope
 
@@ -97,6 +99,12 @@ src/unmarker_text_bench/
   watermarks.py       calibrated research surrogates
   metrics.py          edit-distance metrics
   runner.py           experiment orchestration and exports
+  self_information.py causal teacher-forced scorer and exact-budget selection
+  attack_pipeline.py  simple, SIRA, BIRA, and position-aware remote attacks
+  openrouter_backend.py provider-pinned constrained rewrite client
+  remote_evaluation.py official detectors and multilingual neural validation
+  final_report.py     development-fitted surrogate and held-out reports
+modal_pipeline.py     resumable Modal GPU jobs and artifact transfer
 tests/
   test_benchmark.py
 ```
@@ -143,14 +151,15 @@ measures the complete search policy. It is invalid to compare a progressive
 pipeline against a fixed-budget baseline as if the difference came only from
 ranking.
 
-## Next evidence gates
+## Evidence gates
 
-The reference benchmark is only Gate 1. Before integration into unmarker.it:
+The checked-in reference benchmark is only Gate 1. The remote pipeline now
+implements the next experimental stages, but production integration still
+requires:
 
-1. run and qualify the independent Gate 2 corpus with the official MarkLLM adapter;
-2. reproduce BIRA and SIRA with their official code and open-weight models;
-3. replace the NLI proxy with a multilingual NLI model and sentence embeddings;
-4. expand to at least 200 passages per language and multiple domains;
-5. perform blinded human evaluation;
-6. report cost and latency on the intended backend infrastructure;
-7. avoid any claim about Claude until an authorized production detector can verify it.
+1. execute and qualify the independent Modal corpus baseline;
+2. run a bounded OpenRouter pilot before the complete fixed-budget grid;
+3. evaluate only the held-out split after fitting the surrogate on development;
+4. complete the generated blinded human review sheet;
+5. repeat across model families and additional domains;
+6. avoid any claim about Claude until an authorized production detector can verify it.

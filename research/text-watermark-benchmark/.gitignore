@@ -3,5 +3,7 @@ __pycache__/
 .venv/
 results/latest/
 results/markllm-latest/
+results/modal-*/
+results/remote-*/
 .markllm-source/
 datasets/*.tmp

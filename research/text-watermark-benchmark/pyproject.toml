@@ -8,6 +8,7 @@ license = { text = "MIT" }
 [project.scripts]
 unmarker-text-bench = "unmarker_text_bench.cli:main"
 unmarker-markllm-corpus = "unmarker_text_bench.markllm_cli:main"
+unmarker-remote-bench = "unmarker_text_bench.remote_cli:main"
 
 [project.optional-dependencies]
 markllm = [
@@ -17,6 +18,12 @@ markllm = [
   "torch>=2.2",
   "tqdm>=4.66",
   "transformers>=4.46",
+]
+remote = [
+  "transformers>=5.15,<5.16",
+]
+modal = [
+  "modal==1.5.4",
 ]
 
 [build-system]
