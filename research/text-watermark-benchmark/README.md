@@ -9,6 +9,10 @@ This directory contains an isolated research harness for comparing four text rew
 
 The benchmark is deliberately separate from the React application. It is intended to validate algorithmic choices before a backend API or product UI is designed.
 
+Gate 2 setup for official MarkLLM generation and detection is documented in
+[`MARKLLM.md`](MARKLLM.md). It uses an isolated optional environment and does
+not change the application dependencies.
+
 ## Current scope
 
 The default run is dependency-free and deterministic. It uses:
@@ -143,7 +147,7 @@ ranking.
 
 The reference benchmark is only Gate 1. Before integration into unmarker.it:
 
-1. connect MarkLLM detector implementations, including its SynthID configuration;
+1. run and qualify the independent Gate 2 corpus with the official MarkLLM adapter;
 2. reproduce BIRA and SIRA with their official code and open-weight models;
 3. replace the NLI proxy with a multilingual NLI model and sentence embeddings;
 4. expand to at least 200 passages per language and multiple domains;

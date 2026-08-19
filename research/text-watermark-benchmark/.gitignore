@@ -2,3 +2,6 @@ __pycache__/
 *.py[cod]
 .venv/
 results/latest/
+results/markllm-latest/
+.markllm-source/
+datasets/*.tmp

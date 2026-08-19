@@ -8,6 +8,12 @@ from pathlib import Path
 
 from unmarker_text_bench.language_model import ReferenceNgramScorer
 from unmarker_text_bench.lexicon import VariantLexicon
+from unmarker_text_bench.markllm_gate import (
+    DetectionResult,
+    Gate2Config,
+    MarkLLMGateRunner,
+    PromptSample,
+)
 from unmarker_text_bench.runner import BenchmarkConfig, BenchmarkRunner
 from unmarker_text_bench.strategies import PositionAwareBiraPipeline
 from unmarker_text_bench.tokenization import extract_numbers, extract_urls, replace_tokens, tokenize
@@ -100,6 +106,77 @@ class RunnerTests(unittest.TestCase):
                 key = (row["sample_id"], row["watermark"], row["budget"])
                 positions_by_case_budget.setdefault(key, set()).add(int(row["changed_positions"]))
             self.assertTrue(all(len(counts) == 1 for counts in positions_by_case_budget.values()))
+
+
+class FakeMarkLLMBackend:
+    def __init__(self) -> None:
+        self.unwatermarked_calls = 0
+        self.watermarked_calls = 0
+
+    @property
+    def metadata(self) -> dict[str, str]:
+        return {"implementation": "fake-markllm", "model": "fake-model"}
+
+    def generate_unwatermarked(self, prompt: str, seed: int) -> str:
+        self.unwatermarked_calls += 1
+        return f"Plain generated continuation for seed {seed} and prompt {prompt}"
+
+    def generate_watermarked(self, algorithm: str, prompt: str, seed: int) -> str:
+        self.watermarked_calls += 1
+        return f"[WM:{algorithm}] Generated continuation for seed {seed} and prompt {prompt}"
+
+    def detect(self, algorithm: str, text: str) -> DetectionResult:
+        marked = f"[WM:{algorithm}]" in text
+        return DetectionResult(marked, 0.9 if marked else 0.1)
+
+    def count_tokens(self, text: str) -> int:
+        return len(text.split())
+
+
+class MarkLLMGateTests(unittest.TestCase):
+    prompts = [
+        PromptSample(
+            "en-1", "en", "test", "calibration", "Explain a sufficiently detailed English topic."
+        ),
+        PromptSample(
+            "en-2", "en", "test", "evaluation", "Describe a second independent English topic."
+        ),
+        PromptSample(
+            "it-1",
+            "it",
+            "test",
+            "calibration",
+            "Spiega un argomento italiano sufficientemente dettagliato.",
+        ),
+        PromptSample(
+            "it-2",
+            "it",
+            "test",
+            "evaluation",
+            "Descrivi un secondo argomento italiano indipendente.",
+        ),
+    ]
+
+    def test_evidence_run_rejects_small_prompt_sets(self) -> None:
+        with self.assertRaisesRegex(ValueError, "independent calibration and evaluation prompts"):
+            MarkLLMGateRunner(self.prompts, FakeMarkLLMBackend())
+
+    def test_smoke_run_generates_once_per_prompt_and_writes_artifacts(self) -> None:
+        backend = FakeMarkLLMBackend()
+        config = Gate2Config(min_generated_tokens=1, allow_small_smoke=True)
+        runner = MarkLLMGateRunner(self.prompts, backend, config)
+        with tempfile.TemporaryDirectory() as directory:
+            summary = runner.run(Path(directory))
+            self.assertEqual(backend.unwatermarked_calls, len(self.prompts))
+            self.assertEqual(backend.watermarked_calls, 6)
+            self.assertEqual(summary["source_prompt_count"], 4)
+            self.assertFalse(summary["lexicon_used_for_generation"])
+            self.assertEqual(len(summary["cells"]), 6)
+            self.assertTrue((Path(directory) / "generations.jsonl").exists())
+            self.assertTrue((Path(directory) / "config.json").exists())
+            self.assertTrue(
+                all(cell["watermarked_tpr_at_calibrated_threshold"] == 1.0 for cell in summary["cells"])
+            )
 
 
 if __name__ == "__main__":

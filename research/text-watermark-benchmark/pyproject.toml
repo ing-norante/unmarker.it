@@ -7,6 +7,17 @@ license = { text = "MIT" }
 
 [project.scripts]
 unmarker-text-bench = "unmarker_text_bench.cli:main"
+unmarker-markllm-corpus = "unmarker_text_bench.markllm_cli:main"
+
+[project.optional-dependencies]
+markllm = [
+  "datasets>=3.0",
+  "numpy>=1.26",
+  "scikit-learn>=1.5",
+  "torch>=2.2",
+  "tqdm>=4.66",
+  "transformers>=4.46",
+]
 
 [build-system]
 requires = ["hatchling"]
