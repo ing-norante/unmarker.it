@@ -5,73 +5,73 @@ from dataclasses import dataclass
 
 GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
     "en": (
-        ("important", "relevant", "significant"),
-        ("use", "utilize", "employ"),
-        ("show", "indicate", "demonstrate"),
-        ("clear", "plain", "definite"),
-        ("quick", "rapid", "fast"),
-        ("small", "minor", "limited"),
-        ("large", "substantial", "considerable"),
-        ("method", "technique", "procedure"),
-        ("result", "outcome", "finding"),
-        ("choose", "select", "pick"),
-        ("begin", "start", "commence"),
-        ("end", "finish", "conclude"),
-        ("safe", "secure", "protected"),
-        ("keep", "preserve", "retain"),
-        ("create", "build", "produce"),
-        ("improve", "enhance", "refine"),
-        ("reduce", "decrease", "lower"),
-        ("however", "nevertheless", "yet"),
-        ("therefore", "consequently", "thus"),
-        ("system", "service", "platform"),
-        ("data", "information", "details"),
-        ("user", "customer", "person"),
-        ("text", "passage", "content"),
-        ("accurate", "precise", "correct"),
-        ("simple", "straightforward", "direct"),
-        ("complex", "difficult", "intricate"),
-        ("check", "verify", "inspect"),
-        ("problem", "challenge", "difficulty"),
-        ("value", "benefit", "merit"),
-        ("process", "procedure", "workflow"),
-        ("different", "distinct", "separate"),
-        ("common", "frequent", "widespread"),
+        ("important", "relevant", "significant", "notable"),
+        ("use", "utilize", "employ", "apply"),
+        ("show", "indicate", "demonstrate", "reveal"),
+        ("clear", "plain", "definite", "explicit"),
+        ("quick", "rapid", "fast", "swift"),
+        ("small", "minor", "limited", "modest"),
+        ("large", "substantial", "considerable", "extensive"),
+        ("method", "technique", "procedure", "strategy"),
+        ("result", "outcome", "finding", "conclusion"),
+        ("choose", "select", "pick", "opt"),
+        ("begin", "start", "commence", "initiate"),
+        ("end", "finish", "conclude", "complete"),
+        ("safe", "secure", "protected", "guarded"),
+        ("keep", "preserve", "retain", "maintain"),
+        ("create", "build", "produce", "generate"),
+        ("improve", "enhance", "refine", "optimize"),
+        ("reduce", "decrease", "lower", "minimize"),
+        ("however", "nevertheless", "yet", "nonetheless"),
+        ("therefore", "consequently", "thus", "accordingly"),
+        ("system", "service", "platform", "framework"),
+        ("data", "information", "details", "evidence"),
+        ("user", "customer", "person", "client"),
+        ("text", "passage", "content", "material"),
+        ("accurate", "precise", "correct", "exact"),
+        ("simple", "straightforward", "direct", "uncomplicated"),
+        ("complex", "difficult", "intricate", "elaborate"),
+        ("check", "verify", "inspect", "review"),
+        ("problem", "challenge", "difficulty", "issue"),
+        ("value", "benefit", "merit", "advantage"),
+        ("process", "operation", "workflow", "sequence"),
+        ("different", "distinct", "separate", "varied"),
+        ("common", "frequent", "widespread", "typical"),
     ),
     "it": (
-        ("importante", "rilevante", "significativo"),
-        ("usare", "utilizzare", "impiegare"),
-        ("mostra", "indica", "dimostra"),
-        ("chiaro", "evidente", "ovvio"),
-        ("rapido", "veloce", "celere"),
-        ("piccolo", "minore", "limitato"),
-        ("grande", "sostanziale", "considerevole"),
-        ("metodo", "approccio", "criterio"),
-        ("risultato", "esito", "prodotto"),
-        ("scegliere", "selezionare", "preferire"),
-        ("iniziare", "cominciare", "partire"),
-        ("finire", "terminare", "concludere"),
-        ("sicuro", "protetto", "affidabile"),
-        ("testare", "valutare", "esaminare"),
-        ("mantenere", "preservare", "conservare"),
-        ("creare", "costruire", "produrre"),
-        ("migliorare", "perfezionare", "raffinare"),
-        ("ridurre", "diminuire", "abbassare"),
-        ("tuttavia", "comunque", "eppure"),
-        ("quindi", "pertanto", "dunque"),
-        ("sistema", "servizio", "meccanismo"),
-        ("dati", "elementi", "valori"),
-        ("utente", "cliente", "persona"),
-        ("testo", "brano", "contenuto"),
-        ("accurato", "preciso", "corretto"),
-        ("semplice", "lineare", "essenziale"),
-        ("complesso", "difficile", "articolato"),
-        ("controllare", "verificare", "ispezionare"),
-        ("problema", "quesito", "dilemma"),
-        ("valore", "beneficio", "vantaggio"),
-        ("processo", "flusso", "percorso"),
-        ("diverso", "distinto", "alternativo"),
-        ("comune", "frequente", "diffuso"),
+        ("importante", "rilevante", "significativo", "notevole"),
+        ("usare", "utilizzare", "impiegare", "adoperare"),
+        ("mostra", "indica", "dimostra", "evidenzia"),
+        ("chiaro", "evidente", "ovvio", "esplicito"),
+        ("rapido", "veloce", "celere", "immediato"),
+        ("piccolo", "minore", "limitato", "modesto"),
+        ("grande", "sostanziale", "considerevole", "ampio"),
+        ("metodo", "approccio", "criterio", "procedura"),
+        ("risultato", "esito", "prodotto", "conclusione"),
+        ("scegliere", "selezionare", "preferire", "adottare"),
+        ("iniziare", "cominciare", "partire", "avviare"),
+        ("finire", "terminare", "concludere", "completare"),
+        ("sicuro", "protetto", "affidabile", "garantito"),
+        ("testare", "valutare", "esaminare", "collaudare"),
+        ("mantenere", "preservare", "conservare", "trattenere"),
+        ("creare", "costruire", "produrre", "generare"),
+        ("migliorare", "perfezionare", "raffinare", "ottimizzare"),
+        ("ridurre", "diminuire", "abbassare", "minimizzare"),
+        ("tuttavia", "comunque", "eppure", "nondimeno"),
+        ("quindi", "pertanto", "dunque", "perciò"),
+        ("sistema", "servizio", "meccanismo", "piattaforma"),
+        ("dati", "elementi", "valori", "informazioni"),
+        ("utente", "cliente", "persona", "fruitore"),
+        ("testo", "brano", "contenuto", "materiale"),
+        ("accurato", "preciso", "corretto", "esatto"),
+        ("semplice", "lineare", "essenziale", "diretto"),
+        ("complesso", "difficile", "articolato", "elaborato"),
+        ("controllare", "verificare", "ispezionare", "rivedere"),
+        ("problema", "quesito", "dilemma", "difficoltà"),
+        ("valore", "beneficio", "vantaggio", "utilità"),
+        ("processo", "flusso", "percorso", "iter"),
+        ("diverso", "distinto", "alternativo", "differente"),
+        ("comune", "frequente", "diffuso", "usuale"),
     ),
 }
 
@@ -85,11 +85,40 @@ class VariantLexicon:
         return cls(GROUPS)
 
     def alternatives(self, word: str, language: str) -> tuple[str, ...]:
+        """Return the complete semantic class used only for canonicalization."""
         lowered = word.lower()
         for group in self.groups.get(language, ()):
             if lowered in group:
                 return group
         return ()
+
+    def embedding_alternatives(self, word: str, language: str) -> tuple[str, ...]:
+        """Candidate set reserved for the controlled watermark embedder.
+
+        The first two variants are never emitted by the controlled rewriter. This
+        removes the previous construction where embedder and attacker selected
+        from exactly the same candidate set.
+        """
+        alternatives = self.alternatives(word, language)
+        return alternatives[:2] if len(alternatives) >= 4 else ()
+
+    def rewrite_alternatives(self, word: str, language: str) -> tuple[str, ...]:
+        """Candidate set reserved for rewrite pipelines and disjoint from embedder output."""
+        alternatives = self.alternatives(word, language)
+        return alternatives[2:] if len(alternatives) >= 4 else ()
+
+    def candidate_overlap(self, language: str) -> set[str]:
+        embedding = {
+            candidate
+            for group in self.groups.get(language, ())
+            for candidate in group[:2]
+        }
+        rewriting = {
+            candidate
+            for group in self.groups.get(language, ())
+            for candidate in group[2:]
+        }
+        return embedding & rewriting
 
     def canonical(self, word: str, language: str) -> str:
         alternatives = self.alternatives(word, language)
@@ -100,4 +129,4 @@ class VariantLexicon:
         if not alternatives:
             return 1.0
         rank = alternatives.index(word.lower())
-        return (1.0, 0.55, 0.3)[rank]
+        return 0.55**rank

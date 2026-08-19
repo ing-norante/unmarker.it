@@ -35,7 +35,7 @@ class SurrogateWatermark:
         tokens = tokenize(text)
         replacements: dict[int, str] = {}
         for index, token in enumerate(tokens):
-            alternatives = self.lexicon.alternatives(token.text, language)
+            alternatives = self.lexicon.embedding_alternatives(token.text, language)
             if token.protected or len(alternatives) < 2:
                 continue
             context = self._context(tokens, index)

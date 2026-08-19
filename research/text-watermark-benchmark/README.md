@@ -19,6 +19,12 @@ The default run is dependency-free and deterministic. It uses:
 - rule-based semantic and entailment proxies;
 - exact preservation checks for protected content.
 
+The controlled embedder and rewriters no longer emit candidates from the same
+pool. For each semantic class, the embedder is restricted to the first two
+variants and every rewriter to the last two. Their output vocabularies are
+disjoint, although the semantic ontology remains shared and is still a toy
+benchmark limitation.
+
 These components validate the benchmark mechanics and relative edit/quality trade-offs. They are **not** evidence that a strategy removes Claude's production watermark. The surrogate detector names in the reports are intentionally explicit.
 
 By default, four adjacent passages of the same language are composed into an approximately 200-token evaluation document. This avoids presenting short-text detector behavior as if it were representative of watermark detection on longer passages. The composition window is recorded in `config.json`.
@@ -50,7 +56,10 @@ PYTHONPATH=src python3 -m unmarker_text_bench.cli \
 
 No web or development server is started.
 
-The checked-in controlled result is summarized in [`RESULTS.md`](RESULTS.md).
+The corrected checked-in controlled result is summarized in
+[`RESULTS.md`](RESULTS.md). `results/reference-v1` is retained as a historical
+run whose comparison was confounded by unequal budget policies and shared
+candidate pools; it must not be used as algorithmic evidence.
 
 ## Outputs
 
@@ -61,7 +70,16 @@ Each run writes:
 - `human-review.csv`: blinded-ready rows with empty 1-5 human rating fields;
 - `config.json`: the complete benchmark configuration.
 
-The `selected` column identifies the output used in aggregate metrics. For the position-aware pipeline, conservative, intermediate, and aggressive candidates are tried in order. The first candidate that is below the active detector threshold and passes all quality gates is selected. If none passes, the most aggressive candidate is retained and `stop_passed` is false.
+All four pipelines are evaluated at all three fixed budgets, producing an
+uncensored fixed-budget grid. Separately, the `selected` column identifies the
+candidate selected by the same progressive policy for every pipeline. The
+first candidate that is below the active detector threshold and passes all
+quality gates is selected. If none passes, the aggressive candidate is retained
+and `stop_passed` is false.
+
+The primary comparison includes only language-detector cells whose no-attack
+baseline detects every composed document. Results for weaker cells remain in
+the diagnostics and are never silently discarded.
 
 ## Components
 
@@ -95,13 +113,19 @@ The interfaces in `types.py` are the seam for future components:
 
 `conditional_evasion_rate` considers only samples detected before rewriting. It prevents detector false negatives in the clean attack baseline from being counted as successful removals.
 
-`semantic_similarity` canonicalizes synonym groups before calculating content-token F1. `nli_proxy` is the minimum of content recall, exact protected-content preservation, and negation preservation. These are fast regression gates, not replacements for model-based multilingual NLI or human evaluation.
+`semantic_similarity` in `runs.csv` is retained for schema compatibility but is
+reported as `synonym-canonical F1` in `summary.json`. It canonicalizes the same
+controlled semantic groups before calculating content-token F1. `nli_proxy` is
+the minimum of content recall, exact protected-content preservation, and
+negation preservation. Both are regression gates, not independent quality
+evidence, and are omitted from the primary result table.
 
 The human review sheet is required before treating an experiment as product evidence.
 
-## Progressive position-aware policy
+## Shared budget policies
 
-Default budgets operate on editable positions ranked by token self-information:
+Default budgets operate on editable positions. They are applied to every
+pipeline both as a fixed grid and through the shared progressive stopping rule:
 
 | Mode | Editable positions targeted |
 |---|---:|
@@ -109,14 +133,18 @@ Default budgets operate on editable positions ranked by token self-information:
 | Intermediate | 35% |
 | Aggressive | 65% |
 
-The values are experiment configuration, not final product defaults.
+The values are experiment configuration, not final product defaults. A fixed
+budget comparison isolates selection/ranking; the progressive comparison
+measures the complete search policy. It is invalid to compare a progressive
+pipeline against a fixed-budget baseline as if the difference came only from
+ranking.
 
 ## Next evidence gates
 
 The reference benchmark is only Gate 1. Before integration into unmarker.it:
 
-1. reproduce BIRA and SIRA with their official code and open-weight models;
-2. connect MarkLLM detector implementations, including its SynthID configuration;
+1. connect MarkLLM detector implementations, including its SynthID configuration;
+2. reproduce BIRA and SIRA with their official code and open-weight models;
 3. replace the NLI proxy with a multilingual NLI model and sentence embeddings;
 4. expand to at least 200 passages per language and multiple domains;
 5. perform blinded human evaluation;

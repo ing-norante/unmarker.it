@@ -36,10 +36,17 @@ def measure_run(
     original_tokens = [token.text.lower() for token in tokenize(original)]
     candidate_tokens = [token.text.lower() for token in tokenize(candidate)]
     token_distance = levenshtein(original_tokens, candidate_tokens)
+    if len(original_tokens) == len(candidate_tokens):
+        character_distance = sum(
+            levenshtein(original_token, candidate_token)
+            for original_token, candidate_token in zip(original_tokens, candidate_tokens)
+        )
+    else:
+        character_distance = levenshtein(original, candidate)
     return RunMetrics(
         token_edit_distance=token_distance,
         changed_token_ratio=token_distance / max(len(original_tokens), 1),
-        character_edit_distance=levenshtein(original, candidate),
+        character_edit_distance=character_distance,
         quality=validator.evaluate(original, candidate, language),
         latency_ms=latency_ms,
         estimated_cost_per_1k_tokens=cost_per_1k_tokens,

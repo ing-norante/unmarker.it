@@ -1,88 +1,146 @@
-# Reference Run v1
+# Corrected Reference Run v2
 
 Date: 2026-08-19
-
-Command:
 
 ```bash
 PYTHONPATH=research/text-watermark-benchmark/src \
   python3 -m unmarker_text_bench.cli \
-  --output research/text-watermark-benchmark/results/reference-v1
+  --output research/text-watermark-benchmark/results/reference-v2
 ```
 
-## Experimental unit
+## Conclusion
+
+This run is a harness regression test, not algorithmic evidence that
+position-aware BIRA is better than the baselines.
+
+After removing the main comparison confounds, position-aware BIRA evades one
+additional eligible case compared with simple paraphrasing (22/24 versus
+21/24) and changes slightly fewer tokens under the shared progressive policy
+(10.4% versus 11.1%). The documents overlap, the detection difference is one
+case, and the edit difference is 0.7 percentage points, so no superiority claim
+is warranted.
+
+Reference v1 is retained for provenance but is superseded. Its 7.9% aggregate
+mixed unequal fixed budgets, early stopping available only to position-aware
+BIRA, a weak Italian KGW cell, and identical embedder/rewriter candidate pools.
+The former 37/40/42% edit-saving claim must not be used.
+
+## What changed from v1
+
+1. Every pipeline is evaluated at fixed 15%, 35%, and 65% editable-position
+   budgets.
+2. The same conservative-to-aggressive stopping policy is applied to every
+   pipeline.
+3. The primary table excludes cells whose no-attack baseline TPR is below 100%.
+4. Embedder output candidates and rewriter output candidates are disjoint. They
+   still share the controlled semantic ontology, which remains a limitation.
+5. Synonym-canonical F1 and protected-span checks are treated as regression
+   gates, not independent evidence of human quality.
+6. The report names 16 source passages and overlapping composed documents
+   instead of presenting 48 detector-text pairs as independent samples.
+
+## Experimental units
 
 - 8 English and 8 Italian source passages;
-- circular composition of 4 passages into approximately 200-token documents;
-- 16 composed documents;
-- 3 independently keyed detector surrogates per document;
-- 48 watermarked attack cases;
-- detector thresholds calibrated per language with 128 null keys at target FPR 1%;
-- all aggregate attack metrics use the selected output of each pipeline.
+- circular windows of 4 passages, producing 16 overlapping composed documents;
+- 3 detector surrogates applied to each document, producing 48 attack cases;
+- only 16 source passages, 8 per language, are the underlying source units;
+- detector thresholds calibrated separately by language with 128 null keys at
+  target FPR 1%;
+- no inferential statistics are reported because neither the circular windows
+  nor the three detector copies are independent observations.
 
-## Aggregate result
+## Baseline-strength gate
 
-| Pipeline | TPR @ 1% FPR | Conditional evasion | Changed-token ratio | Semantic proxy | Protected content |
-|---|---:|---:|---:|---:|---:|
-| No attack | 91.7% | - | 0.0% | 1.000 | 100% |
-| Simple paraphrase | 0.0% | 100% | 12.6% | 0.999 | 100% |
-| SIRA reference | 0.0% | 100% | 13.6% | 1.000 | 100% |
-| BIRA reference | 0.0% | 100% | 13.1% | 1.000 | 100% |
-| Position-aware BIRA | 0.0% | 100% | **7.9%** | 1.000 | 100% |
+| Language | Surrogate | No-attack TPR | Primary comparison |
+|---|---|---:|---|
+| English | KGW-like | 100.0% | Included |
+| English | SynthID-tournament-like | 50.0% | Excluded |
+| English | Unigram-like | 100.0% | Included |
+| Italian | KGW-like | 25.0% | Excluded |
+| Italian | SynthID-tournament-like | 75.0% | Excluded |
+| Italian | Unigram-like | 100.0% | Included |
 
-Within this controlled benchmark, position-aware BIRA reaches the same conditional evasion as the three baselines while changing:
+The primary comparison therefore contains 24 detector-document cases from
+three cells. This is a filtering rule for readable diagnostics, not a remedy
+for the small effective sample size.
 
-- 37% fewer tokens than simple paraphrasing;
-- 40% fewer tokens than the BIRA reference;
-- 42% fewer tokens than the SIRA reference.
+## Shared progressive policy on eligible cells
 
-This is the first useful signal from the project: position-level ranking plus non-overlapping contextual edits merits evaluation with real causal models and official detector implementations.
+| Pipeline | Residual TPR | Conditional evasion | Changed-token ratio | Successful stops |
+|---|---:|---:|---:|---:|
+| Simple paraphrase | 12.5% (3/24) | 87.5% | 11.1% | 21/24 |
+| SIRA reference, budget-normalized | 25.0% (6/24) | 75.0% | 11.0% | 18/24 |
+| BIRA reference, budget-normalized | 25.0% (6/24) | 75.0% | 11.2% | 18/24 |
+| Position-aware BIRA | **8.3% (2/24)** | **91.7%** | **10.4%** | **22/24** |
 
-## Progressive budget behavior
+Position-aware BIRA is descriptively best on both fields in this run, but only
+by one detection and 0.7 edit percentage points versus simple paraphrasing. One
+small, overlapping toy fixture cannot establish a ranking or uncertainty bound.
 
-The selected budget across 48 cases was:
+Selected budgets also show that aggressive rewriting remains common:
 
-| Budget | Selected cases | Share |
-|---|---:|---:|
-| Conservative, 15% of editable positions | 6 | 12.5% |
-| Intermediate, 35% | 31 | 64.6% |
-| Aggressive, 65% | 11 | 22.9% |
+| Pipeline | Conservative | Intermediate | Aggressive |
+|---|---:|---:|---:|
+| Simple paraphrase | 1 | 7 | 16 |
+| SIRA reference | 1 | 7 | 16 |
+| BIRA reference | 0 | 8 | 16 |
+| Position-aware BIRA | 1 | 9 | 14 |
 
-Every selected position-aware candidate passed the detector and quality gates. The aggressive budget was therefore needed in fewer than one quarter of cases.
+## Fixed-budget comparison on eligible cells
 
-## Detector/language diagnostic
+All methods operate at the same editable-position budget in this table and have
+the same mean changed-token ratio at a given budget. This isolates selection
+order from progressive stopping.
 
-| Language | Surrogate | TPR before attack | Position-aware TPR | Position-aware changed tokens |
-|---|---|---:|---:|---:|
-| English | KGW-like | 100% | 0% | 12.4% |
-| English | SynthID-tournament-like | 100% | 0% | 10.9% |
-| English | Unigram-like | 100% | 0% | 7.7% |
-| Italian | KGW-like | **50%** | 0% | 4.0% |
-| Italian | SynthID-tournament-like | 100% | 0% | 6.4% |
-| Italian | Unigram-like | 100% | 0% | 6.2% |
+| Pipeline | 15% TPR / edits | 35% TPR / edits | 65% TPR / edits |
+|---|---:|---:|---:|
+| Simple paraphrase | 95.8% / 3.2% | 66.7% / 7.3% | 12.5% / 13.2% |
+| SIRA reference | 95.8% / 3.2% | 66.7% / 7.3% | 25.0% / 13.2% |
+| BIRA reference | 100.0% / 3.2% | 66.7% / 7.3% | 25.0% / 13.2% |
+| Position-aware BIRA | 95.8% / 3.2% | **58.3% / 7.3%** | **8.3% / 13.2%** |
 
-The Italian KGW-like cell fails the intended baseline-strength gate and must not be used as positive evidence. Its conditional evasion metric covers only the four documents detected before rewriting. The other five cells start at 100% TPR.
+At 65%, position-aware BIRA differs from simple paraphrasing by one case. At
+15%, all strategies fail almost completely. The descriptive gap grows against
+SIRA/BIRA, but the construction and dependence problems still preclude an
+algorithmic claim.
 
-## Interpretation boundaries
+## Quality fields
 
-This run validates harness behavior, not production watermark removal.
+The synonym-canonical F1, NLI proxy, and protected-content preservation values
+are all 1.0. They are omitted from the main tables because this is expected by
+construction: validators canonicalize the controlled semantic classes and the
+strategies cannot edit protected spans. These fields remain useful regression
+tests but do not approximate human judgment in this experiment.
 
-- The watermarks are controlled surrogates, not Anthropic's secret Claude configuration.
-- The causal scorer is a deterministic bilingual n-gram adapter, not an LLM.
-- Rewrites use curated synonym classes, not the official SIRA/BIRA model stacks.
-- The semantic and NLI values are regression proxies; the human-review sheet remains unevaluated.
-- Local reference latency is not representative of a GPU/API backend.
-- Cost is recorded as zero because this run uses no paid inference. The field is ready for real provider or GPU costs.
+The blinded human-review file is still unevaluated. Local latency and zero cost
+are implementation diagnostics, not backend estimates.
 
-The machine-readable evidence is in [`results/reference-v1/summary.json`](results/reference-v1/summary.json). Per-attempt metrics are in [`runs.csv`](results/reference-v1/runs.csv), and [`human-review.csv`](results/reference-v1/human-review.csv) is ready for blinded ratings.
+## Remaining limitations
 
-## Next gate
+- Surrogates are not MarkLLM or production watermark implementations.
+- SIRA and BIRA are budget-normalized core-strategy references, not official
+  repositories or model stacks.
+- The causal scorer is a deterministic bilingual n-gram model.
+- Candidate output pools are disjoint, but both sides know the same curated
+  semantic ontology.
+- Only 8 source passages per language feed overlapping windows.
+- No model-based multilingual NLI, embeddings, or human ratings are present.
 
-The next experiment should preserve this runner and replace components in this order:
+## Next evidence gate
 
-1. causal scorer with an open-weight multilingual model;
-2. constrained rewriter with a model exposing token logits/logit processors;
-3. semantic proxies with multilingual NLI and sentence embeddings;
-4. surrogates with MarkLLM implementations;
-5. reference BIRA/SIRA strategies with their official repositories;
-6. dataset with at least 200 independent documents per language.
+Do not tune another claim on this toy run. Preserve the runner and replace the
+largest sources of construction bias in this order:
+
+1. MarkLLM-backed KGW, Unigram, and SynthID configurations that score normal
+   model-generated text without the benchmark lexicon;
+2. official SIRA/BIRA code paths and a common budget-policy adapter;
+3. an open-weight causal scorer and constrained rewriter whose vocabulary is
+   independent of the detector;
+4. multilingual NLI, sentence embeddings, and blinded human evaluation;
+5. at least 200 independent documents per language and domain-stratified
+   reporting.
+
+Machine-readable results are in
+[`results/reference-v2/summary.json`](results/reference-v2/summary.json), with
+all fixed-budget attempts in [`runs.csv`](results/reference-v2/runs.csv).

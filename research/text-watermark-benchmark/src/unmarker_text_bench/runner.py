@@ -27,13 +27,6 @@ class BenchmarkConfig:
         ("intermediate", 0.35),
         ("aggressive", 0.65),
     )
-    fixed_budgets: dict[str, tuple[str, float]] = field(
-        default_factory=lambda: {
-            "simple_paraphrase": ("fixed", 0.65),
-            "sira": ("paper_default", 0.70),
-            "bira": ("paper_proxy", 0.50),
-        }
-    )
     cost_per_1k_tokens: dict[str, float] = field(default_factory=dict)
     calibration_null_keys: int = 128
     semantic_threshold: float = 0.90
@@ -44,6 +37,7 @@ class BenchmarkConfig:
 class BenchmarkRunner:
     def __init__(self, samples: list[Sample], config: BenchmarkConfig | None = None) -> None:
         self.config = config or BenchmarkConfig()
+        self.source_samples = samples
         self.samples = self._compose_samples(samples, self.config.compose_window)
         self.lexicon = VariantLexicon.default()
         self.scorer = ReferenceNgramScorer(samples, self.lexicon)
@@ -125,42 +119,25 @@ class BenchmarkRunner:
                     )
                 )
 
-                for pipeline_name, (budget_name, budget_ratio) in self.config.fixed_budgets.items():
-                    pipeline = self.pipelines[pipeline_name]
-                    start = time.perf_counter()
-                    candidate = pipeline.rewrite(
-                        watermarked_text,
-                        sample.language,
-                        budget_name,
-                        budget_ratio,
-                    )
-                    latency_ms = (time.perf_counter() - start) * 1000
-                    record = self._record(
+                for pipeline_name in self.pipelines:
+                    attempts = self._run_progressive(
                         sample,
                         detector,
                         watermarked_text,
-                        candidate,
-                        latency_ms,
-                        selected=True,
-                        stop_passed=False,
+                        pipeline_name,
                     )
-                    records.append(record)
-                    human_rows.append(self._human_row(sample, detector, watermarked_text, candidate, record))
+                    records.extend(attempts)
+                    selected = next(record for record in attempts if record["selected"])
+                    selected_candidate = RewriteCandidate(
+                        selected["output_text"],
+                        pipeline_name,
+                        selected["budget"],
+                    )
+                    human_rows.append(
+                        self._human_row(sample, detector, watermarked_text, selected_candidate, selected)
+                    )
 
-                position_attempts = self._run_position_aware(sample, detector, watermarked_text)
-                records.extend(position_attempts)
-                selected = next(record for record in position_attempts if record["selected"])
-                selected_candidate = RewriteCandidate(
-                    selected["output_text"],
-                    "bira_position_aware",
-                    selected["budget"],
-                )
-                human_rows.append(
-                    self._human_row(sample, detector, watermarked_text, selected_candidate, selected)
-                )
-
-        selected_records = [record for record in records if record["selected"]]
-        summary = self._summarize(selected_records, thresholds)
+        summary = self._summarize(records, thresholds)
         self._write_json(output_dir / "summary.json", summary)
         compact_records = [
             {key: value for key, value in record.items() if key not in {"input_text", "output_text"}}
@@ -171,15 +148,17 @@ class BenchmarkRunner:
         self._write_json(output_dir / "config.json", asdict(self.config))
         return summary
 
-    def _run_position_aware(
+    def _run_progressive(
         self,
         sample: Sample,
         detector: SurrogateWatermark,
         watermarked_text: str,
+        pipeline_name: str,
     ) -> list[dict[str, Any]]:
-        pipeline = self.pipelines["bira_position_aware"]
+        pipeline = self.pipelines[pipeline_name]
         attempts: list[dict[str, Any]] = []
         selected_index: int | None = None
+        cumulative_latency_ms = 0.0
         for budget_name, budget_ratio in self.config.budgets:
             start = time.perf_counter()
             candidate = pipeline.rewrite(
@@ -189,6 +168,7 @@ class BenchmarkRunner:
                 budget_ratio,
             )
             latency_ms = (time.perf_counter() - start) * 1000
+            cumulative_latency_ms += latency_ms
             record = self._record(
                 sample,
                 detector,
@@ -198,10 +178,12 @@ class BenchmarkRunner:
                 selected=False,
                 stop_passed=False,
             )
+            record["budget_ratio"] = budget_ratio
+            record["evaluation_policy"] = "fixed_budget_grid"
+            record["progressive_cumulative_latency_ms"] = cumulative_latency_ms
             attempts.append(record)
-            if not record["detected"] and record["quality_passes"]:
+            if selected_index is None and not record["detected"] and record["quality_passes"]:
                 selected_index = len(attempts) - 1
-                break
         if selected_index is None:
             selected_index = len(attempts) - 1
         attempts[selected_index]["selected"] = True
@@ -235,6 +217,8 @@ class BenchmarkRunner:
             "watermark": detector.name,
             "pipeline": candidate.pipeline,
             "budget": candidate.budget,
+            "budget_ratio": 0.0,
+            "evaluation_policy": "baseline" if candidate.pipeline == "no_attack" else "unspecified",
             "selected": selected,
             "stop_passed": stop_passed,
             "score": decision.score,
@@ -252,6 +236,7 @@ class BenchmarkRunner:
             "urls_preserved": metrics.quality.urls_preserved,
             "quality_passes": metrics.quality.passes,
             "latency_ms": metrics.latency_ms,
+            "progressive_cumulative_latency_ms": metrics.latency_ms,
             "estimated_cost_per_1k_tokens": metrics.estimated_cost_per_1k_tokens,
             "input_tokens": len(tokenize(watermarked_text)),
             "changed_positions": len(candidate.changed_positions),
@@ -287,19 +272,25 @@ class BenchmarkRunner:
         records: list[dict[str, Any]],
         thresholds: dict[str, dict[str, float]],
     ) -> dict[str, Any]:
-        grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
-        overall: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for record in records:
-            grouped[(record["language"], record["watermark"], record["pipeline"])].append(record)
-            overall[record["pipeline"]].append(record)
-
+        baseline_records = [record for record in records if record["pipeline"] == "no_attack"]
+        attack_records = [record for record in records if record["pipeline"] != "no_attack"]
+        progressive_records = [record for record in attack_records if record["selected"]]
         baseline_detected = {
             (record["sample_id"], record["language"], record["watermark"]): record["detected"]
-            for record in records
-            if record["pipeline"] == "no_attack"
+            for record in baseline_records
+        }
+        baseline_cells: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+        for record in baseline_records:
+            baseline_cells[(record["language"], record["watermark"])].append(record)
+        eligible_cells = {
+            cell
+            for cell, items in baseline_cells.items()
+            if all(item["detected"] for item in items)
         }
 
         def aggregate(items: list[dict[str, Any]]) -> dict[str, Any]:
+            if not items:
+                return {"samples": 0}
             initially_detected = [
                 item
                 for item in items
@@ -317,38 +308,107 @@ class BenchmarkRunner:
                 "conditional_evasion_rate": conditional_evasion,
                 "mean_changed_token_ratio": mean(item["changed_token_ratio"] for item in items),
                 "mean_token_edit_distance": mean(item["token_edit_distance"] for item in items),
-                "mean_semantic_similarity": mean(item["semantic_similarity"] for item in items),
+                "mean_synonym_canonical_f1": mean(item["semantic_similarity"] for item in items),
                 "mean_nli_proxy": mean(item["nli_proxy"] for item in items),
                 "protected_preservation_rate": mean(item["protected_preservation"] for item in items),
                 "quality_pass_rate": mean(float(item["quality_passes"]) for item in items),
                 "progressive_stop_pass_rate": mean(float(item["stop_passed"]) for item in items),
-                "mean_latency_ms": mean(item["latency_ms"] for item in items),
+                "mean_candidate_latency_ms": mean(item["latency_ms"] for item in items),
+                "mean_progressive_policy_latency_ms": mean(
+                    item["progressive_cumulative_latency_ms"] for item in items
+                ),
                 "mean_estimated_cost_per_1k_tokens": mean(
                     item["estimated_cost_per_1k_tokens"] for item in items
                 ),
             }
 
+        def group_by_pipeline(items: list[dict[str, Any]]) -> dict[str, Any]:
+            grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+            for item in items:
+                grouped[item["pipeline"]].append(item)
+            return {pipeline: aggregate(group) for pipeline, group in sorted(grouped.items())}
+
+        def group_by_pipeline_budget(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            grouped: dict[tuple[str, str, float], list[dict[str, Any]]] = defaultdict(list)
+            for item in items:
+                grouped[(item["pipeline"], item["budget"], item["budget_ratio"])].append(item)
+            return [
+                {
+                    "pipeline": pipeline,
+                    "budget": budget,
+                    "budget_ratio": budget_ratio,
+                    **aggregate(group),
+                }
+                for (pipeline, budget, budget_ratio), group in sorted(grouped.items())
+            ]
+
+        def in_eligible_cell(item: dict[str, Any]) -> bool:
+            return (item["language"], item["watermark"]) in eligible_cells
+
+        diagnostic_groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
+        for record in progressive_records:
+            diagnostic_groups[(record["language"], record["watermark"], record["pipeline"])].append(record)
+
+        source_counts: dict[str, int] = defaultdict(int)
+        for sample in self.source_samples:
+            source_counts[sample.language] += 1
+
         return {
-            "benchmark_scope": "controlled_reference_surrogates",
+            "benchmark_scope": "controlled_decoupled_surrogates",
             "warning": (
                 "These results validate benchmark mechanics against deterministic KGW, Unigram, "
                 "and SynthID-tournament-like surrogates. They do not demonstrate removal of Claude's production watermark."
             ),
+            "evidence_status": "harness_regression_only_not_algorithmic_evidence",
             "fpr_target": 0.01,
             "thresholds": thresholds,
-            "sample_count": len(self.samples),
+            "source_passage_count": len(self.source_samples),
+            "source_passages_by_language": dict(sorted(source_counts.items())),
+            "composed_document_count": len(self.samples),
+            "attack_case_count": len(baseline_records),
+            "independence_warning": (
+                "Circular composition creates overlapping documents, and the three detectors reuse each composed text. "
+                "The effective source unit is the source passage, not the detector-text attack case."
+            ),
+            "composed_documents_are_independent": False,
+            "detectors_share_composed_text": True,
             "languages": sorted({sample.language for sample in self.samples}),
-            "overall_by_pipeline": {
-                pipeline: aggregate(items) for pipeline, items in sorted(overall.items())
+            "candidate_set_protocol": {
+                "embedding_pool": "first two variants in each controlled semantic class",
+                "rewrite_pool": "last two variants in each controlled semantic class",
+                "shared_candidate_outputs": False,
+                "overlap_by_language": {
+                    language: sorted(self.lexicon.candidate_overlap(language))
+                    for language in sorted({sample.language for sample in self.samples})
+                },
+                "remaining_caveat": "Embedder and rewriter still share the benchmark's semantic ontology.",
             },
+            "baseline_by_cell": [
+                {
+                    "language": language,
+                    "watermark": watermark,
+                    "eligible_for_primary_comparison": (language, watermark) in eligible_cells,
+                    **aggregate(items),
+                }
+                for (language, watermark), items in sorted(baseline_cells.items())
+            ],
+            "primary_progressive_eligible_cells_by_pipeline": group_by_pipeline(
+                [item for item in progressive_records if in_eligible_cell(item)]
+            ),
+            "progressive_all_cells_by_pipeline": group_by_pipeline(progressive_records),
+            "fixed_budget_eligible_cells": group_by_pipeline_budget(
+                [item for item in attack_records if in_eligible_cell(item)]
+            ),
+            "fixed_budget_all_cells": group_by_pipeline_budget(attack_records),
             "by_language_watermark_pipeline": [
                 {
                     "language": language,
                     "watermark": watermark,
                     "pipeline": pipeline,
+                    "eligible_for_primary_comparison": (language, watermark) in eligible_cells,
                     **aggregate(items),
                 }
-                for (language, watermark, pipeline), items in sorted(grouped.items())
+                for (language, watermark, pipeline), items in sorted(diagnostic_groups.items())
             ],
         }
 
@@ -369,16 +429,16 @@ class BenchmarkRunner:
 
 def compact_summary(summary: dict[str, Any]) -> str:
     lines = [
-        "pipeline                 TPR@1%FPR  evasion   changed   semantic  quality  progressive",
-        "-----------------------  ---------  --------  --------  --------  -------  -----------",
+        "Primary comparison: baseline-TPR=100% cells, shared progressive policy",
+        "pipeline                 TPR@1%FPR  evasion   changed   stop-pass  policy-ms",
+        "-----------------------  ---------  --------  --------  ---------  ---------",
     ]
-    for pipeline, metrics in summary["overall_by_pipeline"].items():
+    for pipeline, metrics in summary["primary_progressive_eligible_cells_by_pipeline"].items():
         lines.append(
             f"{pipeline:<23}  {metrics['tpr_at_fpr_1pct']:<9.3f}  "
             f"{metrics['conditional_evasion_rate']:<8.3f}  "
             f"{metrics['mean_changed_token_ratio']:<8.3f}  "
-            f"{metrics['mean_semantic_similarity']:<8.3f}  "
-            f"{metrics['quality_pass_rate']:<7.3f}  "
-            f"{metrics['progressive_stop_pass_rate']:<11.3f}"
+            f"{metrics['progressive_stop_pass_rate']:<9.3f}  "
+            f"{metrics['mean_progressive_policy_latency_ms']:<9.3f}"
         )
     return "\n".join(lines)

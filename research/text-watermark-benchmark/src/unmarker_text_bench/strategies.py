@@ -26,7 +26,7 @@ class ReferenceRewritePipeline:
         return [
             index
             for index, token in enumerate(tokens)
-            if not token.protected and len(self.lexicon.alternatives(token.text, language)) > 1
+            if not token.protected and self.lexicon.rewrite_alternatives(token.text, language)
         ]
 
     def best_replacement(
@@ -51,9 +51,9 @@ class SimpleParaphrasePipeline(ReferenceRewritePipeline):
         target_count = max(1, math.ceil(len(eligible) * budget_ratio)) if eligible else 0
         replacements: dict[int, str] = {}
         for index in eligible[:target_count]:
-            alternatives = self.lexicon.alternatives(tokens[index].text, language)
-            current = alternatives.index(tokens[index].text.lower())
-            replacements[index] = alternatives[(current + 1) % len(alternatives)]
+            alternatives = self.lexicon.rewrite_alternatives(tokens[index].text, language)
+            if alternatives:
+                replacements[index] = alternatives[0]
         return RewriteCandidate(
             replace_tokens(text, tokens, replacements),
             self.name,
@@ -98,15 +98,27 @@ class BiraPipeline(ReferenceRewritePipeline):
     def rewrite(self, text: str, language: str, budget_name: str, budget_ratio: float) -> RewriteCandidate:
         tokens = tokenize(text)
         eligible = self.eligible(tokens, language)
+        information_by_type: dict[str, list[float]] = {}
+        for index in eligible:
+            information_by_type.setdefault(tokens[index].text.lower(), []).append(
+                self.scorer.self_information(tokens, index)
+            )
+        type_scores = {
+            token_type: sum(values) / len(values)
+            for token_type, values in information_by_type.items()
+        }
         suspicious = sorted(
             eligible,
-            key=lambda index: self.scorer.self_information(tokens, index),
+            key=lambda index: (
+                type_scores[tokens[index].text.lower()],
+                _stable_order(index, tokens[index], self.name),
+            ),
             reverse=True,
         )
-        suspect_count = max(1, math.ceil(len(suspicious) * budget_ratio)) if suspicious else 0
-        suspect_types = {tokens[index].text.lower() for index in suspicious[:suspect_count]}
+        target_count = max(1, math.ceil(len(suspicious) * budget_ratio)) if suspicious else 0
+        suspect_types = {tokens[index].text.lower() for index in suspicious[:target_count]}
         replacements: dict[int, str] = {}
-        for index in eligible:
+        for index in suspicious[:target_count]:
             alternatives = self.scorer.ranked_alternatives(tokens, index, language, suspect_types)
             if not alternatives:
                 alternatives = self.scorer.ranked_alternatives(
@@ -124,8 +136,9 @@ class BiraPipeline(ReferenceRewritePipeline):
             tuple(sorted(replacements)),
             {
                 "reference_implementation": True,
+                "selection": "global_mean_self_information_by_token_type",
                 "proxy_suppression_types": sorted(suspect_types),
-                "full_rewrite_proxy": True,
+                "budget_normalized": True,
             },
         )
 

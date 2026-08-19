@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import tempfile
 import unittest
@@ -63,17 +64,42 @@ class PipelineTests(unittest.TestCase):
         marked_scores = [detector.score(text, sample.language) for text, sample in zip(watermarked, SAMPLES)]
         self.assertGreater(sum(marked_scores), sum(clean_scores))
 
+    def test_embedder_and_rewriter_candidate_outputs_are_disjoint(self) -> None:
+        for language in ("en", "it"):
+            self.assertEqual(self.lexicon.candidate_overlap(language), set())
+            for group in self.lexicon.groups[language]:
+                self.assertTrue(set(group[:2]).isdisjoint(group[2:]))
+
 
 class RunnerTests(unittest.TestCase):
     def test_runner_writes_expected_artifacts(self) -> None:
         runner = BenchmarkRunner(SAMPLES, BenchmarkConfig(calibration_null_keys=16))
         with tempfile.TemporaryDirectory() as directory:
             summary = runner.run(Path(directory))
-            self.assertEqual(summary["benchmark_scope"], "controlled_reference_surrogates")
-            self.assertIn("bira_position_aware", summary["overall_by_pipeline"])
+            self.assertEqual(summary["benchmark_scope"], "controlled_decoupled_surrogates")
+            self.assertIn(
+                "bira_position_aware",
+                summary["progressive_all_cells_by_pipeline"],
+            )
             self.assertTrue((Path(directory) / "runs.csv").exists())
             payload = json.loads((Path(directory) / "summary.json").read_text())
-            self.assertEqual(payload["sample_count"], 2)
+            self.assertEqual(payload["source_passage_count"], 2)
+            self.assertEqual(payload["composed_document_count"], 2)
+            self.assertFalse(payload["candidate_set_protocol"]["shared_candidate_outputs"])
+            with (Path(directory) / "runs.csv").open(newline="", encoding="utf-8") as handle:
+                rows = list(csv.DictReader(handle))
+            attack_rows = [row for row in rows if row["pipeline"] != "no_attack"]
+            attempts_per_case: dict[tuple[str, str, str], int] = {}
+            for row in attack_rows:
+                key = (row["sample_id"], row["watermark"], row["pipeline"])
+                attempts_per_case[key] = attempts_per_case.get(key, 0) + 1
+            self.assertTrue(attempts_per_case)
+            self.assertTrue(all(count == 3 for count in attempts_per_case.values()))
+            positions_by_case_budget: dict[tuple[str, str, str], set[int]] = {}
+            for row in attack_rows:
+                key = (row["sample_id"], row["watermark"], row["budget"])
+                positions_by_case_budget.setdefault(key, set()).add(int(row["changed_positions"]))
+            self.assertTrue(all(len(counts) == 1 for counts in positions_by_case_budget.values()))
 
 
 if __name__ == "__main__":

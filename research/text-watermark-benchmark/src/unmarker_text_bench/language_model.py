@@ -55,7 +55,7 @@ class ReferenceNgramScorer:
         excluded: set[str] | None = None,
     ) -> list[str]:
         excluded = excluded or set()
-        alternatives = self.lexicon.alternatives(tokens[index].text, language)
+        alternatives = self.lexicon.rewrite_alternatives(tokens[index].text, language)
         return sorted(
             (candidate for candidate in alternatives if candidate.lower() not in excluded),
             key=lambda candidate: self.token_probability(tokens, index, candidate),
