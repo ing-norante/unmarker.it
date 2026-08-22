@@ -112,8 +112,12 @@ used both in constrained prompts and validation. Modal extracts candidate
 entities again. A candidate-only entity surface is a hard failure only when
 that surface does not occur in the original text; this avoids treating
 context-dependent span segmentation as a new fact. Language-specific
-thresholds must come from an explicitly human-approved 50-English/50-Italian
-gold set. An automatically generated draft is never labeled as approved.
+thresholds must come from 50 English and 50 Italian rows with human gold
+annotations. The reproducible pilot source uses the shared PER/ORG/LOC schema
+from UNER English-EWT and KIND Wikinews. Their repository commits and file
+hashes are pinned, and the calibrated label set is propagated to extraction
+and candidate validation. An automatically generated draft is never labeled
+as approved.
 
 `human-review.csv` is produced with blank blinded rating fields. Human
 evaluation remains required before promotion.
@@ -159,10 +163,34 @@ uv run --extra modal modal run modal_pipeline.py \
   --output results/gate2b-exp-pilot-v1/modal-prepare
 ```
 
-### 2. Create and approve the NER gold set
+### 2. Build and calibrate the NER gold set
 
-Prepare a private, untracked JSONL with exactly 50 independent rows per
-language:
+The reproducible route downloads 50 rows per language from two published,
+human-annotated test sets, verifies their pinned SHA-256 hashes, then runs the
+pinned GLiNER model over exactly the common PER/ORG/LOC label set:
+
+```bash
+uv run --extra modal modal run modal_pipeline.py \
+  --stage ner-public-gold \
+  --run-id gate2b-exp-pilot-v1 \
+  --gold-samples-per-language 50 \
+  --output results/gate2b-exp-pilot-v1/ner-gold
+
+uv run --extra modal modal run modal_pipeline.py \
+  --stage ner-calibrate \
+  --run-id gate2b-exp-pilot-v1 \
+  --gold-set results/gate2b-exp-pilot-v1/ner-gold/ner-gold.approved.jsonl \
+  --output results/gate2b-exp-pilot-v1/ner-calibration
+```
+
+UNER English-EWT is CC BY-SA 4.0. KIND's manually annotated Wikinews NER
+annotations are CC BY-NC 4.0, so this combined gold artifact and Gate 2b pilot
+are research-only and must not be reused in a commercial backend. The generated
+source, manifest, and calibrated rows remain untracked.
+
+For a later in-domain calibration, replace the public sources with a private,
+independently reviewed source. Prepare an untracked JSONL with exactly 50
+independent rows per language:
 
 ```json
 {"id":"private-en-001","language":"en","text":"..."}
@@ -185,13 +213,8 @@ Review every row in `ner-gold.pending.jsonl`: correct `human_entities`, set
 `review_status` to `approved`, and fill `reviewer`. Calibration rejects pending
 or anonymous rows. Keep the approved file private and untracked.
 
-```bash
-uv run --extra modal modal run modal_pipeline.py \
-  --stage ner-calibrate \
-  --run-id gate2b-exp-pilot-v1 \
-  --gold-set /absolute/private/ner-gold.approved.jsonl \
-  --output results/gate2b-exp-pilot-v1/ner-calibration
-```
+Then run `ner-calibrate` on the reviewed private file as above. Do not use the
+published dataset reviewer fields to bless new or edited texts.
 
 The English and Italian thresholds maximize exact-span F1, breaking ties by
 recall and then the lower threshold.

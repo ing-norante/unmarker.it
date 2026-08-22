@@ -110,7 +110,7 @@ src/unmarker_text_bench/
   openrouter_backend.py provider-pinned constrained rewrite client
   remote_evaluation.py official detectors and multilingual neural validation
   protected_spans.py  GLiNER manifests and deterministic structured-span gates
-  ner_gold.py         human-approved NER threshold calibration workflow
+  ner_gold.py         pinned public/private human-gold NER calibration workflow
   llm_judge.py        blinded frontier-model quality pre-screen and audit sample
   final_report.py     development-fitted surrogate and held-out reports
   unicode_hygiene.py conservative invisible-carrier cleanup and audit
@@ -143,6 +143,11 @@ negation preservation. Both are regression gates, not independent quality
 evidence, and are omitted from the primary result table.
 
 The human review sheet is required before treating an experiment as product evidence.
+
+The Gate 2b GLiNER threshold pilot uses human-annotated UNER English-EWT and
+KIND Wikinews rows with a common PER/ORG/LOC label set. Source commits and file
+hashes are pinned. Because KIND annotations are CC BY-NC 4.0, these calibration
+artifacts are research-only and are not inputs to a commercial backend.
 
 ## Conservative Unicode hygiene
 

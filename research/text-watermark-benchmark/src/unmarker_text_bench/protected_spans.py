@@ -24,7 +24,7 @@ GLINER_LABELS = (
     "work of art",
     "legal document",
 )
-THRESHOLD_GRID = tuple(round(value / 100, 2) for value in range(30, 81, 5))
+THRESHOLD_GRID = tuple(round(value / 100, 2) for value in range(30, 96, 5))
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 QUOTED_RE = re.compile(r'(?:(?:"([^"]+)")|(?:“([^”]+)”)|(?:‘([^’]+)’))')
 
@@ -129,11 +129,15 @@ class ProtectedSpanIndex:
             (record.text_sha256, record.language): record for record in materialized
         }
         if len(self.records) != len(materialized):
-            raise ValueError("Protected-span records contain duplicate text/language keys")
+            raise ValueError(
+                "Protected-span records contain duplicate text/language keys"
+            )
         self.metadata = metadata or {}
 
     @classmethod
-    def load(cls, records_path: Path, manifest_path: Path | None = None) -> ProtectedSpanIndex:
+    def load(
+        cls, records_path: Path, manifest_path: Path | None = None
+    ) -> ProtectedSpanIndex:
         records = []
         with records_path.open(encoding="utf-8") as handle:
             for line_number, line in enumerate(handle, start=1):
@@ -201,13 +205,14 @@ def validate_record(
     original_text: str | None = None,
 ) -> dict[str, Any]:
     if original_text is not None and text_sha256(original_text) != record.text_sha256:
-        raise ValueError("Protected-span record does not match the supplied original text")
-    expected_entities = Counter(_normalized_surface(span.text) for span in record.entities)
+        raise ValueError(
+            "Protected-span record does not match the supplied original text"
+        )
+    expected_entities = Counter(
+        _normalized_surface(span.text) for span in record.entities
+    )
     actual_entity_counts = Counter(
-        {
-            surface: _surface_count(candidate, surface)
-            for surface in expected_entities
-        }
+        {surface: _surface_count(candidate, surface) for surface in expected_entities}
     )
     entities_preserved = expected_entities == actual_entity_counts
 
@@ -226,7 +231,11 @@ def validate_record(
             (_normalized_surface(span.text), span.label) for span in candidate_entities
         )
         introduced = [
-            {"text": text, "label": label, "count": count - expected_pairs[(text, label)]}
+            {
+                "text": text,
+                "label": label,
+                "count": count - expected_pairs[(text, label)],
+            }
             for (text, label), count in sorted(candidate_pairs.items())
             if count > expected_pairs[(text, label)]
             and (original_text is None or _surface_count(original_text, text) == 0)
@@ -234,9 +243,7 @@ def validate_record(
 
     checks = {"entities_preserved": entities_preserved, **structured_checks}
     failure_reasons = [
-        name.removesuffix("_preserved")
-        for name, passed in checks.items()
-        if not passed
+        name.removesuffix("_preserved") for name, passed in checks.items() if not passed
     ]
     if introduced:
         failure_reasons.append("introduced_entities")
@@ -273,11 +280,15 @@ class GlinerEntityExtractor:
         if set(thresholds) != {"en", "it"}:
             raise ValueError("GLiNER thresholds must contain exactly 'en' and 'it'")
         if not 0 < overlap_tokens < window_tokens:
-            raise ValueError("GLiNER overlap must be positive and smaller than the window")
+            raise ValueError(
+                "GLiNER overlap must be positive and smaller than the window"
+            )
         try:
             from gliner import GLiNER
         except ImportError as error:
-            raise RuntimeError("GLiNER extraction requires the gliner package") from error
+            raise RuntimeError(
+                "GLiNER extraction requires the gliner package"
+            ) from error
         self.thresholds = {key: float(value) for key, value in thresholds.items()}
         self.model_name = model_name
         self.model_revision = model_revision
@@ -362,7 +373,12 @@ class GlinerEntityExtractor:
                 best[key] = span
         ordered = sorted(
             best.values(),
-            key=lambda span: (span.start, -(span.end - span.start), -span.score, span.label),
+            key=lambda span: (
+                span.start,
+                -(span.end - span.start),
+                -span.score,
+                span.label,
+            ),
         )
         selected: list[EntitySpan] = []
         for span in ordered:
@@ -404,14 +420,18 @@ class ProtectedSpanManifestRunner:
                 if text:
                     sources.setdefault((text_sha256(str(text)), language), str(text))
         records = [
-            ProtectedSpanRecord.build(text, language, self.extractor.extract(text, language))
+            ProtectedSpanRecord.build(
+                text, language, self.extractor.extract(text, language)
+            )
             for (_, language), text in sorted(sources.items())
         ]
         output_path.parent.mkdir(parents=True, exist_ok=True)
         _write_jsonl(output_path, [record.to_dict() for record in records])
         manifest = {
             "artifact_schema_version": self.ARTIFACT_SCHEMA_VERSION,
-            "generations_sha256": hashlib.sha256(generations_path.read_bytes()).hexdigest(),
+            "generations_sha256": hashlib.sha256(
+                generations_path.read_bytes()
+            ).hexdigest(),
             "record_count": len(records),
             "extractor": self.extractor.metadata,
             "threshold_provenance": threshold_provenance

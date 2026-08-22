@@ -25,7 +25,11 @@ from unmarker_text_bench.markllm_gate import (
     MarkLLMGateRunner,
     PromptSample,
 )
-from unmarker_text_bench.ner_gold import NerThresholdCalibrator
+from unmarker_text_bench.ner_gold import (
+    NerGoldDraftRunner,
+    NerThresholdCalibrator,
+    PublicNerGoldSourceBuilder,
+)
 from unmarker_text_bench.openrouter_backend import (
     OpenRouterError,
     OpenRouterRewriter,
@@ -644,6 +648,87 @@ class ProtectedSpanTests(unittest.TestCase):
 
 
 class NerGoldTests(unittest.TestCase):
+    def test_approved_source_round_trips_sample_ids_and_gold_labels(self) -> None:
+        class Extractor:
+            metadata: ClassVar[dict[str, list[str]]] = {
+                "labels": ["person", "organization", "location"]
+            }
+
+            @staticmethod
+            def extract(text: str, language: str) -> list[EntitySpan]:
+                del language
+                return [EntitySpan(text[:5], 0, 5, "person", 0.9)]
+
+        rows = []
+        for language in ("en", "it"):
+            text = "Alice works."
+            rows.append(
+                {
+                    "sample_id": f"public-{language}",
+                    "language": language,
+                    "text": text,
+                    "human_entities": [
+                        {"text": "Alice", "start": 0, "end": 5, "label": "person"}
+                    ],
+                    "gold_label_set": ["person", "organization", "location"],
+                    "review_status": "approved",
+                    "reviewer": "published annotators",
+                    "gold_provenance": {"name": language},
+                }
+            )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.jsonl"
+            output = root / "approved.jsonl"
+            RemotePipelineTests._write_jsonl(source, rows)
+            manifest = NerGoldDraftRunner(Extractor(), 1).run_source(source, output)
+            actual = [json.loads(line) for line in output.read_text().splitlines()]
+        self.assertTrue(manifest["human_approved"])
+        self.assertEqual(
+            [row["sample_id"] for row in actual], ["public-en", "public-it"]
+        )
+        self.assertTrue(all(row["human_entities"] for row in actual))
+
+    def test_public_gold_builder_preserves_published_spans_and_provenance(self) -> None:
+        english = """# newdoc id = doc-1
+# sent_id = doc-1-1
+# text = Alice joined Acme in Rome.
+1\tAlice\tB-PER\t-\thuman
+2\tjoined\tO\t-\t-
+3\tAcme\tB-ORG\t-\thuman
+4\tin\tO\t-\t-
+5\tRome\tB-LOC\t-\thuman
+6\t.\tO\t-\t-
+"""
+        italian = """Alice\tPER
+lavora\tO
+per\tO
+l'\tORG
+Acme\tORG
+a\tO
+Roma\tLOC
+.\tO
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "public.jsonl"
+            manifest = PublicNerGoldSourceBuilder(1).run(english, italian, path)
+            rows = [json.loads(line) for line in path.read_text().splitlines()]
+        self.assertTrue(manifest["human_approved"])
+        self.assertTrue(manifest["research_only"])
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            rows[0]["gold_label_set"], ["person", "organization", "location"]
+        )
+        self.assertEqual(
+            [span["text"] for span in rows[0]["human_entities"]],
+            ["Alice", "Acme", "Rome"],
+        )
+        self.assertEqual(
+            [span["text"] for span in rows[1]["human_entities"]],
+            ["Alice", "l'Acme", "Roma"],
+        )
+        self.assertTrue(all(row["review_status"] == "approved" for row in rows))
+
     def test_calibration_requires_explicit_human_approval(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -773,7 +858,9 @@ class FakeEntityExtractor:
         for value in ("Alice", "Bob"):
             if value in text:
                 start = text.index(value)
-                result.append(EntitySpan(value, start, start + len(value), "person", 1.0))
+                result.append(
+                    EntitySpan(value, start, start + len(value), "person", 1.0)
+                )
         return result
 
 
@@ -871,9 +958,7 @@ class RemotePipelineTests(unittest.TestCase):
                 json.loads(line)
                 for line in (attacks / "api-calls.jsonl").read_text().splitlines()
             ]
-            self.assertEqual(
-                len(api_rows), len({row["call_key"] for row in api_rows})
-            )
+            self.assertEqual(len(api_rows), len({row["call_key"] for row in api_rows}))
             candidates = [
                 json.loads(line)
                 for line in (attacks / "candidates.jsonl").read_text().splitlines()
@@ -931,9 +1016,7 @@ class RemotePipelineTests(unittest.TestCase):
             self.assertTrue((report_dir / "adaptive-oracle-selections.jsonl").exists())
 
             judge_dir = root / "judge"
-            judge_summary = LlmJudgeRunner(
-                FakeStructuredJudge(), max_workers=4
-            ).run(
+            judge_summary = LlmJudgeRunner(FakeStructuredJudge(), max_workers=4).run(
                 report_dir / "progressive-selections.jsonl",
                 judge_dir,
             )
@@ -1028,7 +1111,9 @@ class RemotePipelineTests(unittest.TestCase):
                     continue
                 extra_generations.append({**row, "algorithm": "EXP"})
                 original_key = f"{row['sample_id']}|KGW|watermarked"
-                score = next(value for value in scores if value["score_key"] == original_key)
+                score = next(
+                    value for value in scores if value["score_key"] == original_key
+                )
                 extra_scores.append(
                     {
                         **score,

@@ -182,6 +182,7 @@ def score_corpus(run_id: str) -> dict:
 def protect_sources(
     run_id: str,
     thresholds: dict[str, float],
+    labels: tuple[str, ...],
     threshold_provenance: dict | None = None,
 ) -> dict:
     from unmarker_text_bench.protected_spans import (
@@ -192,8 +193,14 @@ def protect_sources(
     run_dir = _remote_run_dir(run_id)
     generations = run_dir / "corpus" / "generations.jsonl"
     if not generations.exists():
-        raise FileNotFoundError("Generate the MarkLLM corpus before extracting entities")
-    extractor = GlinerEntityExtractor(thresholds=thresholds, device="cuda")
+        raise FileNotFoundError(
+            "Generate the MarkLLM corpus before extracting entities"
+        )
+    extractor = GlinerEntityExtractor(
+        thresholds=thresholds,
+        labels=labels,
+        device="cuda",
+    )
     output = run_dir / "protection" / "gliner-v1" / "protected-spans.jsonl"
     manifest = ProtectedSpanManifestRunner(extractor).run(
         generations,
@@ -224,10 +231,26 @@ def draft_ner_gold(
     generations = run_dir / "corpus" / "generations.jsonl"
     if not generations.exists() and not private_source_jsonl:
         raise FileNotFoundError("Generate the MarkLLM corpus before drafting NER gold")
-    extractor = GlinerEntityExtractor(
-        thresholds={"en": 0.30, "it": 0.30}, device="cuda"
+    source_rows = [
+        json.loads(line) for line in private_source_jsonl.splitlines() if line.strip()
+    ]
+    label_sets = {tuple(row.get("gold_label_set") or ()) for row in source_rows} - {()}
+    if len(label_sets) > 1:
+        raise ValueError("NER gold source rows must use one common entity label set")
+    labels = next(iter(label_sets)) if label_sets else None
+    extractor_kwargs = {
+        "thresholds": {"en": 0.30, "it": 0.30},
+        "device": "cuda",
+    }
+    if labels:
+        extractor_kwargs["labels"] = labels
+    extractor = GlinerEntityExtractor(**extractor_kwargs)
+    source_is_approved = bool(source_rows) and all(
+        row.get("review_status") == "approved" and str(row.get("reviewer", "")).strip()
+        for row in source_rows
     )
-    output = run_dir / "protection" / "gold" / "ner-gold.pending.jsonl"
+    suffix = "approved" if source_is_approved else "pending"
+    output = run_dir / "protection" / "gold" / f"ner-gold.{suffix}.jsonl"
     runner = NerGoldDraftRunner(extractor, samples_per_language)
     if private_source_jsonl:
         source_path = run_dir / "protection" / "gold" / "private-source.jsonl"
@@ -301,9 +324,7 @@ def evaluate_candidates(
     protected_spans = None
     entity_extractor = None
     if quality_profile == "gliner-v1":
-        protected_path = (
-            run_dir / "protection" / "gliner-v1" / "protected-spans.jsonl"
-        )
+        protected_path = run_dir / "protection" / "gliner-v1" / "protected-spans.jsonl"
         if not protected_path.exists():
             raise FileNotFoundError(
                 "Run the Modal protect stage before gliner-v1 evaluation"
@@ -318,7 +339,14 @@ def evaluate_candidates(
         thresholds = protected_spans.metadata.get("extractor", {}).get("thresholds")
         if not thresholds:
             raise ValueError("Protected-span manifest has no GLiNER thresholds")
-        entity_extractor = GlinerEntityExtractor(thresholds=thresholds, device="cuda")
+        labels = protected_spans.metadata.get("extractor", {}).get("labels")
+        if not labels:
+            raise ValueError("Protected-span manifest has no GLiNER label set")
+        entity_extractor = GlinerEntityExtractor(
+            thresholds=thresholds,
+            labels=tuple(labels),
+            device="cuda",
+        )
     elif quality_profile != "legacy-v1":
         raise ValueError("quality_profile must be legacy-v1 or gliner-v1")
     resolved_label = evaluation_label or quality_profile
@@ -398,9 +426,7 @@ def main(
                 calibration_prompts_per_language > 0
                 and evaluation_prompts_per_language > 0
             ):
-                raise ValueError(
-                    "Both split-specific prompt limits must be positive"
-                )
+                raise ValueError("Both split-specific prompt limits must be positive")
             prompt_text = _limit_prompts_by_split(
                 prompt_text,
                 calibration_prompts_per_language,
@@ -434,7 +460,7 @@ def main(
         print(json.dumps(score_corpus.remote(run_id), indent=2))
         _download_prepare_artifacts(run_id, output_dir)
     elif stage == "protect":
-        thresholds, provenance = _load_gliner_thresholds(gliner_thresholds)
+        thresholds, labels, provenance = _load_gliner_thresholds(gliner_thresholds)
         if evidence_profile == "gate2b_exp_pilot" and not provenance.get(
             "human_approved"
         ):
@@ -443,25 +469,33 @@ def main(
             )
         print(
             json.dumps(
-                protect_sources.remote(run_id, thresholds, provenance), indent=2
+                protect_sources.remote(run_id, thresholds, labels, provenance), indent=2
             )
         )
         _download_protection_artifacts(run_id, output_dir)
-    elif stage == "ner-draft":
+    elif stage in {"ner-draft", "ner-public-gold"}:
+        if stage == "ner-public-gold":
+            if gold_source:
+                raise ValueError("ner-public-gold does not accept --gold-source")
+            from unmarker_text_bench.ner_gold import PublicNerGoldSourceBuilder
+
+            source_path = output_dir / "public-gold-source.approved.jsonl"
+            source_manifest = PublicNerGoldSourceBuilder(
+                gold_samples_per_language
+            ).download_and_run(source_path)
+            print(json.dumps(source_manifest, indent=2))
+            gold_source = str(source_path)
         private_source_jsonl = (
             Path(gold_source).read_text(encoding="utf-8") if gold_source else ""
         )
-        print(
-            json.dumps(
-                draft_ner_gold.remote(
-                    run_id,
-                    gold_samples_per_language,
-                    private_source_jsonl,
-                ),
-                indent=2,
-            )
+        manifest = draft_ner_gold.remote(
+            run_id,
+            gold_samples_per_language,
+            private_source_jsonl,
         )
-        _download_ner_gold_artifacts(run_id, output_dir)
+        print(json.dumps(manifest, indent=2))
+        suffix = "approved" if manifest.get("human_approved") else "pending"
+        _download_ner_gold_artifacts(run_id, output_dir, suffix)
     elif stage == "ner-calibrate":
         if not gold_set:
             raise ValueError("--gold-set is required for ner-calibrate")
@@ -520,8 +554,8 @@ def main(
                 pass
     else:
         raise ValueError(
-            "stage must be one of: prepare, ner-draft, ner-calibrate, protect, "
-            "evaluate, download"
+            "stage must be one of: prepare, ner-draft, ner-public-gold, "
+            "ner-calibrate, protect, evaluate, download"
         )
     print(f"Artifacts downloaded to {output_dir.resolve()}")
 
@@ -564,12 +598,14 @@ def _download_protection_artifacts(run_id: str, output_dir: Path) -> None:
         _download_file(f"/{run_id}/{remote_name}", output_dir / local_name)
 
 
-def _download_ner_gold_artifacts(run_id: str, output_dir: Path) -> None:
+def _download_ner_gold_artifacts(
+    run_id: str, output_dir: Path, suffix: str = "pending"
+) -> None:
     for remote_name, local_name in (
-        ("protection/gold/ner-gold.pending.jsonl", "ner-gold.pending.jsonl"),
+        (f"protection/gold/ner-gold.{suffix}.jsonl", f"ner-gold.{suffix}.jsonl"),
         (
-            "protection/gold/ner-gold.pending.manifest.json",
-            "ner-gold.pending.manifest.json",
+            f"protection/gold/ner-gold.{suffix}.manifest.json",
+            f"ner-gold.{suffix}.manifest.json",
         ),
     ):
         _download_file(f"/{run_id}/{remote_name}", output_dir / local_name)
@@ -654,23 +690,35 @@ def _limit_prompts_by_split(
     return "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in selected)
 
 
-def _load_gliner_thresholds(path: str) -> tuple[dict[str, float], dict]:
+def _load_gliner_thresholds(
+    path: str,
+) -> tuple[dict[str, float], tuple[str, ...], dict]:
+    from unmarker_text_bench.protected_spans import GLINER_LABELS
+
     if not path:
         return (
             {"en": 0.5, "it": 0.5},
+            GLINER_LABELS,
             {"human_approved": False, "status": "uncalibrated_default"},
         )
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     thresholds = payload.get("thresholds", payload)
     if set(thresholds) != {"en", "it"}:
         raise ValueError("GLiNER thresholds must contain exactly en and it")
+    labels = tuple(payload.get("labels") or GLINER_LABELS)
+    if not labels or len(labels) != len(set(labels)):
+        raise ValueError("GLiNER labels must be non-empty and unique")
     provenance = {
         "human_approved": bool(payload.get("human_approved", False)),
         "status": str(payload.get("status", "external_threshold_file")),
         "threshold_file_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
         "reviewed_gold_sha256": payload.get("reviewed_gold_sha256"),
+        "labels": list(labels),
+        "reviewers": payload.get("reviewers", []),
+        "gold_provenance": payload.get("gold_provenance", []),
     }
     return (
         {language: float(value) for language, value in thresholds.items()},
+        labels,
         provenance,
     )
