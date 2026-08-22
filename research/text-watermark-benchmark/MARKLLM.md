@@ -17,9 +17,9 @@ Pinned components:
   `40c069824f4251a91eefaf281ebe4c544efd3e18`;
 - causal self-information scorer: `Qwen/Qwen3-8B` at
   `b968826d9c46dd6066d109eabc6255188de91218`;
-- OpenRouter rewriter: `qwen/qwen3.8-2.4t-a95b`;
-- its logit-bias tokenizer: `Qwen/Qwen3.8-2.4T-A95B` at
-  `207bd685a7e3696cfaff12ded7c6a7ea0f88c996`;
+- OpenRouter rewriter: `qwen/qwen3-235b-a22b-2507` on the DeepInfra FP8 route;
+- its logit-bias tokenizer: `Qwen/Qwen3-235B-A22B-Instruct-2507` at
+  `ac9c66cc9b46af7306746a9250f23d47083d689e`;
 - semantic model: `paraphrase-multilingual-mpnet-base-v2` at
   `4328cf26390c98c5e3c738b4460a05b95f4911f5`;
 - multilingual NLI model: `mDeBERTa-v3-base-mnli-xnli` at
@@ -207,12 +207,13 @@ not only the endpoint metadata preflight.
 Actual provider, returned model, request ID, token usage, API cost, latency,
 beta, and a hash of biased token IDs are recorded per call.
 
-The selected Qwen endpoint requires reasoning. Requests therefore use its
-lowest actually supported `low` effort and exclude the reasoning trace from the
-response; reasoning tokens still count toward usage and cost. This setting is
-recorded in the attack manifest. The completion cap is 4,096 tokens so
-mandatory reasoning cannot consume the whole allowance on a 192-token rewrite;
-only actually used tokens are billed.
+The default 235B endpoint is non-thinking, so the client omits the `reasoning`
+parameter. This keeps rewrite latency and cost from being dominated by hidden
+reasoning while retaining a large frontier-class rewriter and exact
+logit-bias/tokenizer alignment. For an explicitly selected reasoning model, an
+empty `finish_reason=length` response retries at 8,192 and then 16,384 tokens;
+usage, cost, latency, request IDs, retry count, and the effective cap are
+aggregated in the call artifact.
 
 The stage resumes from `api-calls.jsonl`, `beta-calibration.json`,
 `raw-candidates.jsonl`, and `raw-baselines.jsonl`. It exports candidate

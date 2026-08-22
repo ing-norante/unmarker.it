@@ -10,9 +10,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-DEFAULT_OPENROUTER_MODEL = "qwen/qwen3.8-2.4t-a95b"
-DEFAULT_OPENROUTER_TOKENIZER = "Qwen/Qwen3.8-2.4T-A95B"
-DEFAULT_OPENROUTER_TOKENIZER_REVISION = "207bd685a7e3696cfaff12ded7c6a7ea0f88c996"
+DEFAULT_OPENROUTER_MODEL = "qwen/qwen3-235b-a22b-2507"
+DEFAULT_OPENROUTER_TOKENIZER = "Qwen/Qwen3-235B-A22B-Instruct-2507"
+DEFAULT_OPENROUTER_TOKENIZER_REVISION = "ac9c66cc9b46af7306746a9250f23d47083d689e"
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,10 @@ class RewriteResponse:
     latency_ms: float
     reasoning_tokens: int = 0
     finish_reason: str | None = None
+    request_ids: tuple[str, ...] = ()
+    attempt_count: int = 1
+    length_retry_count: int = 0
+    max_tokens_used: int | None = None
 
 
 class OpenRouterError(RuntimeError):
@@ -51,7 +55,8 @@ class OpenRouterRewriter:
         base_url: str = "https://openrouter.ai/api/v1",
         temperature: float = 0.2,
         max_tokens: int = 4096,
-        reasoning_effort: str = "low",
+        length_retry_max_tokens: int = 16384,
+        reasoning_effort: str | None = None,
         timeout_seconds: float = 180.0,
         max_retries: int = 5,
         allow_fallbacks: bool = False,
@@ -65,7 +70,15 @@ class OpenRouterRewriter:
         self.base_url = base_url.rstrip("/")
         self.temperature = temperature
         self.max_tokens = max_tokens
-        self.reasoning_effort = reasoning_effort
+        if length_retry_max_tokens < max_tokens:
+            raise ValueError("length_retry_max_tokens must be >= max_tokens")
+        self.length_retry_max_tokens = length_retry_max_tokens
+        self.reasoning_effort = (
+            None
+            if reasoning_effort is None
+            or reasoning_effort.strip().lower() in {"", "none", "off"}
+            else reasoning_effort
+        )
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
         self.allow_fallbacks = allow_fallbacks
@@ -80,8 +93,10 @@ class OpenRouterRewriter:
             "provider": self.provider,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            "length_retry_max_tokens": self.length_retry_max_tokens,
+            "length_retry_policy": "double_on_empty_finish_reason_length",
             "reasoning_effort": self.reasoning_effort,
-            "reasoning_excluded_from_response": True,
+            "reasoning_excluded_from_response": self.reasoning_effort is not None,
             "allow_fallbacks": self.allow_fallbacks,
             "require_parameters": True,
             "data_collection": "deny",
@@ -109,13 +124,14 @@ class OpenRouterRewriter:
             ],
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
-            "reasoning": {
-                "effort": self.reasoning_effort,
-                "exclude": True,
-            },
             "provider": provider,
             "usage": {"include": True},
         }
+        if self.reasoning_effort is not None:
+            body["reasoning"] = {
+                "effort": self.reasoning_effort,
+                "exclude": True,
+            }
         if logit_bias:
             body["logit_bias"] = {
                 str(key): float(value) for key, value in logit_bias.items()
@@ -123,7 +139,79 @@ class OpenRouterRewriter:
         if seed is not None:
             body["seed"] = int(seed)
 
-        request = urllib.request.Request(
+        current_max_tokens = self.max_tokens
+        payloads: list[dict[str, Any]] = []
+        latencies: list[float] = []
+        while True:
+            body["max_tokens"] = current_max_tokens
+            request = self._chat_request(body)
+            started = time.perf_counter()
+            payload = self._send_with_retries(request)
+            latencies.append((time.perf_counter() - started) * 1000)
+            payloads.append(payload)
+            try:
+                choice = payload["choices"][0]
+                content = choice["message"]["content"]
+            except (KeyError, IndexError, TypeError, AttributeError) as error:
+                raise OpenRouterError(
+                    "OpenRouter returned no assistant text"
+                ) from error
+            if isinstance(content, str) and content.strip():
+                text = content.strip()
+                break
+            finish_reason = choice.get("finish_reason")
+            if (
+                finish_reason == "length"
+                and current_max_tokens < self.length_retry_max_tokens
+            ):
+                current_max_tokens = min(
+                    current_max_tokens * 2, self.length_retry_max_tokens
+                )
+                continue
+            reasoning_tokens = (
+                (payload.get("usage") or {})
+                .get("completion_tokens_details", {})
+                .get("reasoning_tokens")
+            )
+            raise OpenRouterError(
+                "OpenRouter returned no assistant text "
+                f"(finish_reason={finish_reason!r}, reasoning_tokens={reasoning_tokens!r}, "
+                f"attempts={len(payloads)}, max_tokens={current_max_tokens})"
+            )
+
+        usages = [payload.get("usage") or {} for payload in payloads]
+        completion_details = [
+            usage.get("completion_tokens_details") or {} for usage in usages
+        ]
+        costs = [
+            float(usage["cost"]) for usage in usages if usage.get("cost") is not None
+        ]
+        return RewriteResponse(
+            text=text,
+            request_id=payload.get("id"),
+            model=str(payload.get("model") or self.model),
+            provider=payload.get("provider"),
+            prompt_tokens=sum(int(usage.get("prompt_tokens") or 0) for usage in usages),
+            completion_tokens=sum(
+                int(usage.get("completion_tokens") or 0) for usage in usages
+            ),
+            cost_usd=sum(costs) if costs else None,
+            latency_ms=sum(latencies),
+            reasoning_tokens=sum(
+                int(details.get("reasoning_tokens") or 0)
+                for details in completion_details
+            ),
+            finish_reason=choice.get("finish_reason"),
+            request_ids=tuple(
+                str(item["id"]) for item in payloads if item.get("id") is not None
+            ),
+            attempt_count=len(payloads),
+            length_retry_count=len(payloads) - 1,
+            max_tokens_used=current_max_tokens,
+        )
+
+    def _chat_request(self, body: dict[str, Any]) -> urllib.request.Request:
+        return urllib.request.Request(
             f"{self.base_url}/chat/completions",
             data=json.dumps(body).encode("utf-8"),
             headers={
@@ -133,42 +221,6 @@ class OpenRouterRewriter:
                 "X-Title": "Unmarker text watermark benchmark",
             },
             method="POST",
-        )
-        started = time.perf_counter()
-        payload = self._send_with_retries(request)
-        latency_ms = (time.perf_counter() - started) * 1000
-        try:
-            choice = payload["choices"][0]
-            content = choice["message"]["content"]
-            if not isinstance(content, str) or not content.strip():
-                finish_reason = choice.get("finish_reason")
-                reasoning_tokens = (
-                    (payload.get("usage") or {})
-                    .get("completion_tokens_details", {})
-                    .get("reasoning_tokens")
-                )
-                raise OpenRouterError(
-                    "OpenRouter returned no assistant text "
-                    f"(finish_reason={finish_reason!r}, reasoning_tokens={reasoning_tokens!r})"
-                )
-            text = content.strip()
-        except OpenRouterError:
-            raise
-        except (KeyError, IndexError, TypeError, AttributeError) as error:
-            raise OpenRouterError("OpenRouter returned no assistant text") from error
-        usage = payload.get("usage") or {}
-        completion_details = usage.get("completion_tokens_details") or {}
-        return RewriteResponse(
-            text=text,
-            request_id=payload.get("id"),
-            model=str(payload.get("model") or self.model),
-            provider=payload.get("provider"),
-            prompt_tokens=int(usage.get("prompt_tokens") or 0),
-            completion_tokens=int(usage.get("completion_tokens") or 0),
-            cost_usd=float(usage["cost"]) if usage.get("cost") is not None else None,
-            latency_ms=latency_ms,
-            reasoning_tokens=int(completion_details.get("reasoning_tokens") or 0),
-            finish_reason=choice.get("finish_reason"),
         )
 
     def validate_capabilities(self, require_logit_bias: bool = False) -> dict[str, Any]:
@@ -221,7 +273,11 @@ class OpenRouterRewriter:
             )
         reasoning = model_metadata.get("reasoning") or {}
         supported_efforts = reasoning.get("supported_efforts")
-        if supported_efforts and self.reasoning_effort not in supported_efforts:
+        if (
+            supported_efforts
+            and self.reasoning_effort is not None
+            and self.reasoning_effort not in supported_efforts
+        ):
             raise OpenRouterError(
                 f"Reasoning effort {self.reasoning_effort!r} is not supported by "
                 f"{self.model!r}; supported={supported_efforts}"

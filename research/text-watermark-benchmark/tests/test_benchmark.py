@@ -400,6 +400,7 @@ class OpenRouterTests(unittest.TestCase):
             api_key="not-a-real-key",
             model="test/model",
             provider="Together",
+            reasoning_effort="low",
             transport=transport,
         )
         self.assertTrue(
@@ -413,6 +414,100 @@ class OpenRouterTests(unittest.TestCase):
         self.assertEqual(body["reasoning"], {"effort": "low", "exclude": True})
         self.assertEqual(response.cost_usd, 0.01)
         self.assertNotIn("not-a-real-key", json.dumps(client.metadata))
+
+    def test_non_reasoning_model_omits_reasoning_parameter(self) -> None:
+        requests: list[urllib.request.Request] = []
+
+        def transport(
+            request: urllib.request.Request, timeout: float
+        ) -> tuple[int, bytes]:
+            requests.append(request)
+            return 200, json.dumps(
+                {
+                    "id": "request-1",
+                    "model": "test/model",
+                    "provider": "DeepInfra",
+                    "choices": [{"message": {"content": "Rewritten text"}}],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 4},
+                }
+            ).encode()
+
+        client = OpenRouterRewriter(
+            api_key="not-a-real-key",
+            model="test/model",
+            provider="DeepInfra",
+            reasoning_effort="none",
+            transport=transport,
+        )
+        client.rewrite("system", "user")
+        self.assertNotIn("reasoning", json.loads(requests[-1].data))
+
+    def test_empty_length_response_retries_with_larger_budget(self) -> None:
+        requests: list[urllib.request.Request] = []
+
+        def transport(
+            request: urllib.request.Request, timeout: float
+        ) -> tuple[int, bytes]:
+            requests.append(request)
+            body = json.loads(request.data)
+            if len(requests) == 1:
+                self.assertEqual(body["max_tokens"], 4096)
+                return 200, json.dumps(
+                    {
+                        "id": "length-1",
+                        "model": "test/model",
+                        "provider": "DeepInfra",
+                        "choices": [
+                            {
+                                "message": {"content": ""},
+                                "finish_reason": "length",
+                            }
+                        ],
+                        "usage": {
+                            "prompt_tokens": 10,
+                            "completion_tokens": 4096,
+                            "cost": 0.02,
+                            "completion_tokens_details": {"reasoning_tokens": 4096},
+                        },
+                    }
+                ).encode()
+            self.assertEqual(body["max_tokens"], 8192)
+            return 200, json.dumps(
+                {
+                    "id": "success-2",
+                    "model": "test/model",
+                    "provider": "DeepInfra",
+                    "choices": [
+                        {
+                            "message": {"content": "Recovered rewrite"},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": 10,
+                        "completion_tokens": 100,
+                        "cost": 0.01,
+                        "completion_tokens_details": {"reasoning_tokens": 80},
+                    },
+                }
+            ).encode()
+
+        client = OpenRouterRewriter(
+            api_key="not-a-real-key",
+            model="test/model",
+            provider="DeepInfra",
+            transport=transport,
+        )
+        response = client.rewrite("system", "user")
+        self.assertEqual(response.text, "Recovered rewrite")
+        self.assertEqual(response.request_ids, ("length-1", "success-2"))
+        self.assertEqual(response.attempt_count, 2)
+        self.assertEqual(response.length_retry_count, 1)
+        self.assertEqual(response.max_tokens_used, 8192)
+        self.assertEqual(response.prompt_tokens, 20)
+        self.assertEqual(response.completion_tokens, 4196)
+        self.assertEqual(response.reasoning_tokens, 4176)
+        self.assertAlmostEqual(response.cost_usd or 0.0, 0.03)
 
     def test_http_200_upstream_error_is_not_treated_as_completion(self) -> None:
         def transport(

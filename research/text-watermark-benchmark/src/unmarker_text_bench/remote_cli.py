@@ -37,7 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     attack.add_argument("--temperature", type=float, default=0.2)
     attack.add_argument("--max-tokens", type=int, default=4096)
-    attack.add_argument("--reasoning-effort", default="low")
+    attack.add_argument("--length-retry-max-tokens", type=int, default=16384)
+    attack.add_argument(
+        "--reasoning-effort",
+        default="none",
+        help="Use none for non-thinking models; otherwise low, medium, etc.",
+    )
     attack.add_argument(
         "--pipelines", default="simple_paraphrase,sira,bira,bira_position_aware"
     )
@@ -93,6 +98,7 @@ def main() -> None:
             provider=args.provider or None,
             temperature=args.temperature,
             max_tokens=args.max_tokens,
+            length_retry_max_tokens=args.length_retry_max_tokens,
             reasoning_effort=args.reasoning_effort,
             allow_fallbacks=args.allow_provider_fallbacks,
         )
