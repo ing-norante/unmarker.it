@@ -15,6 +15,10 @@ self-information scoring, target detection, and neural quality validation;
 OpenRouter supplies the constrained frontier rewriter. It does not change the
 React application's dependency graph and requires no Ollama process.
 
+The completed official-EXP pilot and its non-promotion decision are documented
+in [`GATE2B_RESULTS.md`](GATE2B_RESULTS.md). Raw generations and licensed NER
+gold artifacts remain untracked.
+
 The remote run also produces two controls that are deliberately excluded from
 the candidate-algorithm ranking: an adaptive target-detector oracle paraphrase
 baseline and a clean-text re-stamp control. Every rewrite passes through a
