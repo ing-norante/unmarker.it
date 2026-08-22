@@ -39,11 +39,19 @@ class FinalReportRunner:
                 f"Missing remote evaluations for {len(missing)} candidates"
             )
         rows = [
-            {**candidate, **evaluation_by_key[candidate["candidate_key"]]}
+            self._merge_evaluation(
+                candidate,
+                evaluation_by_key[candidate["candidate_key"]],
+                calls,
+            )
             for candidate in candidates
         ]
         baseline_rows = [
-            {**baseline, **evaluation_by_key[baseline["candidate_key"]]}
+            self._merge_evaluation(
+                baseline,
+                evaluation_by_key[baseline["candidate_key"]],
+                calls,
+            )
             for baseline in baselines
         ]
 
@@ -78,6 +86,12 @@ class FinalReportRunner:
             "held_out_candidate_count": len(held_out),
             "baseline_count": len(baseline_rows),
             "held_out_baseline_count": len(held_out_baselines),
+            "incomplete_api_output_candidate_count": sum(
+                not row["api_output_complete"] for row in rows
+            ),
+            "incomplete_api_output_baseline_count": sum(
+                not row["api_output_complete"] for row in baseline_rows
+            ),
             "independent_held_out_source_prompts": len(
                 {row["sample_id"] for row in held_out}
             ),
@@ -130,6 +144,10 @@ class FinalReportRunner:
                     "multilingual semantic-similarity, and bidirectional-NLI gates all pass."
                 ),
                 (
+                    "Any candidate backed by an API call whose finish_reason is not stop is "
+                    "forced to fail the quality gate and counted separately."
+                ),
+                (
                     "This benchmark evaluates reproduced MarkLLM schemes, not Claude or any "
                     "undisclosed production watermark."
                 ),
@@ -143,6 +161,37 @@ class FinalReportRunner:
             self._render_markdown(summary), encoding="utf-8"
         )
         return summary
+
+    @staticmethod
+    def _merge_evaluation(
+        artifact: dict[str, Any],
+        evaluation: dict[str, Any],
+        calls: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        missing_calls = [
+            call_key for call_key in artifact["api_call_keys"] if call_key not in calls
+        ]
+        if missing_calls:
+            raise ValueError(
+                f"Missing API records for {artifact['candidate_key']}: {missing_calls}"
+            )
+        incomplete_calls = [
+            call_key
+            for call_key in artifact["api_call_keys"]
+            if calls[call_key].get("finish_reason") not in {None, "stop"}
+        ]
+        merged = {
+            **artifact,
+            **evaluation,
+            "remote_quality_pass_before_api_completion_gate": bool(
+                evaluation["quality_pass"]
+            ),
+            "api_output_complete": not incomplete_calls,
+            "incomplete_api_call_keys": incomplete_calls,
+        }
+        if incomplete_calls:
+            merged["quality_pass"] = False
+        return merged
 
     @staticmethod
     def _judge_summary(
@@ -164,10 +213,7 @@ class FinalReportRunner:
             raise ValueError(
                 f"Missing LLM judgments for {len(missing)} progressive selections"
             )
-        joined = [
-            {**row, **by_key[row["candidate_key"]]}
-            for row in selected
-        ]
+        joined = [{**row, **by_key[row["candidate_key"]]} for row in selected]
         return {
             "status": "complete",
             "role": "quality pre-screen only; never an attack-success oracle",
@@ -179,9 +225,7 @@ class FinalReportRunner:
                 for row in joined
             ),
             "mean_fluency": mean(float(row["fluency_score"]) for row in joined),
-            "mean_naturalness": mean(
-                float(row["naturalness_score"]) for row in joined
-            ),
+            "mean_naturalness": mean(float(row["naturalness_score"]) for row in joined),
         }
 
     def _select_oracle(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -357,10 +401,14 @@ class FinalReportRunner:
                 if value[5] + value[6] > 0
                 and value[1] >= self.SURROGATE_PRECISION_FLOOR
             ]
-            best = max(
-                admissible,
-                key=lambda value: (value[2], value[0], value[1], value[3]),
-            ) if admissible else None
+            best = (
+                max(
+                    admissible,
+                    key=lambda value: (value[2], value[0], value[1], value[3]),
+                )
+                if admissible
+                else None
+            )
             cells.append(
                 {
                     "algorithm": algorithm,

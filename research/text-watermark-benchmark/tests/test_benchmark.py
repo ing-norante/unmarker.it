@@ -1035,6 +1035,17 @@ class RemotePipelineTests(unittest.TestCase):
                 summary_with_judge["llm_quality_prescreen"]["status"], "complete"
             )
 
+    def test_incomplete_api_output_forces_quality_failure(self) -> None:
+        merged = FinalReportRunner._merge_evaluation(
+            {"candidate_key": "candidate-1", "api_call_keys": ["call-1"]},
+            {"candidate_key": "candidate-1", "quality_pass": True},
+            {"call-1": {"finish_reason": "length"}},
+        )
+        self.assertFalse(merged["api_output_complete"])
+        self.assertFalse(merged["quality_pass"])
+        self.assertTrue(merged["remote_quality_pass_before_api_completion_gate"])
+        self.assertEqual(merged["incomplete_api_call_keys"], ["call-1"])
+
     def test_modal_quality_recomputes_protected_spans(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
