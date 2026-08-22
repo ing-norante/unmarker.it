@@ -33,6 +33,24 @@ class RewriteResponse:
     max_tokens_used: int | None = None
 
 
+@dataclass(frozen=True)
+class StructuredResponse:
+    data: dict[str, Any]
+    request_id: str | None
+    model: str
+    provider: str | None
+    prompt_tokens: int
+    completion_tokens: int
+    reasoning_tokens: int
+    cost_usd: float | None
+    latency_ms: float
+    finish_reason: str | None
+    request_ids: tuple[str, ...] = ()
+    attempt_count: int = 1
+    length_retry_count: int = 0
+    max_tokens_used: int | None = None
+
+
 class OpenRouterError(RuntimeError):
     pass
 
@@ -210,6 +228,113 @@ class OpenRouterRewriter:
             max_tokens_used=current_max_tokens,
         )
 
+    def complete_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        schema_name: str,
+        schema: dict[str, Any],
+        seed: int | None = None,
+    ) -> StructuredResponse:
+        provider: dict[str, Any] = {
+            "allow_fallbacks": self.allow_fallbacks,
+            "require_parameters": True,
+            "data_collection": "deny",
+        }
+        if self.provider:
+            provider["only"] = [self.provider]
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "max_tokens": self.max_tokens,
+            "provider": provider,
+            "usage": {"include": True},
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema_name,
+                    "strict": True,
+                    "schema": schema,
+                },
+            },
+        }
+        if self.reasoning_effort is not None:
+            body["reasoning"] = {
+                "effort": self.reasoning_effort,
+                "exclude": True,
+            }
+        if seed is not None:
+            body["seed"] = int(seed)
+        current_max_tokens = self.max_tokens
+        payloads: list[dict[str, Any]] = []
+        latencies: list[float] = []
+        while True:
+            body["max_tokens"] = current_max_tokens
+            started = time.perf_counter()
+            payload = self._send_with_retries(self._chat_request(body))
+            latencies.append((time.perf_counter() - started) * 1000)
+            payloads.append(payload)
+            try:
+                choice = payload["choices"][0]
+                content = choice["message"]["content"]
+            except (KeyError, IndexError, TypeError) as error:
+                raise OpenRouterError(
+                    "OpenRouter returned no structured content"
+                ) from error
+            if content:
+                try:
+                    data = content if isinstance(content, dict) else json.loads(content)
+                except (TypeError, json.JSONDecodeError) as error:
+                    raise OpenRouterError(
+                        "OpenRouter returned invalid structured JSON"
+                    ) from error
+                break
+            if (
+                choice.get("finish_reason") == "length"
+                and current_max_tokens < self.length_retry_max_tokens
+            ):
+                current_max_tokens = min(
+                    current_max_tokens * 2, self.length_retry_max_tokens
+                )
+                continue
+            raise OpenRouterError("OpenRouter returned empty structured content")
+        if not isinstance(data, dict):
+            raise OpenRouterError("OpenRouter structured output is not an object")
+        usages = [value.get("usage") or {} for value in payloads]
+        details = [
+            usage.get("completion_tokens_details") or {} for usage in usages
+        ]
+        costs = [
+            float(usage["cost"])
+            for usage in usages
+            if usage.get("cost") is not None
+        ]
+        return StructuredResponse(
+            data=data,
+            request_id=payload.get("id"),
+            model=str(payload.get("model") or self.model),
+            provider=payload.get("provider"),
+            prompt_tokens=sum(int(usage.get("prompt_tokens") or 0) for usage in usages),
+            completion_tokens=sum(
+                int(usage.get("completion_tokens") or 0) for usage in usages
+            ),
+            reasoning_tokens=sum(
+                int(value.get("reasoning_tokens") or 0) for value in details
+            ),
+            cost_usd=sum(costs) if costs else None,
+            latency_ms=sum(latencies),
+            finish_reason=choice.get("finish_reason"),
+            request_ids=tuple(
+                str(value["id"]) for value in payloads if value.get("id") is not None
+            ),
+            attempt_count=len(payloads),
+            length_retry_count=len(payloads) - 1,
+            max_tokens_used=current_max_tokens,
+        )
+
     def _chat_request(self, body: dict[str, Any]) -> urllib.request.Request:
         return urllib.request.Request(
             f"{self.base_url}/chat/completions",
@@ -223,7 +348,12 @@ class OpenRouterRewriter:
             method="POST",
         )
 
-    def validate_capabilities(self, require_logit_bias: bool = False) -> dict[str, Any]:
+    def validate_capabilities(
+        self,
+        require_logit_bias: bool = False,
+        require_structured_output: bool = False,
+        require_seed: bool = False,
+    ) -> dict[str, Any]:
         request = urllib.request.Request(
             f"{self.base_url}/models/{self.model}/endpoints",
             headers={"Accept": "application/json"},
@@ -251,6 +381,22 @@ class OpenRouterRewriter:
         ):
             raise OpenRouterError(
                 f"Provider {self.provider!r} does not expose logit_bias for {self.model!r}"
+            )
+        if require_structured_output and not any(
+            {"response_format", "structured_outputs"}
+            <= set(endpoint.get("supported_parameters", []))
+            for endpoint in matches
+        ):
+            raise OpenRouterError(
+                f"Provider {self.provider!r} does not expose strict structured output "
+                f"for {self.model!r}"
+            )
+        if require_seed and not any(
+            "seed" in endpoint.get("supported_parameters", [])
+            for endpoint in matches
+        ):
+            raise OpenRouterError(
+                f"Provider {self.provider!r} does not expose seed for {self.model!r}"
             )
         models_request = urllib.request.Request(
             f"{self.base_url}/models",
@@ -288,6 +434,15 @@ class OpenRouterRewriter:
             "endpoints": len(matches),
             "logit_bias_supported": any(
                 "logit_bias" in endpoint.get("supported_parameters", [])
+                for endpoint in matches
+            ),
+            "structured_output_supported": any(
+                {"response_format", "structured_outputs"}
+                <= set(endpoint.get("supported_parameters", []))
+                for endpoint in matches
+            ),
+            "seed_supported": any(
+                "seed" in endpoint.get("supported_parameters", [])
                 for endpoint in matches
             ),
             "statuses": [endpoint.get("status") for endpoint in matches],

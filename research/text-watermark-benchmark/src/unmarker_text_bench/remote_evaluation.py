@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .markllm_gate import DetectionResult
+from .protected_spans import EntityExtractor, ProtectedSpanIndex
+from .quality_checks import deterministic_quality
 
 
 @dataclass(frozen=True)
@@ -156,7 +158,7 @@ class NeuralQualityEvaluator:
 
 
 class CandidateEvaluationRunner:
-    ARTIFACT_SCHEMA_VERSION = 2
+    ARTIFACT_SCHEMA_VERSION = 3
 
     def __init__(
         self,
@@ -165,12 +167,20 @@ class CandidateEvaluationRunner:
         semantic_threshold: float = 0.90,
         nli_threshold: float = 0.80,
         batch_size: int = 32,
+        protected_spans: ProtectedSpanIndex | None = None,
+        entity_extractor: EntityExtractor | None = None,
     ) -> None:
         self.detector = detector
         self.quality = quality
         self.semantic_threshold = semantic_threshold
         self.nli_threshold = nli_threshold
         self.batch_size = batch_size
+        self.protected_spans = protected_spans
+        self.entity_extractor = entity_extractor
+        if (protected_spans is None) != (entity_extractor is None):
+            raise ValueError(
+                "Protected-span evaluation requires both an index and an entity extractor"
+            )
 
     def run(
         self,
@@ -195,6 +205,21 @@ class CandidateEvaluationRunner:
             "detector": self.detector.metadata,
             "semantic_threshold": self.semantic_threshold,
             "nli_threshold": self.nli_threshold,
+            "protected_spans": (
+                self.protected_spans.metadata
+                if self.protected_spans is not None
+                else None
+            ),
+            "entity_extractor": (
+                self.entity_extractor.metadata
+                if self.entity_extractor is not None
+                else None
+            ),
+            "deterministic_quality_contract": (
+                "gliner-source-manifest-and-source-aware-candidate-diff-v1"
+                if self.protected_spans is not None
+                else "legacy-candidate-artifact-v1"
+            ),
         }
         manifest_path = output_path.with_suffix(".manifest.json")
         if resume and output_path.exists():
@@ -230,7 +255,23 @@ class CandidateEvaluationRunner:
                     candidate["algorithm"], candidate["candidate_text"]
                 )
                 threshold = float(generation["calibrated_threshold_1pct"])
-                deterministic_pass = bool(candidate["deterministic_quality"]["passes"])
+                if self.protected_spans is not None:
+                    protected_record = self.protected_spans.get(
+                        candidate["original_text"], candidate["language"]
+                    )
+                    candidate_entities = self.entity_extractor.extract(
+                        candidate["candidate_text"], candidate["language"]
+                    )
+                    deterministic = deterministic_quality(
+                        candidate["original_text"],
+                        candidate["candidate_text"],
+                        candidate["language"],
+                        protected_record=protected_record,
+                        candidate_entities=candidate_entities,
+                    ).to_dict()
+                else:
+                    deterministic = candidate["deterministic_quality"]
+                deterministic_pass = bool(deterministic["passes"])
                 quality_pass = (
                     deterministic_pass
                     and quality.semantic_similarity >= self.semantic_threshold
@@ -274,6 +315,13 @@ class CandidateEvaluationRunner:
                     ),
                     "bidirectional_entailment": quality.bidirectional_entailment,
                     "deterministic_quality_pass": deterministic_pass,
+                    "deterministic_quality": deterministic,
+                    "deterministic_failure_reasons": deterministic.get(
+                        "failure_reasons", []
+                    ),
+                    "introduced_entities": deterministic.get(
+                        "introduced_entities", []
+                    ),
                     "quality_pass": quality_pass,
                 }
                 completed[row["candidate_key"]] = row
@@ -295,6 +343,14 @@ class CandidateEvaluationRunner:
                 bool(row["target_detected"]) for row in ordered
             ),
             "quality": self.quality.metadata,
+            "quality_profile": (
+                "gliner-v1" if self.protected_spans is not None else "legacy-v1"
+            ),
+            "deterministic_failure_reasons": _counts(
+                reason
+                for row in ordered
+                for reason in row.get("deterministic_failure_reasons", [])
+            ),
         }
 
 

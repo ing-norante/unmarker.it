@@ -27,6 +27,9 @@ class DeterministicQuality:
     passes: bool
     expected: dict[str, list[str]]
     actual: dict[str, list[str]]
+    failure_reasons: tuple[str, ...] = ()
+    introduced_entities: tuple[dict[str, Any], ...] = ()
+    protected_text_sha256: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -47,8 +50,35 @@ def extract_protected(text: str, language: str) -> dict[str, list[str]]:
 
 
 def deterministic_quality(
-    original: str, candidate: str, language: str
+    original: str,
+    candidate: str,
+    language: str,
+    protected_record: Any | None = None,
+    candidate_entities: Any | None = None,
 ) -> DeterministicQuality:
+    if protected_record is not None:
+        from .protected_spans import validate_record
+
+        payload = validate_record(
+            protected_record,
+            candidate,
+            candidate_entities,
+            original_text=original,
+        )
+        return DeterministicQuality(
+            entities_preserved=bool(payload["entities_preserved"]),
+            numbers_preserved=bool(payload["numbers_preserved"]),
+            urls_preserved=bool(payload["urls_preserved"]),
+            emails_preserved=bool(payload["emails_preserved"]),
+            quotations_preserved=bool(payload["quotations_preserved"]),
+            negations_preserved=bool(payload["negations_preserved"]),
+            passes=bool(payload["passes"]),
+            expected=payload["expected"],
+            actual=payload["actual"],
+            failure_reasons=tuple(payload["failure_reasons"]),
+            introduced_entities=tuple(payload["introduced_entities"]),
+            protected_text_sha256=payload["protected_text_sha256"],
+        )
     expected = extract_protected(original, language)
     actual = extract_protected(candidate, language)
 
@@ -68,6 +98,11 @@ def deterministic_quality(
         passes=all(checks.values()),
         expected=expected,
         actual=actual,
+        failure_reasons=tuple(
+            name.removesuffix("_preserved")
+            for name, passed in checks.items()
+            if not passed
+        ),
     )
 
 

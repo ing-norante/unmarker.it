@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -34,6 +35,7 @@ image = (
         "scikit-learn==1.9.0",
         "tqdm==4.70.0",
         "accelerate==1.12.0",
+        "gliner==0.2.24",
     )
     .run_commands(
         f"git clone https://github.com/THU-BPM/MarkLLM.git {REMOTE_MARKLLM_ROOT}",
@@ -72,6 +74,7 @@ def generate_corpus(
     prompts_jsonl: str,
     allow_small_smoke: bool = False,
     algorithms: tuple[str, ...] = ("KGW", "Unigram", "SynthID", "EXP"),
+    evidence_profile: str = "formal",
 ) -> dict:
     from unmarker_text_bench.markllm_backend import OfficialMarkLLMBackend
     from unmarker_text_bench.markllm_gate import (
@@ -106,6 +109,12 @@ def generate_corpus(
         if "EXP" in algorithms
         else None,
     )
+    if evidence_profile == "gate2b_exp_pilot":
+        minimum_calibration = 100
+        minimum_evaluation = 50
+    else:
+        minimum_calibration = 100
+        minimum_evaluation = 100
     runner = MarkLLMGateRunner(
         load_prompts(prompts_path),
         backend,
@@ -113,6 +122,11 @@ def generate_corpus(
             algorithms=algorithms,
             min_generated_tokens=80,
             allow_small_smoke=allow_small_smoke,
+            min_calibration_prompts_per_language=minimum_calibration,
+            min_evaluation_prompts_per_language=minimum_evaluation,
+            evidence_profile=(
+                "integration_smoke" if allow_small_smoke else evidence_profile
+            ),
         ),
     )
     summary = runner.run(
@@ -165,8 +179,86 @@ def score_corpus(run_id: str) -> dict:
     retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
     volumes=volumes,
 )
-def evaluate_candidates(run_id: str) -> dict:
+def protect_sources(
+    run_id: str,
+    thresholds: dict[str, float],
+    threshold_provenance: dict | None = None,
+) -> dict:
+    from unmarker_text_bench.protected_spans import (
+        GlinerEntityExtractor,
+        ProtectedSpanManifestRunner,
+    )
+
+    run_dir = _remote_run_dir(run_id)
+    generations = run_dir / "corpus" / "generations.jsonl"
+    if not generations.exists():
+        raise FileNotFoundError("Generate the MarkLLM corpus before extracting entities")
+    extractor = GlinerEntityExtractor(thresholds=thresholds, device="cuda")
+    output = run_dir / "protection" / "gliner-v1" / "protected-spans.jsonl"
+    manifest = ProtectedSpanManifestRunner(extractor).run(
+        generations,
+        output,
+        threshold_provenance=threshold_provenance,
+    )
+    run_volume.commit()
+    hf_cache.commit()
+    return manifest
+
+
+@app.function(
+    image=image,
+    gpu="L40S",
+    timeout=86_400,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes=volumes,
+)
+def draft_ner_gold(
+    run_id: str,
+    samples_per_language: int = 50,
+    private_source_jsonl: str = "",
+) -> dict:
+    from unmarker_text_bench.ner_gold import NerGoldDraftRunner
+    from unmarker_text_bench.protected_spans import GlinerEntityExtractor
+
+    run_dir = _remote_run_dir(run_id)
+    generations = run_dir / "corpus" / "generations.jsonl"
+    if not generations.exists() and not private_source_jsonl:
+        raise FileNotFoundError("Generate the MarkLLM corpus before drafting NER gold")
+    extractor = GlinerEntityExtractor(
+        thresholds={"en": 0.30, "it": 0.30}, device="cuda"
+    )
+    output = run_dir / "protection" / "gold" / "ner-gold.pending.jsonl"
+    runner = NerGoldDraftRunner(extractor, samples_per_language)
+    if private_source_jsonl:
+        source_path = run_dir / "protection" / "gold" / "private-source.jsonl"
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.write_text(private_source_jsonl, encoding="utf-8")
+        manifest = runner.run_source(source_path, output)
+    else:
+        manifest = runner.run(generations, output)
+    run_volume.commit()
+    hf_cache.commit()
+    return manifest
+
+
+@app.function(
+    image=image,
+    gpu="L40S",
+    timeout=86_400,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes=volumes,
+)
+def evaluate_candidates(
+    run_id: str,
+    quality_profile: str = "legacy-v1",
+    evaluation_label: str = "",
+    require_human_approved_ner: bool = False,
+) -> dict:
     from unmarker_text_bench.markllm_backend import OfficialMarkLLMDetectorBackend
+    from unmarker_text_bench.protected_spans import (
+        GlinerEntityExtractor,
+        ProtectedSpanIndex,
+    )
     from unmarker_text_bench.remote_evaluation import (
         CandidateEvaluationRunner,
         NeuralQualityEvaluator,
@@ -206,10 +298,40 @@ def evaluate_candidates(run_id: str) -> dict:
         device="cuda",
         batch_size=32,
     )
-    summary = CandidateEvaluationRunner(detector, quality).run(
+    protected_spans = None
+    entity_extractor = None
+    if quality_profile == "gliner-v1":
+        protected_path = (
+            run_dir / "protection" / "gliner-v1" / "protected-spans.jsonl"
+        )
+        if not protected_path.exists():
+            raise FileNotFoundError(
+                "Run the Modal protect stage before gliner-v1 evaluation"
+            )
+        protected_spans = ProtectedSpanIndex.load(protected_path)
+        if require_human_approved_ner and not protected_spans.metadata.get(
+            "threshold_provenance", {}
+        ).get("human_approved"):
+            raise ValueError(
+                "This evidence profile requires human-approved GLiNER thresholds"
+            )
+        thresholds = protected_spans.metadata.get("extractor", {}).get("thresholds")
+        if not thresholds:
+            raise ValueError("Protected-span manifest has no GLiNER thresholds")
+        entity_extractor = GlinerEntityExtractor(thresholds=thresholds, device="cuda")
+    elif quality_profile != "legacy-v1":
+        raise ValueError("quality_profile must be legacy-v1 or gliner-v1")
+    resolved_label = evaluation_label or quality_profile
+    _validate_artifact_label(resolved_label)
+    summary = CandidateEvaluationRunner(
+        detector,
+        quality,
+        protected_spans=protected_spans,
+        entity_extractor=entity_extractor,
+    ).run(
         generations,
         candidates,
-        run_dir / "evaluation" / "candidate-evaluations.jsonl",
+        run_dir / "evaluation" / resolved_label / "candidate-evaluations.jsonl",
         resume=True,
         checkpoint=run_volume.commit,
     )
@@ -228,14 +350,27 @@ def main(
     allow_small_smoke: bool = False,
     algorithms: str = "KGW,Unigram,SynthID,EXP",
     prompts_per_cell: int = 0,
+    calibration_prompts_per_language: int = 0,
+    evaluation_prompts_per_language: int = 0,
+    quality_profile: str = "legacy-v1",
+    gliner_thresholds: str = "",
+    gold_set: str = "",
+    gold_samples_per_language: int = 50,
+    evaluation_label: str = "",
+    evidence_profile: str = "formal",
+    gold_source: str = "",
 ) -> None:
-    """Run `prepare`, `evaluate`, or `download` from a Modal-authenticated machine."""
+    """Run a benchmark stage from a Modal-authenticated machine."""
 
     _validate_run_id(run_id)
     output_dir = (
         Path(output) if output else PROJECT_ROOT / "results" / f"modal-{run_id}"
     )
     output_dir.mkdir(parents=True, exist_ok=True)
+    if evidence_profile not in {"formal", "gate2b_exp_pilot"}:
+        raise ValueError("evidence_profile must be formal or gate2b_exp_pilot")
+    if stage in {"evaluate", "download"}:
+        _validate_artifact_label(evaluation_label or quality_profile)
     if stage == "prepare":
         selected_algorithms = tuple(
             value.strip() for value in algorithms.split(",") if value.strip()
@@ -243,6 +378,12 @@ def main(
         if not selected_algorithms:
             raise ValueError("--algorithms must contain at least one MarkLLM algorithm")
         prompt_text = Path(prompts).read_text(encoding="utf-8")
+        if prompts_per_cell and (
+            calibration_prompts_per_language or evaluation_prompts_per_language
+        ):
+            raise ValueError(
+                "Use --prompts-per-cell or the two split-specific limits, not both"
+            )
         if prompts_per_cell:
             if prompts_per_cell < 1:
                 raise ValueError("--prompts-per-cell must be at least 1")
@@ -252,6 +393,32 @@ def main(
                     "--allow-small-smoke"
                 )
             prompt_text = _limit_prompts_per_cell(prompt_text, prompts_per_cell)
+        elif calibration_prompts_per_language or evaluation_prompts_per_language:
+            if not (
+                calibration_prompts_per_language > 0
+                and evaluation_prompts_per_language > 0
+            ):
+                raise ValueError(
+                    "Both split-specific prompt limits must be positive"
+                )
+            prompt_text = _limit_prompts_by_split(
+                prompt_text,
+                calibration_prompts_per_language,
+                evaluation_prompts_per_language,
+            )
+        if evidence_profile == "gate2b_exp_pilot":
+            if selected_algorithms != ("EXP",):
+                raise ValueError("gate2b_exp_pilot requires --algorithms EXP")
+            if (
+                calibration_prompts_per_language != 100
+                or evaluation_prompts_per_language != 50
+            ):
+                raise ValueError(
+                    "gate2b_exp_pilot requires 100 calibration and 50 evaluation "
+                    "prompts per language"
+                )
+            if allow_small_smoke:
+                raise ValueError("gate2b_exp_pilot is not an integration smoke")
         print(
             json.dumps(
                 generate_corpus.remote(
@@ -259,32 +426,91 @@ def main(
                     prompt_text,
                     allow_small_smoke,
                     selected_algorithms,
+                    evidence_profile,
                 ),
                 indent=2,
             )
         )
         print(json.dumps(score_corpus.remote(run_id), indent=2))
         _download_prepare_artifacts(run_id, output_dir)
+    elif stage == "protect":
+        thresholds, provenance = _load_gliner_thresholds(gliner_thresholds)
+        if evidence_profile == "gate2b_exp_pilot" and not provenance.get(
+            "human_approved"
+        ):
+            raise ValueError(
+                "gate2b_exp_pilot requires human-approved GLiNER thresholds"
+            )
+        print(
+            json.dumps(
+                protect_sources.remote(run_id, thresholds, provenance), indent=2
+            )
+        )
+        _download_protection_artifacts(run_id, output_dir)
+    elif stage == "ner-draft":
+        private_source_jsonl = (
+            Path(gold_source).read_text(encoding="utf-8") if gold_source else ""
+        )
+        print(
+            json.dumps(
+                draft_ner_gold.remote(
+                    run_id,
+                    gold_samples_per_language,
+                    private_source_jsonl,
+                ),
+                indent=2,
+            )
+        )
+        _download_ner_gold_artifacts(run_id, output_dir)
+    elif stage == "ner-calibrate":
+        if not gold_set:
+            raise ValueError("--gold-set is required for ner-calibrate")
+        from unmarker_text_bench.ner_gold import NerThresholdCalibrator
+
+        payload = NerThresholdCalibrator().run(
+            Path(gold_set), output_dir / "gliner-thresholds.json"
+        )
+        print(json.dumps(payload, indent=2))
     elif stage == "evaluate":
         if not candidates:
             raise ValueError("--candidates is required for the evaluate stage")
         with run_volume.batch_upload(force=True) as upload:
             upload.put_file(candidates, f"/{run_id}/attacks/evaluation-inputs.jsonl")
-        print(json.dumps(evaluate_candidates.remote(run_id), indent=2))
+        print(
+            json.dumps(
+                evaluate_candidates.remote(
+                    run_id,
+                    quality_profile,
+                    evaluation_label,
+                    evidence_profile == "gate2b_exp_pilot",
+                ),
+                indent=2,
+            )
+        )
+        resolved_label = evaluation_label or quality_profile
+        _validate_artifact_label(resolved_label)
+        evaluation_root = f"/{run_id}/evaluation/{resolved_label}"
         _download_file(
-            f"/{run_id}/evaluation/candidate-evaluations.jsonl",
+            f"{evaluation_root}/candidate-evaluations.jsonl",
             output_dir / "candidate-evaluations.jsonl",
         )
         _download_file(
-            f"/{run_id}/evaluation/candidate-evaluations.manifest.json",
+            f"{evaluation_root}/candidate-evaluations.manifest.json",
             output_dir / "candidate-evaluations.manifest.json",
         )
     elif stage == "download":
         _download_prepare_artifacts(run_id, output_dir)
+        try:
+            _download_protection_artifacts(run_id, output_dir)
+        except FileNotFoundError:
+            pass
         for remote_name, local_name in (
-            ("evaluation/candidate-evaluations.jsonl", "candidate-evaluations.jsonl"),
             (
-                "evaluation/candidate-evaluations.manifest.json",
+                f"evaluation/{evaluation_label or quality_profile}/candidate-evaluations.jsonl",
+                "candidate-evaluations.jsonl",
+            ),
+            (
+                f"evaluation/{evaluation_label or quality_profile}/candidate-evaluations.manifest.json",
                 "candidate-evaluations.manifest.json",
             ),
         ):
@@ -293,7 +519,10 @@ def main(
             except FileNotFoundError:
                 pass
     else:
-        raise ValueError("stage must be one of: prepare, evaluate, download")
+        raise ValueError(
+            "stage must be one of: prepare, ner-draft, ner-calibrate, protect, "
+            "evaluate, download"
+        )
     print(f"Artifacts downloaded to {output_dir.resolve()}")
 
 
@@ -307,6 +536,11 @@ def _validate_run_id(run_id: str) -> None:
         raise ValueError("run_id must be 1-80 safe filename characters")
 
 
+def _validate_artifact_label(label: str) -> None:
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}", label):
+        raise ValueError("evaluation_label must be 1-80 safe filename characters")
+
+
 def _download_prepare_artifacts(run_id: str, output_dir: Path) -> None:
     for remote_name, local_name in (
         ("corpus/generations.jsonl", "generations.jsonl"),
@@ -315,6 +549,28 @@ def _download_prepare_artifacts(run_id: str, output_dir: Path) -> None:
         ("corpus/input-manifest.json", "corpus-input-manifest.json"),
         ("scores/token-scores.jsonl", "token-scores.jsonl"),
         ("scores/token-scores.manifest.json", "token-scores.manifest.json"),
+    ):
+        _download_file(f"/{run_id}/{remote_name}", output_dir / local_name)
+
+
+def _download_protection_artifacts(run_id: str, output_dir: Path) -> None:
+    for remote_name, local_name in (
+        ("protection/gliner-v1/protected-spans.jsonl", "protected-spans.jsonl"),
+        (
+            "protection/gliner-v1/protected-spans.manifest.json",
+            "protected-spans.manifest.json",
+        ),
+    ):
+        _download_file(f"/{run_id}/{remote_name}", output_dir / local_name)
+
+
+def _download_ner_gold_artifacts(run_id: str, output_dir: Path) -> None:
+    for remote_name, local_name in (
+        ("protection/gold/ner-gold.pending.jsonl", "ner-gold.pending.jsonl"),
+        (
+            "protection/gold/ner-gold.pending.manifest.json",
+            "ner-gold.pending.manifest.json",
+        ),
     ):
         _download_file(f"/{run_id}/{remote_name}", output_dir / local_name)
 
@@ -361,3 +617,60 @@ def _limit_prompts_per_cell(prompts_jsonl: str, limit: int) -> str:
     if missing:
         raise ValueError(f"Prompt subset is missing language/split cells: {missing}")
     return "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in selected)
+
+
+def _limit_prompts_by_split(
+    prompts_jsonl: str,
+    calibration_limit: int,
+    evaluation_limit: int,
+) -> str:
+    limits = {"calibration": calibration_limit, "evaluation": evaluation_limit}
+    counts: dict[tuple[str, str], int] = {}
+    selected = []
+    for line_number, line in enumerate(prompts_jsonl.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            cell = (str(row["language"]), str(row["split"]))
+        except (json.JSONDecodeError, KeyError) as error:
+            raise ValueError(f"Invalid prompt JSONL at line {line_number}") from error
+        if cell[1] not in limits or counts.get(cell, 0) >= limits[cell[1]]:
+            continue
+        selected.append(row)
+        counts[cell] = counts.get(cell, 0) + 1
+    required = {
+        (language, split): limits[split]
+        for language in ("en", "it")
+        for split in ("calibration", "evaluation")
+    }
+    incomplete = {
+        str(cell): {"expected": count, "actual": counts.get(cell, 0)}
+        for cell, count in required.items()
+        if counts.get(cell, 0) != count
+    }
+    if incomplete:
+        raise ValueError(f"Prompt subset is incomplete: {incomplete}")
+    return "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in selected)
+
+
+def _load_gliner_thresholds(path: str) -> tuple[dict[str, float], dict]:
+    if not path:
+        return (
+            {"en": 0.5, "it": 0.5},
+            {"human_approved": False, "status": "uncalibrated_default"},
+        )
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    thresholds = payload.get("thresholds", payload)
+    if set(thresholds) != {"en", "it"}:
+        raise ValueError("GLiNER thresholds must contain exactly en and it")
+    provenance = {
+        "human_approved": bool(payload.get("human_approved", False)),
+        "status": str(payload.get("status", "external_threshold_file")),
+        "threshold_file_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+        "reviewed_gold_sha256": payload.get("reviewed_gold_sha256"),
+    }
+    return (
+        {language: float(value) for language, value in thresholds.items()},
+        provenance,
+    )

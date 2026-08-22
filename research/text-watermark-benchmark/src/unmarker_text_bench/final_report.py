@@ -11,7 +11,8 @@ from typing import Any
 
 
 class FinalReportRunner:
-    ARTIFACT_SCHEMA_VERSION = 2
+    ARTIFACT_SCHEMA_VERSION = 3
+    SURROGATE_PRECISION_FLOOR = 0.80
 
     def run(
         self,
@@ -20,6 +21,7 @@ class FinalReportRunner:
         api_calls_path: Path,
         output_dir: Path,
         baselines_path: Path | None = None,
+        judge_evaluations_path: Path | None = None,
     ) -> dict[str, Any]:
         output_dir.mkdir(parents=True, exist_ok=True)
         candidates = _read_jsonl(candidates_path)
@@ -49,6 +51,7 @@ class FinalReportRunner:
         held_out = [row for row in rows if row["attack_split"] == "held_out_test"]
         fixed = self._fixed_budget_metrics(held_out, calls)
         selected = self._select_progressive(held_out, surrogate)
+        judge_summary = self._judge_summary(selected, judge_evaluations_path)
         progressive = self._progressive_metrics(selected, calls, held_out)
         held_out_baselines = [
             row for row in baseline_rows if row["attack_split"] == "held_out_test"
@@ -81,6 +84,7 @@ class FinalReportRunner:
             "surrogate": surrogate,
             "fixed_budget_cells": fixed,
             "progressive_cells": progressive,
+            "llm_quality_prescreen": judge_summary,
             "adaptive_oracle": {
                 "role": "target-detector adaptive upper-bound baseline, not a candidate algorithm",
                 "selection_uses_target_detector": True,
@@ -139,6 +143,46 @@ class FinalReportRunner:
             self._render_markdown(summary), encoding="utf-8"
         )
         return summary
+
+    @staticmethod
+    def _judge_summary(
+        selected: list[dict[str, Any]], judge_path: Path | None
+    ) -> dict[str, Any]:
+        if judge_path is None:
+            return {
+                "status": "pending",
+                "role": "quality pre-screen only; never an attack-success oracle",
+            }
+        judgments = _read_jsonl(judge_path)
+        by_key = {row["candidate_key"]: row for row in judgments}
+        missing = [
+            row["candidate_key"]
+            for row in selected
+            if row["candidate_key"] not in by_key
+        ]
+        if missing:
+            raise ValueError(
+                f"Missing LLM judgments for {len(missing)} progressive selections"
+            )
+        joined = [
+            {**row, **by_key[row["candidate_key"]]}
+            for row in selected
+        ]
+        return {
+            "status": "complete",
+            "role": "quality pre-screen only; never an attack-success oracle",
+            "candidates": len(joined),
+            "pass_rate": _mean(row["llm_screen_pass"] for row in joined),
+            "material_error_rate": _mean(row["material_error"] for row in joined),
+            "deterministic_llm_disagreements": sum(
+                bool(row["quality_pass"]) != bool(row["llm_screen_pass"])
+                for row in joined
+            ),
+            "mean_fluency": mean(float(row["fluency_score"]) for row in joined),
+            "mean_naturalness": mean(
+                float(row["naturalness_score"]) for row in joined
+            ),
+        }
 
     def _select_oracle(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -269,12 +313,12 @@ class FinalReportRunner:
         }
 
     def _fit_surrogate(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
-        groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
+        groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
         for row in rows:
             if row["attack_split"] == "development":
-                groups[(row["pipeline"], row["algorithm"], row["language"])].append(row)
+                groups[(row["algorithm"], row["language"])].append(row)
         cells = []
-        for (pipeline, algorithm, language), items in sorted(groups.items()):
+        for (algorithm, language), items in sorted(groups.items()):
             eligible = [row for row in items if row["preattack_detected"]]
             thresholds = sorted(
                 {float(row["self_information_retention"]) for row in eligible}
@@ -307,35 +351,58 @@ class FinalReportRunner:
                 scored.append(
                     (f1, precision, recall, -threshold, threshold, tp, fp, tn, fn)
                 )
-            best = max(scored)
+            admissible = [
+                value
+                for value in scored
+                if value[5] + value[6] > 0
+                and value[1] >= self.SURROGATE_PRECISION_FLOOR
+            ]
+            best = max(
+                admissible,
+                key=lambda value: (value[2], value[0], value[1], value[3]),
+            ) if admissible else None
             cells.append(
                 {
-                    "pipeline": pipeline,
                     "algorithm": algorithm,
                     "language": language,
+                    "scope": "shared_across_candidate_pipelines",
+                    "pipelines": sorted({row["pipeline"] for row in items}),
                     "feature": "self_information_retention",
                     "pass_rule": "all quality gates pass and retention <= threshold",
-                    "threshold": best[4],
+                    "precision_floor": self.SURROGATE_PRECISION_FLOOR,
+                    "enabled": best is not None,
+                    "disabled_reason": (
+                        None
+                        if best is not None
+                        else "no development threshold met the precision floor"
+                    ),
+                    "threshold": best[4] if best is not None else None,
                     "development_candidates": len(items),
                     "development_initially_detected_candidates": len(eligible),
                     "development_evasion_prevalence": _mean(
                         not row["target_detected"] for row in eligible
                     ),
-                    "development_precision": best[1],
-                    "development_recall": best[2],
-                    "development_f1": best[0],
-                    "confusion": {
-                        "tp": best[5],
-                        "fp": best[6],
-                        "tn": best[7],
-                        "fn": best[8],
-                    },
+                    "development_precision": best[1] if best is not None else None,
+                    "development_recall": best[2] if best is not None else None,
+                    "development_f1": best[0] if best is not None else None,
+                    "confusion": (
+                        {
+                            "tp": best[5],
+                            "fp": best[6],
+                            "tn": best[7],
+                            "fn": best[8],
+                        }
+                        if best is not None
+                        else None
+                    ),
                 }
             )
         return {
             "fit_split": "development",
             "evaluation_split": "held_out_test",
             "target_label_used_for_fit_only": True,
+            "grouping": "one threshold per algorithm and language, shared by all pipelines",
+            "precision_floor": self.SURROGATE_PRECISION_FLOOR,
             "cells": cells,
         }
 
@@ -362,7 +429,7 @@ class FinalReportRunner:
         surrogate: dict[str, Any],
     ) -> list[dict[str, Any]]:
         thresholds = {
-            (cell["pipeline"], cell["algorithm"], cell["language"]): cell["threshold"]
+            (cell["algorithm"], cell["language"]): cell["threshold"]
             for cell in surrogate["cells"]
         }
         groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -371,7 +438,7 @@ class FinalReportRunner:
         selected = []
         for (_, pipeline), items in sorted(groups.items()):
             ordered = sorted(items, key=lambda row: float(row["budget_ratio"]))
-            key = (pipeline, ordered[0]["algorithm"], ordered[0]["language"])
+            key = (ordered[0]["algorithm"], ordered[0]["language"])
             threshold = thresholds[key]
             chosen = ordered[-1]
             stopped_on_pass = False
@@ -379,7 +446,8 @@ class FinalReportRunner:
             for row in ordered:
                 attempted.append(row["candidate_key"])
                 surrogate_pass = (
-                    bool(row["quality_pass"])
+                    threshold is not None
+                    and bool(row["quality_pass"])
                     and float(row["self_information_retention"]) <= threshold
                 )
                 if surrogate_pass:

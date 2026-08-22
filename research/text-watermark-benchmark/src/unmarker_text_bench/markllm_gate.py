@@ -50,6 +50,7 @@ class Gate2Config:
     min_generated_tokens: int = 80
     seed: int = 20260819
     allow_small_smoke: bool = False
+    evidence_profile: str = "formal"
 
 
 def load_prompts(path: Path) -> list[PromptSample]:
@@ -79,7 +80,7 @@ def load_prompts(path: Path) -> list[PromptSample]:
 
 
 class MarkLLMGateRunner:
-    ARTIFACT_SCHEMA_VERSION = 2
+    ARTIFACT_SCHEMA_VERSION = 3
 
     def __init__(
         self,
@@ -95,6 +96,17 @@ class MarkLLMGateRunner:
     def _validate_prompts(self) -> None:
         if not self.config.algorithms:
             raise ValueError("At least one MarkLLM algorithm is required")
+        if self.config.evidence_profile not in {
+            "formal",
+            "gate2b_exp_pilot",
+            "integration_smoke",
+        }:
+            raise ValueError("Unsupported evidence_profile")
+        if (
+            self.config.evidence_profile == "gate2b_exp_pilot"
+            and self.config.algorithms != ("EXP",)
+        ):
+            raise ValueError("gate2b_exp_pilot is restricted to official EXP")
         if not 0.0 < self.config.target_fpr < 1.0:
             raise ValueError("target_fpr must be between 0 and 1")
 
@@ -438,7 +450,12 @@ class MarkLLMGateRunner:
         )
         return {
             "benchmark_scope": "official_markllm_generation_and_detection",
-            "evidence_status": "gate_2_corpus_baseline_only_no_attack_claim",
+            "evidence_status": (
+                "integration_smoke_no_statistical_claim"
+                if self.config.allow_small_smoke
+                else "gate_2_corpus_baseline_only_no_attack_claim"
+            ),
+            "evidence_profile": self.config.evidence_profile,
             "target_fpr": self.config.target_fpr,
             "source_prompt_count": len(self.prompts),
             "source_prompts_by_language": dict(sorted(language_counts.items())),

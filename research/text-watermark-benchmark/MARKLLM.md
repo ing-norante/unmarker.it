@@ -23,7 +23,13 @@ Pinned components:
 - semantic model: `paraphrase-multilingual-mpnet-base-v2` at
   `4328cf26390c98c5e3c738b4460a05b95f4911f5`;
 - multilingual NLI model: `mDeBERTa-v3-base-mnli-xnli` at
-  `8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c`.
+  `8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c`;
+- entity model: `urchade/gliner_multi-v2.1` at
+  `443d26d654e0324125a96bebd8e796c14ff2efe6`, served with
+  `gliner==0.2.24`;
+- blinded quality judge: `openai/gpt-5.6-terra` through the OpenAI route on
+  OpenRouter, with medium reasoning, deterministic seeds, and strict
+  structured output.
 
 The Modal image also pins Python dependencies. Every resumable stage stores an
 input manifest and refuses to combine artifacts whose input hashes or model
@@ -74,12 +80,12 @@ algorithm/language cell.
 
 All four attacks are generated at 15%, 35%, and 65% budgets. This produces an
 uncensored fixed-budget grid. Evaluation source prompts are then divided into
-a deterministic 25% development split and a 75% held-out split. Development
-data fits a scalar attack-time surrogate based on weighted self-information
-retention. The progressive policy is identical for every pipeline: try the
-three budgets in order and stop at the first candidate that passes the
-surrogate and all quality gates. Target MarkLLM decisions from held-out prompts
-never participate in selection.
+a deterministic development split and a held-out split. Development data fits
+a scalar attack-time surrogate based on weighted self-information retention.
+One threshold is fitted per watermark algorithm/language and shared by every
+rewrite pipeline. It is enabled only if development precision reaches 0.80;
+otherwise every pipeline evaluates all three budgets. Target MarkLLM decisions
+from held-out prompts never participate in selection.
 
 Two diagnostic controls are generated separately from that grid:
 
@@ -96,10 +102,18 @@ text and the full action audit are stored together; NFKC is off.
 
 Quality requires all of the following:
 
-- exact multiset preservation of extracted entities, numbers, URLs, email
-  addresses, quotations, and negations;
+- exact multiset preservation of GLiNER-manifested entities plus deterministic
+  numbers, URLs, email addresses, quotations, and negations;
 - multilingual sentence similarity of at least 0.90;
 - bidirectional multilingual NLI entailment of at least 0.80.
+
+GLiNER runs once on every source before rewriting and its versioned manifest is
+used both in constrained prompts and validation. Modal extracts candidate
+entities again. A candidate-only entity surface is a hard failure only when
+that surface does not occur in the original text; this avoids treating
+context-dependent span segmentation as a new fact. Language-specific
+thresholds must come from an explicitly human-approved 50-English/50-Italian
+gold set. An automatically generated draft is never labeled as approved.
 
 `human-review.csv` is produced with blank blinded rating fields. Human
 evaluation remains required before promotion.
@@ -110,7 +124,7 @@ From `research/text-watermark-benchmark`:
 
 ```bash
 uv venv --python 3.11
-uv pip install -e '.[remote,modal]'
+uv pip install -e '.[remote,modal,ner]'
 modal setup
 ```
 
@@ -122,7 +136,146 @@ The OpenRouter stage reads `OPENROUTER_API_KEY`. It can be set in the shell or
 loaded from a named env file with `--env-file`; the value is never written to
 an artifact or printed. Do not commit that env file.
 
-## 1. Generate and score on Modal
+## Gate 2b pilot: exact execution order
+
+Gate 2b uses only official EXP. It has 100 clean calibration and 50 evaluation
+prompts per language; the attack stage assigns exactly 20 evaluation prompts
+to development and 30 to held-out testing. With four pipelines, three budgets,
+the three-attempt adaptive oracle, re-stamp control, and BIRA calibration, its
+theoretical minimum is 1,720 OpenRouter rewrite calls. This is a pilot, not the
+formal 1,000/50/100 design.
+
+### 1. Generate and score on Modal
+
+```bash
+uv run --extra modal modal run modal_pipeline.py \
+  --stage prepare \
+  --run-id gate2b-exp-pilot-v1 \
+  --prompts datasets/markllm-wikipedia-v1.jsonl \
+  --algorithms EXP \
+  --calibration-prompts-per-language 100 \
+  --evaluation-prompts-per-language 50 \
+  --evidence-profile gate2b_exp_pilot \
+  --output results/gate2b-exp-pilot-v1/modal-prepare
+```
+
+### 2. Create and approve the NER gold set
+
+Prepare a private, untracked JSONL with exactly 50 independent rows per
+language:
+
+```json
+{"id":"private-en-001","language":"en","text":"..."}
+{"id":"private-it-001","language":"it","text":"..."}
+```
+
+The text is uploaded to the configured Modal workspace and stored in its run
+Volume, so apply the project's privacy policy before using sensitive data.
+
+```bash
+uv run --extra modal modal run modal_pipeline.py \
+  --stage ner-draft \
+  --run-id gate2b-exp-pilot-v1 \
+  --gold-source /absolute/private/ner-source.jsonl \
+  --gold-samples-per-language 50 \
+  --output results/gate2b-exp-pilot-v1/ner-gold
+```
+
+Review every row in `ner-gold.pending.jsonl`: correct `human_entities`, set
+`review_status` to `approved`, and fill `reviewer`. Calibration rejects pending
+or anonymous rows. Keep the approved file private and untracked.
+
+```bash
+uv run --extra modal modal run modal_pipeline.py \
+  --stage ner-calibrate \
+  --run-id gate2b-exp-pilot-v1 \
+  --gold-set /absolute/private/ner-gold.approved.jsonl \
+  --output results/gate2b-exp-pilot-v1/ner-calibration
+```
+
+The English and Italian thresholds maximize exact-span F1, breaking ties by
+recall and then the lower threshold.
+
+### 3. Build source protection manifests on Modal
+
+```bash
+uv run --extra modal modal run modal_pipeline.py \
+  --stage protect \
+  --run-id gate2b-exp-pilot-v1 \
+  --evidence-profile gate2b_exp_pilot \
+  --gliner-thresholds results/gate2b-exp-pilot-v1/ner-calibration/gliner-thresholds.json \
+  --output results/gate2b-exp-pilot-v1/protection
+```
+
+### 4. Estimate and run the OpenRouter attack grid
+
+```bash
+uv run unmarker-remote-bench estimate \
+  --generations results/gate2b-exp-pilot-v1/modal-prepare/generations.jsonl
+
+uv run unmarker-remote-bench attack \
+  --profile gate2b-exp-pilot \
+  --generations results/gate2b-exp-pilot-v1/modal-prepare/generations.jsonl \
+  --scores results/gate2b-exp-pilot-v1/modal-prepare/token-scores.jsonl \
+  --protected-spans results/gate2b-exp-pilot-v1/protection/protected-spans.jsonl \
+  --output results/gate2b-exp-pilot-v1/attacks \
+  --env-file /absolute/path/to/private.env
+```
+
+The profile fixes EXP, the 20/30 split, `gliner-v1`, and four concurrent
+OpenRouter workers. Calls are checkpointed and de-duplicated across workers.
+
+### 5. Detect and validate on Modal
+
+```bash
+uv run --extra modal modal run modal_pipeline.py \
+  --stage evaluate \
+  --run-id gate2b-exp-pilot-v1 \
+  --candidates results/gate2b-exp-pilot-v1/attacks/evaluation-inputs.jsonl \
+  --evidence-profile gate2b_exp_pilot \
+  --quality-profile gliner-v1 \
+  --evaluation-label gate2b-gliner-v1 \
+  --output results/gate2b-exp-pilot-v1/modal-evaluation
+```
+
+### 6. Finalize, judge, and prepare the manual audit
+
+```bash
+uv run unmarker-remote-bench finalize \
+  --candidates results/gate2b-exp-pilot-v1/attacks/candidates.jsonl \
+  --baselines results/gate2b-exp-pilot-v1/attacks/baselines.jsonl \
+  --evaluations results/gate2b-exp-pilot-v1/modal-evaluation/candidate-evaluations.jsonl \
+  --api-calls results/gate2b-exp-pilot-v1/attacks/api-calls.jsonl \
+  --output results/gate2b-exp-pilot-v1/report
+
+uv run unmarker-remote-bench judge \
+  --selections results/gate2b-exp-pilot-v1/report/progressive-selections.jsonl \
+  --output results/gate2b-exp-pilot-v1/judge \
+  --env-file /absolute/path/to/private.env
+
+uv run unmarker-remote-bench finalize \
+  --candidates results/gate2b-exp-pilot-v1/attacks/candidates.jsonl \
+  --baselines results/gate2b-exp-pilot-v1/attacks/baselines.jsonl \
+  --evaluations results/gate2b-exp-pilot-v1/modal-evaluation/candidate-evaluations.jsonl \
+  --api-calls results/gate2b-exp-pilot-v1/attacks/api-calls.jsonl \
+  --judge-evaluations results/gate2b-exp-pilot-v1/judge/llm-judge.jsonl \
+  --output results/gate2b-exp-pilot-v1/report
+```
+
+The judge sees only language, source, and candidate. Its assessment is a
+quality pre-screen, never an evasion oracle. It writes a 48-row blinded manual
+audit: 24 stratified candidates plus up to 24 deterministic/judge
+disagreements, with deterministic fill if necessary. When there are at most 48
+progressive rows, every row is included. Complete `manual-audit.csv`; the judge
+does not replace human evaluation.
+
+Only after Gate 2b shows a useful signal should the formal profile expand to
+1,000 clean calibration, 50 development, and 100 held-out prompts per language
+and add the remaining watermark schemes and model families.
+
+## General and integration commands
+
+### 1. Generate and score on Modal
 
 ```bash
 .venv/bin/modal run modal_pipeline.py \
@@ -171,7 +324,7 @@ select four prompts from every language/split cell of the full dataset:
 This yields four calibration and four evaluation prompts per language, enough
 to test development/held-out artifact flow but not enough for evidence claims.
 
-## 2. Estimate OpenRouter calls
+### 2. Estimate OpenRouter calls
 
 ```bash
 .venv/bin/unmarker-remote-bench estimate \
@@ -184,7 +337,7 @@ With 200 evaluation prompts and four watermark schemes, the complete grid has
 shared clean re-stamp calls, and 20 clean beta-calibration calls. Adaptive BIRA
 retries can increase this. Always run the estimator and a bounded pilot first.
 
-## 3. Run a bounded OpenRouter pilot
+### 3. Run a bounded OpenRouter pilot
 
 ```bash
 .venv/bin/unmarker-remote-bench attack \
@@ -221,7 +374,7 @@ algorithms to `candidates.jsonl`, controls to `baselines.jsonl`, and their union
 to `evaluation-inputs.jsonl`. Reusing an output directory with different inputs
 or configuration is rejected.
 
-## 4. Detect and validate on Modal
+### 4. Detect and validate on Modal
 
 ```bash
 .venv/bin/modal run modal_pipeline.py \
@@ -235,7 +388,7 @@ This uploads candidate and control text, runs the pinned official MarkLLM
 detectors, and computes multilingual embedding and NLI quality. The result is
 `candidate-evaluations.jsonl`.
 
-## 5. Finalize held-out metrics
+### 5. Finalize held-out metrics
 
 ```bash
 .venv/bin/unmarker-remote-bench finalize \
@@ -275,6 +428,10 @@ The main files are:
   `candidates.jsonl`, `baselines.jsonl`, `evaluation-inputs.jsonl`, and
   `attack-summary.json`;
 - Modal evaluation: `candidate-evaluations.jsonl` and manifest;
+- GLiNER: pending/approved private gold, calibrated thresholds, and
+  `protected-spans.jsonl` plus manifest;
+- quality pre-screen: `llm-judge.jsonl`, summary, `manual-audit.csv`, and its
+  separate blind key;
 - finalization: `summary.json`, `REPORT.md`,
   `progressive-selections.jsonl`, `adaptive-oracle-selections.jsonl`,
   `human-review.csv`, and the separate blind key.
@@ -306,3 +463,22 @@ it in combination with speculative decoding, which is why it is not the
 default. The smoke has no held-out prompts and therefore produces no headline
 progressive result. These checks validate integration only; the tiny fixture
 has no statistical meaning.
+
+On 2026-08-22, the GLiNER Modal stage loaded the pinned multilingual model and
+created 24 protected-source records for the existing EXP end-to-end pilot. A
+fresh source-aware evaluation completed all 128 candidate/control rows. At the
+provisional, uncalibrated 0.5 threshold it produced a 50.0% complete
+quality-pass rate; detector TPR was 60.94%. Diagnostics found 55
+entity-preservation, 25 source-aware introduced-entity, 18 number, 15
+negation, and 10 quotation failures. These values validate integration and
+expose rewriter/NER failure modes; they are not algorithm evidence because the
+pilot has only four evaluation prompts per language and the GLiNER threshold
+was not calibrated on human gold.
+
+The pinned `openai/gpt-5.6-terra` judge also completed all 24 progressive rows
+through the OpenAI OpenRouter route. It passed 50.0%, marked 50.0% with a
+material error, and disagreed with the deterministic/neural quality decision
+on seven rows. Observed cost was $0.103768. The route supports strict structured
+output, seed, and medium reasoning but not `temperature`; the structured client
+therefore omits only that unsupported parameter and keeps provider fallbacks
+disabled. These judgments remain a pre-screen pending the 24-row manual audit.

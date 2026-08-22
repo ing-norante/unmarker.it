@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import median
@@ -10,10 +12,13 @@ from typing import Any, Protocol
 
 from .metrics import levenshtein
 from .openrouter_backend import RewriteResponse
+from .protected_spans import ProtectedSpanIndex, protected_prompt_fragment
 from .quality_checks import (
     deterministic_quality,
     distinct_unigram_ratio,
-    protected_prompt_fragment,
+)
+from .quality_checks import (
+    protected_prompt_fragment as legacy_protected_prompt_fragment,
 )
 from .self_information import (
     mask_selected_tokens,
@@ -75,7 +80,10 @@ class AttackConfig:
     position_spacing: int = 2
     max_logit_bias_token_ids: int = 300
     development_fraction: float = 0.25
+    development_prompts_per_language: int | None = None
     max_evaluation_prompts_per_language: int | None = None
+    quality_profile: str = "legacy-v1"
+    max_workers: int = 1
     enable_oracle_baseline: bool = True
     oracle_max_attempts: int = 3
     enable_restamp_control: bool = True
@@ -103,17 +111,19 @@ PAPER_PROVENANCE = {
 
 
 class AttackRunner:
-    ARTIFACT_SCHEMA_VERSION = 2
+    ARTIFACT_SCHEMA_VERSION = 3
 
     def __init__(
         self,
         rewriter: Rewriter,
         bias_tokenizer: BiasTokenizer,
         config: AttackConfig | None = None,
+        protected_spans: ProtectedSpanIndex | None = None,
     ) -> None:
         self.rewriter = rewriter
         self.bias_tokenizer = bias_tokenizer
         self.config = config or AttackConfig()
+        self.protected_spans = protected_spans
         self._validate_config()
 
     def run(
@@ -146,6 +156,9 @@ class AttackRunner:
 
         self.calls_path = calls_path
         self.calls = {row["call_key"]: row for row in _read_jsonl(calls_path)}
+        self._calls_lock = threading.Lock()
+        self._inflight_calls: dict[str, threading.Event] = {}
+        self._call_errors: dict[str, BaseException] = {}
         candidates = {
             row["candidate_key"]: row for row in _read_jsonl(raw_candidates_path)
         }
@@ -168,76 +181,28 @@ class AttackRunner:
         ]
         evaluation_rows = self._limit_evaluation_rows(evaluation_rows)
         attack_splits = self._attack_splits(evaluation_rows)
-        for generation in evaluation_rows:
-            score_key = (
-                f"{generation['sample_id']}|{generation['algorithm']}|watermarked"
+        candidate_keys = frozenset(candidates)
+        baseline_keys = frozenset(baselines)
+        worker_args = [
+            (
+                generation,
+                scores_by_key,
+                attack_splits[generation["sample_id"]],
+                beta,
+                candidate_keys,
+                baseline_keys,
             )
-            if score_key not in scores_by_key:
-                raise ValueError(f"Missing self-information scores: {score_key}")
-            token_scores = token_scores_from_row(scores_by_key[score_key])
-            case_key = f"{generation['sample_id']}|{generation['algorithm']}"
-            reference_call: dict[str, Any] | None = None
-            if "sira" in self.config.pipelines:
-                reference_call = self._call(
-                    call_key=f"{case_key}|sira|reference",
-                    stage="sira_reference",
-                    system_prompt=SYSTEM_PROMPT,
-                    user_prompt=self._reference_prompt(generation),
-                )
-
-            for pipeline in self.config.pipelines:
-                for budget_name, budget_ratio in self.config.budgets:
-                    candidate_key = f"{case_key}|{pipeline}|{budget_name}"
-                    if candidate_key in candidates:
-                        continue
-                    candidate = self._generate_candidate(
-                        candidate_key=candidate_key,
-                        generation=generation,
-                        token_scores=token_scores,
-                        pipeline=pipeline,
-                        budget_name=budget_name,
-                        budget_ratio=budget_ratio,
-                        attack_split=attack_splits[generation["sample_id"]],
-                        bira_beta=beta,
-                        sira_reference=reference_call,
-                    )
-                    candidates[candidate_key] = candidate
+            for generation in evaluation_rows
+        ]
+        with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
+            for generated_candidates, generated_baselines in executor.map(
+                lambda values: self._process_generation(*values), worker_args
+            ):
+                for candidate in generated_candidates:
+                    candidates[candidate["candidate_key"]] = candidate
                     _append_jsonl(raw_candidates_path, candidate)
-
-            if self.config.enable_oracle_baseline:
-                for attempt in range(1, self.config.oracle_max_attempts + 1):
-                    candidate_key = f"{case_key}|adaptive-oracle|attempt={attempt}"
-                    if candidate_key in baselines:
-                        continue
-                    baseline = self._generate_baseline(
-                        candidate_key=candidate_key,
-                        generation=generation,
-                        source_text=generation["watermarked_text"],
-                        pipeline="adaptive_oracle_paraphrase",
-                        artifact_kind="adaptive_oracle_attempt",
-                        source_kind="watermarked",
-                        attack_split=attack_splits[generation["sample_id"]],
-                        attempt=attempt,
-                        call_key=candidate_key,
-                    )
-                    baselines[candidate_key] = baseline
-                    _append_jsonl(raw_baselines_path, baseline)
-
-            if self.config.enable_restamp_control:
-                candidate_key = f"{case_key}|restamp-control"
-                if candidate_key not in baselines:
-                    baseline = self._generate_baseline(
-                        candidate_key=candidate_key,
-                        generation=generation,
-                        source_text=generation["unwatermarked_text"],
-                        pipeline="restamp_control",
-                        artifact_kind="restamp_control",
-                        source_kind="clean",
-                        attack_split=attack_splits[generation["sample_id"]],
-                        attempt=1,
-                        call_key=f"{generation['sample_id']}|restamp-control",
-                    )
-                    baselines[candidate_key] = baseline
+                for baseline in generated_baselines:
+                    baselines[baseline["candidate_key"]] = baseline
                     _append_jsonl(raw_baselines_path, baseline)
 
         ordered = [candidates[key] for key in sorted(candidates)]
@@ -262,6 +227,8 @@ class AttackRunner:
             "bira_beta": beta,
             "pipelines": list(self.config.pipelines),
             "budgets": dict(self.config.budgets),
+            "quality_profile": self.config.quality_profile,
+            "max_workers": self.config.max_workers,
             "total_openrouter_cost_usd": sum(
                 float(call["cost_usd"] or 0.0) for call in self.calls.values()
             ),
@@ -293,6 +260,87 @@ class AttackRunner:
         }
         _write_json(output_dir / "attack-summary.json", summary)
         return summary
+
+    def _process_generation(
+        self,
+        generation: dict[str, Any],
+        scores_by_key: dict[str, dict[str, Any]],
+        attack_split: str,
+        beta: float,
+        existing_candidate_keys: frozenset[str],
+        existing_baseline_keys: frozenset[str],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        score_key = f"{generation['sample_id']}|{generation['algorithm']}|watermarked"
+        if score_key not in scores_by_key:
+            raise ValueError(f"Missing self-information scores: {score_key}")
+        token_scores = token_scores_from_row(scores_by_key[score_key])
+        case_key = f"{generation['sample_id']}|{generation['algorithm']}"
+        reference_call: dict[str, Any] | None = None
+        if "sira" in self.config.pipelines:
+            reference_call = self._call(
+                call_key=f"{case_key}|sira|reference",
+                stage="sira_reference",
+                system_prompt=SYSTEM_PROMPT,
+                user_prompt=self._reference_prompt(generation),
+            )
+
+        generated_candidates = []
+        for pipeline in self.config.pipelines:
+            for budget_name, budget_ratio in self.config.budgets:
+                candidate_key = f"{case_key}|{pipeline}|{budget_name}"
+                if candidate_key in existing_candidate_keys:
+                    continue
+                generated_candidates.append(
+                    self._generate_candidate(
+                        candidate_key=candidate_key,
+                        generation=generation,
+                        token_scores=token_scores,
+                        pipeline=pipeline,
+                        budget_name=budget_name,
+                        budget_ratio=budget_ratio,
+                        attack_split=attack_split,
+                        bira_beta=beta,
+                        sira_reference=reference_call,
+                    )
+                )
+
+        generated_baselines = []
+        if self.config.enable_oracle_baseline:
+            for attempt in range(1, self.config.oracle_max_attempts + 1):
+                candidate_key = f"{case_key}|adaptive-oracle|attempt={attempt}"
+                if candidate_key in existing_baseline_keys:
+                    continue
+                generated_baselines.append(
+                    self._generate_baseline(
+                        candidate_key=candidate_key,
+                        generation=generation,
+                        source_text=generation["watermarked_text"],
+                        pipeline="adaptive_oracle_paraphrase",
+                        artifact_kind="adaptive_oracle_attempt",
+                        source_kind="watermarked",
+                        attack_split=attack_split,
+                        attempt=attempt,
+                        call_key=candidate_key,
+                    )
+                )
+
+        if self.config.enable_restamp_control:
+            candidate_key = f"{case_key}|restamp-control"
+            if candidate_key not in existing_baseline_keys:
+                generated_baselines.append(
+                    self._generate_baseline(
+                        candidate_key=candidate_key,
+                        generation=generation,
+                        source_text=generation["unwatermarked_text"],
+                        pipeline="restamp_control",
+                        artifact_kind="restamp_control",
+                        source_kind="clean",
+                        attack_split=attack_split,
+                        attempt=1,
+                        call_key=f"{generation['sample_id']}|restamp-control",
+                    )
+                )
+        return generated_candidates, generated_baselines
 
     def _calibrate_beta(
         self,
@@ -483,7 +531,12 @@ class AttackRunner:
         original_tokens = [value.text.lower() for value in tokenize(original)]
         candidate_tokens = [value.text.lower() for value in tokenize(candidate)]
         distance = levenshtein(original_tokens, candidate_tokens)
-        quality = deterministic_quality(original, candidate, generation["language"])
+        quality = deterministic_quality(
+            original,
+            candidate,
+            generation["language"],
+            protected_record=self._protected_record(original, generation["language"]),
+        )
         selected_strings = unique_token_strings(selected)
         information_retention = self._information_retention(token_scores, candidate)
         return {
@@ -543,7 +596,12 @@ class AttackRunner:
         original_tokens = [value.text.lower() for value in tokenize(source_text)]
         candidate_tokens = [value.text.lower() for value in tokenize(candidate)]
         distance = levenshtein(original_tokens, candidate_tokens)
-        quality = deterministic_quality(source_text, candidate, generation["language"])
+        quality = deterministic_quality(
+            source_text,
+            candidate,
+            generation["language"],
+            protected_record=self._protected_record(source_text, generation["language"]),
+        )
         return {
             "candidate_key": candidate_key,
             "case_key": f"{generation['sample_id']}|{generation['algorithm']}",
@@ -578,54 +636,80 @@ class AttackRunner:
         logit_bias: dict[int | str, float] | None = None,
         beta: float | None = None,
     ) -> dict[str, Any]:
-        if call_key in self.calls:
-            return self.calls[call_key]
-        seed = self._seed(call_key) if self.config.send_seed else None
-        response = self.rewriter.rewrite(
-            system_prompt,
-            user_prompt,
-            logit_bias=logit_bias,
-            seed=seed,
-        )
-        row = {
-            "call_key": call_key,
-            "stage": stage,
-            "system_prompt": system_prompt,
-            "user_prompt": user_prompt,
-            "seed": seed,
-            "beta": beta,
-            "logit_bias_count": len(logit_bias or {}),
-            "logit_bias_ids_sha256": hashlib.sha256(
-                json.dumps(sorted(int(key) for key in (logit_bias or {}))).encode(
-                    "utf-8"
-                )
-            ).hexdigest(),
-            **asdict(response),
-        }
-        self.calls[call_key] = row
-        _append_jsonl(self.calls_path, row)
-        return row
+        with self._calls_lock:
+            if call_key in self.calls:
+                return self.calls[call_key]
+            event = self._inflight_calls.get(call_key)
+            owns_call = event is None
+            if owns_call:
+                event = threading.Event()
+                self._inflight_calls[call_key] = event
+        if not owns_call:
+            event.wait()
+            with self._calls_lock:
+                if call_key in self.calls:
+                    return self.calls[call_key]
+                error = self._call_errors.get(call_key)
+            if error is not None:
+                raise RuntimeError(f"Shared OpenRouter call failed: {call_key}") from error
+            raise RuntimeError(f"Shared OpenRouter call finished without a result: {call_key}")
 
-    @staticmethod
-    def _simple_prompt(generation: dict[str, Any], budget_ratio: float) -> str:
+        try:
+            seed = self._seed(call_key) if self.config.send_seed else None
+            response = self.rewriter.rewrite(
+                system_prompt,
+                user_prompt,
+                logit_bias=logit_bias,
+                seed=seed,
+            )
+            row = {
+                "call_key": call_key,
+                "stage": stage,
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+                "seed": seed,
+                "beta": beta,
+                "logit_bias_count": len(logit_bias or {}),
+                "logit_bias_ids_sha256": hashlib.sha256(
+                    json.dumps(sorted(int(key) for key in (logit_bias or {}))).encode(
+                        "utf-8"
+                    )
+                ).hexdigest(),
+                **asdict(response),
+            }
+            with self._calls_lock:
+                self.calls[call_key] = row
+                _append_jsonl(self.calls_path, row)
+            return row
+        except BaseException as error:
+            with self._calls_lock:
+                self._call_errors[call_key] = error
+            raise
+        finally:
+            with self._calls_lock:
+                event.set()
+                self._inflight_calls.pop(call_key, None)
+
+    def _simple_prompt(
+        self, generation: dict[str, Any], budget_ratio: float
+    ) -> str:
         percent = round(budget_ratio * 100)
         return (
             f"Rewrite approximately {percent}% of the wording while preserving the rest when "
             "natural. This percentage is a target, not permission to alter meaning.\n\n"
-            f"{protected_prompt_fragment(generation['watermarked_text'], generation['language'])}"
+            f"{self._protected_fragment(generation['watermarked_text'], generation['language'])}"
             f"\n\n<SOURCE>\n{generation['watermarked_text']}\n</SOURCE>"
         )
 
-    @staticmethod
-    def _reference_prompt(generation: dict[str, Any]) -> str:
+    def _reference_prompt(self, generation: dict[str, Any]) -> str:
         return (
             "Produce a fluent full paraphrase to serve as a semantic reference.\n\n"
-            f"{protected_prompt_fragment(generation['watermarked_text'], generation['language'])}"
+            f"{self._protected_fragment(generation['watermarked_text'], generation['language'])}"
             f"\n\n<SOURCE>\n{generation['watermarked_text']}\n</SOURCE>"
         )
 
-    @staticmethod
     def _sira_prompt(
+        self,
         generation: dict[str, Any],
         masked_text: str,
         reference_text: str,
@@ -633,22 +717,21 @@ class AttackRunner:
         return (
             "Reconstruct every [BLANK] in the incomplete source. Use the reference only to "
             "choose fluent alternatives; keep all unmasked source text whenever grammatical.\n\n"
-            f"{protected_prompt_fragment(generation['watermarked_text'], generation['language'])}"
+            f"{self._protected_fragment(generation['watermarked_text'], generation['language'])}"
             f"\n\n<INCOMPLETE_SOURCE>\n{masked_text}\n</INCOMPLETE_SOURCE>"
             f"\n\n<REFERENCE_PARAPHRASE>\n{reference_text}\n</REFERENCE_PARAPHRASE>"
         )
 
-    @staticmethod
-    def _bira_prompt(generation: dict[str, Any]) -> str:
+    def _bira_prompt(self, generation: dict[str, Any]) -> str:
         return (
             "Produce a fluent full paraphrase. Lexical constraints are applied separately by "
             "the decoding system.\n\n"
-            f"{protected_prompt_fragment(generation['watermarked_text'], generation['language'])}"
+            f"{self._protected_fragment(generation['watermarked_text'], generation['language'])}"
             f"\n\n<SOURCE>\n{generation['watermarked_text']}\n</SOURCE>"
         )
 
-    @staticmethod
     def _baseline_prompt(
+        self,
         source_text: str,
         language: str,
         pipeline: str,
@@ -665,7 +748,7 @@ class AttackRunner:
                 "against or refer to any watermark detector."
             )
         return (
-            f"{instruction}\n\n{protected_prompt_fragment(source_text, language)}"
+            f"{instruction}\n\n{self._protected_fragment(source_text, language)}"
             f"\n\n<SOURCE>\n{source_text}\n</SOURCE>"
         )
 
@@ -695,6 +778,9 @@ class AttackRunner:
                 "model": self.bias_tokenizer.model_name,
                 "revision": self.bias_tokenizer.revision,
             },
+            "protected_spans": (
+                self.protected_spans.metadata if self.protected_spans is not None else None
+            ),
         }
         return json.loads(json.dumps(manifest, ensure_ascii=False))
 
@@ -711,9 +797,15 @@ class AttackRunner:
                     digest_size=8,
                 ).digest(),
             )
-            development_count = max(
-                1, round(len(ordered) * self.config.development_fraction)
+            development_count = (
+                self.config.development_prompts_per_language
+                if self.config.development_prompts_per_language is not None
+                else max(1, round(len(ordered) * self.config.development_fraction))
             )
+            if development_count >= len(ordered):
+                raise ValueError(
+                    f"Development prompt count must leave held-out prompts for {language}"
+                )
             for index, identifier in enumerate(ordered):
                 result[identifier] = (
                     "development" if index < development_count else "held_out_test"
@@ -777,6 +869,17 @@ class AttackRunner:
             raise ValueError(f"Unsupported pipelines: {sorted(invalid)}")
         if not 0.0 < self.config.development_fraction < 0.5:
             raise ValueError("development_fraction must be in (0, 0.5)")
+        if (
+            self.config.development_prompts_per_language is not None
+            and self.config.development_prompts_per_language < 1
+        ):
+            raise ValueError("development_prompts_per_language must be at least 1")
+        if self.config.quality_profile not in {"legacy-v1", "gliner-v1"}:
+            raise ValueError("quality_profile must be legacy-v1 or gliner-v1")
+        if self.config.quality_profile == "gliner-v1" and self.protected_spans is None:
+            raise ValueError("gliner-v1 requires a protected-span manifest")
+        if self.config.max_workers < 1:
+            raise ValueError("max_workers must be at least 1")
         if self.config.oracle_max_attempts < 1:
             raise ValueError("oracle_max_attempts must be at least 1")
         if (
@@ -786,6 +889,16 @@ class AttackRunner:
             raise ValueError(
                 "A limited run still needs at least 4 evaluation prompts per language"
             )
+
+    def _protected_record(self, text: str, language: str) -> Any | None:
+        if self.protected_spans is None:
+            return None
+        return self.protected_spans.get(text, language)
+
+    def _protected_fragment(self, text: str, language: str) -> str:
+        if self.protected_spans is None:
+            return legacy_protected_prompt_fragment(text, language)
+        return protected_prompt_fragment(self.protected_spans.get(text, language))
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

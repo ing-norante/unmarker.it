@@ -7,6 +7,11 @@ from pathlib import Path
 
 from .attack_pipeline import AttackConfig, AttackRunner
 from .final_report import FinalReportRunner
+from .llm_judge import (
+    DEFAULT_JUDGE_MODEL,
+    DEFAULT_JUDGE_PROVIDER,
+    LlmJudgeRunner,
+)
 from .openrouter_backend import (
     DEFAULT_OPENROUTER_MODEL,
     DEFAULT_OPENROUTER_TOKENIZER,
@@ -14,6 +19,7 @@ from .openrouter_backend import (
     HuggingFaceLogitBiasTokenizer,
     OpenRouterRewriter,
 )
+from .protected_spans import ProtectedSpanIndex
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -60,6 +66,20 @@ def build_parser() -> argparse.ArgumentParser:
     attack.add_argument("--allow-provider-fallbacks", action="store_true")
     attack.add_argument("--send-seed", action="store_true")
     attack.add_argument("--no-resume", action="store_true")
+    attack.add_argument(
+        "--profile",
+        choices=("custom", "gate2b-exp-pilot"),
+        default="custom",
+    )
+    attack.add_argument(
+        "--quality-profile",
+        choices=("legacy-v1", "gliner-v1"),
+        default="legacy-v1",
+    )
+    attack.add_argument("--protected-spans", type=Path)
+    attack.add_argument("--protected-spans-manifest", type=Path)
+    attack.add_argument("--development-prompts-per-language", type=int)
+    attack.add_argument("--max-workers", type=int, default=1)
 
     estimate = subparsers.add_parser(
         "estimate", help="Estimate the minimum API call count"
@@ -79,6 +99,19 @@ def build_parser() -> argparse.ArgumentParser:
     finalize.add_argument("--evaluations", type=Path, required=True)
     finalize.add_argument("--api-calls", type=Path, required=True)
     finalize.add_argument("--output", type=Path, required=True)
+    finalize.add_argument("--judge-evaluations", type=Path)
+
+    judge = subparsers.add_parser(
+        "judge", help="Run a blinded structured LLM quality pre-screen"
+    )
+    judge.add_argument("--selections", type=Path, required=True)
+    judge.add_argument("--output", type=Path, required=True)
+    judge.add_argument("--env-file", type=Path)
+    judge.add_argument("--model", default=DEFAULT_JUDGE_MODEL)
+    judge.add_argument("--provider", default=DEFAULT_JUDGE_PROVIDER)
+    judge.add_argument("--max-workers", type=int, default=4)
+    judge.add_argument("--manual-audit-size", type=int, default=48)
+    judge.add_argument("--no-resume", action="store_true")
     return parser
 
 
@@ -87,6 +120,21 @@ def main() -> None:
     if args.command == "attack":
         if args.env_file:
             _load_env_key(args.env_file, "OPENROUTER_API_KEY")
+        if args.profile == "gate2b-exp-pilot":
+            if not args.protected_spans:
+                raise ValueError(
+                    "gate2b-exp-pilot requires --protected-spans from Modal"
+                )
+            args.quality_profile = "gliner-v1"
+            args.pipelines = "simple_paraphrase,sira,bira,bira_position_aware"
+            args.algorithms = "EXP"
+            args.beta_calibration_per_language = 10
+            args.max_evaluation_prompts_per_language = 50
+            args.development_prompts_per_language = 20
+            args.max_workers = 4
+            args.oracle_max_attempts = 3
+            args.no_oracle_baseline = False
+            args.no_restamp_control = False
         pipelines = tuple(
             value.strip() for value in args.pipelines.split(",") if value.strip()
         )
@@ -110,6 +158,21 @@ def main() -> None:
             args.tokenizer,
             args.tokenizer_revision,
         )
+        protected_spans = (
+            ProtectedSpanIndex.load(
+                args.protected_spans,
+                args.protected_spans_manifest,
+            )
+            if args.protected_spans
+            else None
+        )
+        if args.profile == "gate2b-exp-pilot" and not protected_spans.metadata.get(
+            "threshold_provenance", {}
+        ).get("human_approved"):
+            raise ValueError(
+                "gate2b-exp-pilot requires a manifest built from human-approved "
+                "GLiNER thresholds"
+            )
         config = AttackConfig(
             pipelines=pipelines,
             algorithms=algorithms or None,
@@ -122,8 +185,18 @@ def main() -> None:
             oracle_max_attempts=args.oracle_max_attempts,
             enable_restamp_control=not args.no_restamp_control,
             send_seed=args.send_seed,
+            development_prompts_per_language=(
+                args.development_prompts_per_language
+            ),
+            quality_profile=args.quality_profile,
+            max_workers=args.max_workers,
         )
-        summary = AttackRunner(rewriter, bias_tokenizer, config).run(
+        summary = AttackRunner(
+            rewriter,
+            bias_tokenizer,
+            config,
+            protected_spans=protected_spans,
+        ).run(
             args.generations,
             args.scores,
             args.output,
@@ -190,6 +263,32 @@ def main() -> None:
             args.api_calls,
             args.output,
             baselines_path=args.baselines,
+            judge_evaluations_path=args.judge_evaluations,
+        )
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+    elif args.command == "judge":
+        if args.env_file:
+            _load_env_key(args.env_file, "OPENROUTER_API_KEY")
+        backend = OpenRouterRewriter(
+            model=args.model,
+            provider=args.provider or None,
+            temperature=0.0,
+            max_tokens=4096,
+            length_retry_max_tokens=8192,
+            reasoning_effort="medium",
+            allow_fallbacks=False,
+        )
+        capabilities = backend.validate_capabilities(
+            require_logit_bias=False,
+            require_structured_output=True,
+            require_seed=True,
+        )
+        print(f"OpenRouter judge preflight: {json.dumps(capabilities, sort_keys=True)}")
+        summary = LlmJudgeRunner(backend, max_workers=args.max_workers).run(
+            args.selections,
+            args.output,
+            resume=not args.no_resume,
+            manual_audit_size=args.manual_audit_size,
         )
         print(json.dumps(summary, indent=2, ensure_ascii=False))
 

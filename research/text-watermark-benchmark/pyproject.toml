@@ -23,6 +23,10 @@ markllm = [
 remote = [
   "transformers>=5.15,<5.16",
 ]
+ner = [
+  "gliner==0.2.24",
+  "transformers>=5.15,<5.16",
+]
 modal = [
   "modal==1.5.4",
 ]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ from unmarker_text_bench.attack_pipeline import AttackConfig, AttackRunner
 from unmarker_text_bench.final_report import FinalReportRunner
 from unmarker_text_bench.language_model import ReferenceNgramScorer
 from unmarker_text_bench.lexicon import VariantLexicon
+from unmarker_text_bench.llm_judge import LlmJudgeRunner
 from unmarker_text_bench.markllm_backend import (
     markllm_algorithm_capabilities,
     normalize_detection_result,
@@ -23,10 +25,19 @@ from unmarker_text_bench.markllm_gate import (
     MarkLLMGateRunner,
     PromptSample,
 )
+from unmarker_text_bench.ner_gold import NerThresholdCalibrator
 from unmarker_text_bench.openrouter_backend import (
     OpenRouterError,
     OpenRouterRewriter,
     RewriteResponse,
+    StructuredResponse,
+)
+from unmarker_text_bench.protected_spans import (
+    EntitySpan,
+    ProtectedSpanIndex,
+    ProtectedSpanRecord,
+    protected_prompt_fragment,
+    validate_record,
 )
 from unmarker_text_bench.quality_checks import extract_protected
 from unmarker_text_bench.remote_evaluation import (
@@ -347,6 +358,58 @@ class SelfInformationTests(unittest.TestCase):
 
 
 class OpenRouterTests(unittest.TestCase):
+    def test_structured_completion_sends_strict_schema(self) -> None:
+        requests: list[urllib.request.Request] = []
+
+        def transport(
+            request: urllib.request.Request, timeout: float
+        ) -> tuple[int, bytes]:
+            requests.append(request)
+            return 200, json.dumps(
+                {
+                    "id": "structured-1",
+                    "model": "test/model",
+                    "provider": "test-provider",
+                    "choices": [
+                        {
+                            "message": {"content": '{"passes": true}'},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": 8,
+                        "completion_tokens": 3,
+                        "cost": 0.001,
+                    },
+                }
+            ).encode()
+
+        client = OpenRouterRewriter(
+            api_key="not-a-real-key",
+            model="test/model",
+            provider="test-provider",
+            reasoning_effort="medium",
+            transport=transport,
+        )
+        response = client.complete_json(
+            "system",
+            "user",
+            "assessment",
+            {
+                "type": "object",
+                "properties": {"passes": {"type": "boolean"}},
+                "required": ["passes"],
+                "additionalProperties": False,
+            },
+            seed=7,
+        )
+        self.assertEqual(response.data, {"passes": True})
+        body = json.loads(requests[0].data)
+        self.assertTrue(body["response_format"]["json_schema"]["strict"])
+        self.assertEqual(body["seed"], 7)
+        self.assertEqual(body["reasoning"]["effort"], "medium")
+        self.assertNotIn("temperature", body)
+
     def test_client_records_provider_usage_and_bias(self) -> None:
         requests: list[urllib.request.Request] = []
 
@@ -546,6 +609,87 @@ class FakeBiasTokenizer:
         return {index: bias for index, _ in enumerate(token_strings[:max_token_ids])}
 
 
+class ProtectedSpanTests(unittest.TestCase):
+    def test_manifest_validation_rejects_changed_and_introduced_entities(self) -> None:
+        source = "Alice paid 42 euros to Acme Corp."
+        record = ProtectedSpanRecord.build(
+            source,
+            "en",
+            [
+                EntitySpan("Alice", 0, 5, "person", 0.98),
+                EntitySpan("Acme Corp", 23, 32, "organization", 0.95),
+            ],
+        )
+        changed = validate_record(record, "Bob paid 42 euros to Acme Corp.")
+        self.assertFalse(changed["passes"])
+        self.assertIn("entities", changed["failure_reasons"])
+        introduced = validate_record(
+            record,
+            source + " Paris approved it.",
+            [
+                *record.entities,
+                EntitySpan("Paris", len(source) + 1, len(source) + 6, "location", 0.9),
+            ],
+        )
+        self.assertFalse(introduced["passes"])
+        self.assertIn("introduced_entities", introduced["failure_reasons"])
+        self.assertIn("Alice", protected_prompt_fragment(record))
+
+    def test_index_checks_text_hash_and_language(self) -> None:
+        record = ProtectedSpanRecord.build("Alice works.", "en", [])
+        index = ProtectedSpanIndex([record])
+        self.assertEqual(index.get("Alice works.", "en"), record)
+        with self.assertRaisesRegex(ValueError, "language=it"):
+            index.get("Alice works.", "it")
+
+
+class NerGoldTests(unittest.TestCase):
+    def test_calibration_requires_explicit_human_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "review.jsonl"
+            rows = []
+            for language in ("en", "it"):
+                text = "Alice works."
+                rows.append(
+                    {
+                        "sample_id": language,
+                        "language": language,
+                        "text": text,
+                        "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                        "model_suggestions": [
+                            {
+                                "text": "Alice",
+                                "start": 0,
+                                "end": 5,
+                                "label": "person",
+                                "score": 0.62,
+                            }
+                        ],
+                        "human_entities": [
+                            {
+                                "text": "Alice",
+                                "start": 0,
+                                "end": 5,
+                                "label": "person",
+                            }
+                        ],
+                        "review_status": "pending",
+                        "reviewer": "",
+                    }
+                )
+            RemotePipelineTests._write_jsonl(path, rows)
+            with self.assertRaisesRegex(ValueError, "explicitly approved"):
+                NerThresholdCalibrator().run(path, root / "thresholds.json")
+            for row in rows:
+                row["review_status"] = "approved"
+                row["reviewer"] = "human-reviewer"
+            RemotePipelineTests._write_jsonl(path, rows)
+            payload = NerThresholdCalibrator().run(path, root / "thresholds.json")
+            self.assertTrue(payload["human_approved"])
+            self.assertEqual(payload["thresholds"], {"en": 0.3, "it": 0.3})
+
+
 class FakeRewriter:
     def __init__(self) -> None:
         self.calls = 0
@@ -588,6 +732,49 @@ class FakeNeuralQuality:
 
     def evaluate_pairs(self, pairs: list[tuple[str, str]]) -> list[NeuralQualityResult]:
         return [NeuralQualityResult(0.95, 0.9, 0.9) for _ in pairs]
+
+
+class FakeStructuredJudge:
+    @property
+    def metadata(self) -> dict[str, str]:
+        return {"model": "fake-judge", "provider": "fake"}
+
+    def complete_json(self, *args, **kwargs) -> StructuredResponse:
+        return StructuredResponse(
+            data={
+                "meaning_preserved": True,
+                "factual_consistency": True,
+                "protected_facts_preserved": True,
+                "fluency_score": 5,
+                "naturalness_score": 4,
+                "material_error": False,
+                "reason_codes": ["none"],
+                "evidence": "No material difference.",
+            },
+            request_id="judge-1",
+            model="fake-judge",
+            provider="fake",
+            prompt_tokens=10,
+            completion_tokens=10,
+            reasoning_tokens=0,
+            cost_usd=0.001,
+            latency_ms=1.0,
+            finish_reason="stop",
+        )
+
+
+class FakeEntityExtractor:
+    @property
+    def metadata(self) -> dict[str, str]:
+        return {"implementation": "fake-entities"}
+
+    def extract(self, text: str, language: str) -> list[EntitySpan]:
+        result = []
+        for value in ("Alice", "Bob"):
+            if value in text:
+                start = text.index(value)
+                result.append(EntitySpan(value, start, start + len(value), "person", 1.0))
+        return result
 
 
 class RemotePipelineTests(unittest.TestCase):
@@ -674,12 +861,19 @@ class RemotePipelineTests(unittest.TestCase):
             attack_summary = AttackRunner(
                 FakeRewriter(),
                 FakeBiasTokenizer(),
-                AttackConfig(beta_calibration_per_language=1),
+                AttackConfig(beta_calibration_per_language=1, max_workers=4),
             ).run(generations, scores, attacks)
             self.assertEqual(attack_summary["evaluation_cases"], 8)
             self.assertEqual(attack_summary["candidate_count"], 96)
             self.assertEqual(attack_summary["baseline_count"], 32)
             self.assertEqual(attack_summary["evaluation_input_count"], 128)
+            api_rows = [
+                json.loads(line)
+                for line in (attacks / "api-calls.jsonl").read_text().splitlines()
+            ]
+            self.assertEqual(
+                len(api_rows), len({row["call_key"] for row in api_rows})
+            )
             candidates = [
                 json.loads(line)
                 for line in (attacks / "candidates.jsonl").read_text().splitlines()
@@ -722,12 +916,146 @@ class RemotePipelineTests(unittest.TestCase):
                 "official_markllm_held_out_attack_evaluation",
             )
             self.assertTrue(summary["progressive_cells"])
+            self.assertEqual(len(summary["surrogate"]["cells"]), 2)
+            self.assertTrue(
+                all(
+                    cell["scope"] == "shared_across_candidate_pipelines"
+                    for cell in summary["surrogate"]["cells"]
+                )
+            )
             self.assertTrue(summary["adaptive_oracle"]["cells"])
             self.assertTrue(summary["restamp_control"]["cells"])
             self.assertEqual(summary["adaptive_oracle"]["cells"][0]["mean_queries"], 1)
             self.assertTrue((report_dir / "REPORT.md").exists())
             self.assertTrue((report_dir / "human-review.csv").exists())
             self.assertTrue((report_dir / "adaptive-oracle-selections.jsonl").exists())
+
+            judge_dir = root / "judge"
+            judge_summary = LlmJudgeRunner(
+                FakeStructuredJudge(), max_workers=4
+            ).run(
+                report_dir / "progressive-selections.jsonl",
+                judge_dir,
+            )
+            self.assertEqual(judge_summary["judged_candidates"], 24)
+            self.assertEqual(judge_summary["manual_audit_rows"], 24)
+            self.assertTrue((judge_dir / "manual-audit.csv").exists())
+            summary_with_judge = FinalReportRunner().run(
+                attacks / "candidates.jsonl",
+                evaluations,
+                attacks / "api-calls.jsonl",
+                report_dir,
+                baselines_path=attacks / "baselines.jsonl",
+                judge_evaluations_path=judge_dir / "llm-judge.jsonl",
+            )
+            self.assertEqual(
+                summary_with_judge["llm_quality_prescreen"]["status"], "complete"
+            )
+
+    def test_modal_quality_recomputes_protected_spans(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original = "Alice paid 42 euros."
+            candidate = "Bob paid 41 euros."
+            generations = root / "generations.jsonl"
+            candidates = root / "candidates.jsonl"
+            output = root / "evaluations.jsonl"
+            self._write_jsonl(
+                generations,
+                [
+                    {
+                        "sample_id": "en-1",
+                        "language": "en",
+                        "split": "evaluation",
+                        "algorithm": "KGW",
+                        "unwatermarked_score": 0.1,
+                        "watermarked_score": 0.9,
+                        "calibrated_threshold_1pct": 0.5,
+                        "calibrated_watermarked_detected": True,
+                        "calibrated_unwatermarked_detected": False,
+                    }
+                ],
+            )
+            self._write_jsonl(
+                candidates,
+                [
+                    {
+                        "candidate_key": "en-1|KGW|test",
+                        "case_key": "en-1|KGW",
+                        "sample_id": "en-1",
+                        "language": "en",
+                        "algorithm": "KGW",
+                        "pipeline": "test",
+                        "budget": "test",
+                        "artifact_kind": "candidate_algorithm",
+                        "source_kind": "watermarked",
+                        "attack_split": "held_out_test",
+                        "original_text": original,
+                        "candidate_text": candidate,
+                        "deterministic_quality": {"passes": True},
+                    }
+                ],
+            )
+            record = ProtectedSpanRecord.build(
+                original,
+                "en",
+                [EntitySpan("Alice", 0, 5, "person", 1.0)],
+            )
+            summary = CandidateEvaluationRunner(
+                FakeDetector(),
+                FakeNeuralQuality(),
+                protected_spans=ProtectedSpanIndex([record], {"profile": "test"}),
+                entity_extractor=FakeEntityExtractor(),
+            ).run(generations, candidates, output)
+            row = json.loads(output.read_text())
+            self.assertFalse(row["deterministic_quality_pass"])
+            self.assertIn("entities", row["deterministic_failure_reasons"])
+            self.assertIn("introduced_entities", row["deterministic_failure_reasons"])
+            self.assertEqual(summary["quality_profile"], "gliner-v1")
+
+    def test_concurrent_restamp_call_is_shared_across_algorithms(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            generations_path, scores_path = self._write_remote_fixtures(root)
+            generations = [
+                json.loads(line) for line in generations_path.read_text().splitlines()
+            ]
+            scores = [json.loads(line) for line in scores_path.read_text().splitlines()]
+            extra_generations = []
+            extra_scores = []
+            for row in generations:
+                if row["split"] != "evaluation":
+                    continue
+                extra_generations.append({**row, "algorithm": "EXP"})
+                original_key = f"{row['sample_id']}|KGW|watermarked"
+                score = next(value for value in scores if value["score_key"] == original_key)
+                extra_scores.append(
+                    {
+                        **score,
+                        "score_key": f"{row['sample_id']}|EXP|watermarked",
+                    }
+                )
+            self._write_jsonl(generations_path, [*generations, *extra_generations])
+            self._write_jsonl(scores_path, [*scores, *extra_scores])
+            output = root / "concurrent"
+            AttackRunner(
+                FakeRewriter(),
+                FakeBiasTokenizer(),
+                AttackConfig(
+                    pipelines=("simple_paraphrase",),
+                    algorithms=("KGW", "EXP"),
+                    max_workers=4,
+                    enable_oracle_baseline=False,
+                ),
+            ).run(generations_path, scores_path, output)
+            calls = [
+                json.loads(line)
+                for line in (output / "api-calls.jsonl").read_text().splitlines()
+            ]
+            restamp = [row for row in calls if row["stage"] == "restamp_control"]
+            self.assertEqual(len(restamp), 8)
+            self.assertEqual(len(calls), 56)
+            self.assertEqual(len(calls), len({row["call_key"] for row in calls}))
 
 
 if __name__ == "__main__":

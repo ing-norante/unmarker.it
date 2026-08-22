@@ -109,6 +109,9 @@ src/unmarker_text_bench/
   attack_pipeline.py  simple, SIRA, BIRA, and position-aware remote attacks
   openrouter_backend.py provider-pinned constrained rewrite client
   remote_evaluation.py official detectors and multilingual neural validation
+  protected_spans.py  GLiNER manifests and deterministic structured-span gates
+  ner_gold.py         human-approved NER threshold calibration workflow
+  llm_judge.py        blinded frontier-model quality pre-screen and audit sample
   final_report.py     development-fitted surrogate and held-out reports
   unicode_hygiene.py conservative invisible-carrier cleanup and audit
 modal_pipeline.py     resumable Modal GPU jobs and artifact transfer
@@ -190,3 +193,10 @@ requires:
 4. complete the generated blinded human review sheet;
 5. repeat across model families and additional domains;
 6. avoid any claim about Claude until an authorized production detector can verify it.
+
+The Gate 2b pilot is fixed to official MarkLLM EXP, 100 clean calibration and
+50 evaluation prompts per language, with 20 evaluation prompts per language
+reserved for development and 30 for held-out testing. It is explicitly a
+pilot, not the formal 1,000/50/100 design. Its progressive surrogate is fitted
+once per watermark algorithm/language and shared by all rewrite pipelines; a
+cell is disabled unless its development precision reaches 0.80.

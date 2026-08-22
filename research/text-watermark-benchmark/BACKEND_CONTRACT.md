@@ -17,7 +17,7 @@ GET /capabilities
   "languages": ["en", "it"],
   "modes": ["unicode_hygiene", "rewrite"],
   "max_input_tokens": 4096,
-  "quality_gates": ["protected_spans", "semantic_similarity", "bidirectional_nli"],
+  "quality_gates": ["gliner_protected_spans", "semantic_similarity", "bidirectional_nli", "llm_prescreen"],
   "watermark_research_scope": ["KGW", "Unigram", "SynthID", "EXP"],
   "production_detector_claim": false
 }
