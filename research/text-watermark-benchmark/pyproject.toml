@@ -9,6 +9,7 @@ license = { text = "MIT" }
 unmarker-text-bench = "unmarker_text_bench.cli:main"
 unmarker-markllm-corpus = "unmarker_text_bench.markllm_cli:main"
 unmarker-remote-bench = "unmarker_text_bench.remote_cli:main"
+unmarker-unicode-hygiene = "unmarker_text_bench.unicode_cli:main"
 
 [project.optional-dependencies]
 markllm = [

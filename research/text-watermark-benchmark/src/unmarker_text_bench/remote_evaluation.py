@@ -156,7 +156,7 @@ class NeuralQualityEvaluator:
 
 
 class CandidateEvaluationRunner:
-    ARTIFACT_SCHEMA_VERSION = 1
+    ARTIFACT_SCHEMA_VERSION = 2
 
     def __init__(
         self,
@@ -236,6 +236,15 @@ class CandidateEvaluationRunner:
                     and quality.semantic_similarity >= self.semantic_threshold
                     and quality.bidirectional_entailment >= self.nli_threshold
                 )
+                source_kind = candidate.get("source_kind", "watermarked")
+                if source_kind == "clean":
+                    preattack_score = generation["unwatermarked_score"]
+                    preattack_detected = generation["calibrated_unwatermarked_detected"]
+                elif source_kind == "watermarked":
+                    preattack_score = generation["watermarked_score"]
+                    preattack_detected = generation["calibrated_watermarked_detected"]
+                else:
+                    raise ValueError(f"Unknown candidate source_kind: {source_kind}")
                 row = {
                     "candidate_key": candidate["candidate_key"],
                     "case_key": candidate["case_key"],
@@ -244,13 +253,18 @@ class CandidateEvaluationRunner:
                     "algorithm": candidate["algorithm"],
                     "pipeline": candidate["pipeline"],
                     "budget": candidate["budget"],
+                    "artifact_kind": candidate.get(
+                        "artifact_kind", "candidate_algorithm"
+                    ),
+                    "source_kind": source_kind,
+                    "attempt": candidate.get("attempt"),
                     "attack_split": candidate["attack_split"],
                     "target_score": detection.score,
                     "target_threshold_at_1pct_fpr": threshold,
                     "target_detected": detection.score > threshold,
                     "target_builtin_detected": detection.detected,
-                    "preattack_score": generation["watermarked_score"],
-                    "preattack_detected": generation["calibrated_watermarked_detected"],
+                    "preattack_score": preattack_score,
+                    "preattack_detected": preattack_detected,
                     "semantic_similarity": quality.semantic_similarity,
                     "entailment_original_to_candidate": (
                         quality.entailment_original_to_candidate
@@ -273,6 +287,9 @@ class CandidateEvaluationRunner:
             checkpoint()
         return {
             "candidates": len(ordered),
+            "artifact_breakdown": _counts(
+                row.get("artifact_kind", "candidate_algorithm") for row in ordered
+            ),
             "quality_pass_rate": _mean(bool(row["quality_pass"]) for row in ordered),
             "postattack_target_tpr": _mean(
                 bool(row["target_detected"]) for row in ordered
@@ -284,6 +301,13 @@ class CandidateEvaluationRunner:
 def _mean(values: Any) -> float:
     items = [float(value) for value in values]
     return sum(items) / len(items) if items else 0.0
+
+
+def _counts(values: Any) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        counts[str(value)] = counts.get(str(value), 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

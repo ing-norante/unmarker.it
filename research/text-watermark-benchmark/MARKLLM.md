@@ -48,11 +48,27 @@ authors' model-specific scripts. Provenance is pinned to:
 - BIRA: `ml-postech/LLM-Watermark-Evasion-via-Bias-Inversion` at
   `6f62ecce6f3410514fd43a40583a4059822af73a`.
 
+MarkLLM detector scores are put on one common axis before calibration. EXP and
+EXPGumbel return p-values where lower means more watermarked, so the adapter
+records and uses `-log10(p)`; the other configured schemes retain their native
+higher-is-more-watermarked score.
+
+The default Modal run includes official MarkLLM `EXP`. It uses MarkLLM's native
+token-by-token generation method with `sequence_length=192`, not an approximate
+logits-processor replacement. `EXPGumbel` is supported by the adapter only when
+the official implementation fits a configured memory guard. With Qwen3's
+151,936-token vocabulary, official MarkLLM allocates both uniform and Gumbel
+float32 tables of shape `(V * 2, V)`: approximately 344 GiB (369 GB) together. The
+adapter rejects that configuration before allocation. Therefore EXPGumbel is
+not in the Qwen3 Modal matrix; EXP is the executable official representative of
+the exponential/Gumbel family. This exclusion is a resource constraint, not an
+experimental result.
+
 ## Experimental design
 
 The corpus contains 400 independent prompts: 100 calibration and 100
 evaluation prompts for each of English and Italian. Evaluation text is
-watermarked independently with MarkLLM KGW, Unigram, and SynthID. Clean
+watermarked independently with MarkLLM KGW, Unigram, SynthID, and EXP. Clean
 calibration generations set a separate 1% FPR threshold for every
 algorithm/language cell.
 
@@ -64,6 +80,19 @@ retention. The progressive policy is identical for every pipeline: try the
 three budgets in order and stop at the first candidate that passes the
 surrogate and all quality gates. Target MarkLLM decisions from held-out prompts
 never participate in selection.
+
+Two diagnostic controls are generated separately from that grid:
+
+- `adaptive_oracle_paraphrase` precomputes up to three full paraphrases per
+  watermark case, then simulates stopping at the first quality-passing rewrite
+  that evades the target detector. Because it uses the target outcome, it is an
+  upper-bound baseline and is never fitted or ranked as a candidate algorithm;
+- `restamp_control` paraphrases each unique clean generation once, shares that
+  call across watermark detectors, and measures clean FPR before/after plus
+  false-positive introduction.
+
+All rewriter outputs pass through conservative Unicode hygiene. The cleaned
+text and the full action audit are stored together; NFKC is off.
 
 Quality requires all of the following:
 
@@ -98,36 +127,69 @@ an artifact or printed. Do not commit that env file.
 ```bash
 .venv/bin/modal run modal_pipeline.py \
   --stage prepare \
-  --run-id markllm-qwen3-v1 \
-  --output results/modal-markllm-qwen3-v1
+  --run-id markllm-qwen3-exp-v2 \
+  --output results/modal-markllm-qwen3-exp-v2
 ```
 
-This runs Qwen3-14B with the official MarkLLM logits processors, calibrates the
-detectors, then uses Qwen3-8B to calculate token self-information. Generated
-continuations exclude their prompts before detection. Thinking is disabled.
+This runs Qwen3-14B with the official MarkLLM algorithms, including native EXP
+generation, calibrates the detectors, then uses Qwen3-8B to calculate token
+self-information. Generated continuations exclude their prompts before
+detection. Thinking is disabled.
 
 Inspect `corpus-summary.json` before spending on rewrites. Every
 algorithm/language cell should have adequate length, plausible held-out FPR,
 and strong pre-attack TPR. Manually inspect both languages as well.
 
+For an integration-only EXP smoke with the small fixture, use a fresh run ID:
+
+```bash
+.venv/bin/modal run modal_pipeline.py \
+  --stage prepare \
+  --run-id exp-integration-smoke-v2 \
+  --prompts datasets/markllm-smoke-prompts.jsonl \
+  --algorithms EXP \
+  --allow-small-smoke \
+  --output results/exp-integration-smoke-v2
+```
+
+This verifies the native official path but has no statistical value.
+
+To exercise the complete held-out pipeline without generating all 400 prompts,
+select four prompts from every language/split cell of the full dataset:
+
+```bash
+.venv/bin/modal run modal_pipeline.py \
+  --stage prepare \
+  --run-id exp-e2e-pilot-v2 \
+  --prompts datasets/markllm-wikipedia-v1.jsonl \
+  --prompts-per-cell 4 \
+  --algorithms EXP \
+  --allow-small-smoke \
+  --output results/exp-e2e-pilot-v2/modal-prepare
+```
+
+This yields four calibration and four evaluation prompts per language, enough
+to test development/held-out artifact flow but not enough for evidence claims.
+
 ## 2. Estimate OpenRouter calls
 
 ```bash
 .venv/bin/unmarker-remote-bench estimate \
-  --generations results/modal-markllm-qwen3-v1/generations.jsonl
+  --generations results/modal-markllm-qwen3-exp-v2/generations.jsonl
 ```
 
-With 200 evaluation prompts and three watermark schemes, the complete grid has
-600 watermark cases. Its theoretical minimum is 7,820 OpenRouter requests:
-13 per case plus 20 clean beta-calibration calls. Adaptive BIRA retries can
-increase this. Always run the estimator and a bounded pilot first.
+With 200 evaluation prompts and four watermark schemes, the complete grid has
+800 watermark cases. Its theoretical minimum is 13,020 OpenRouter requests:
+10,400 for the candidate grid, 2,400 for the three-attempt oracle pool, 200
+shared clean re-stamp calls, and 20 clean beta-calibration calls. Adaptive BIRA
+retries can increase this. Always run the estimator and a bounded pilot first.
 
 ## 3. Run a bounded OpenRouter pilot
 
 ```bash
 .venv/bin/unmarker-remote-bench attack \
-  --generations results/modal-markllm-qwen3-v1/generations.jsonl \
-  --scores results/modal-markllm-qwen3-v1/token-scores.jsonl \
+  --generations results/modal-markllm-qwen3-exp-v2/generations.jsonl \
+  --scores results/modal-markllm-qwen3-exp-v2/token-scores.jsonl \
   --output results/remote-pilot/attacks \
   --env-file /absolute/path/to/private.env \
   --max-evaluation-prompts-per-language 4
@@ -152,22 +214,24 @@ recorded in the attack manifest. The completion cap is 4,096 tokens so
 mandatory reasoning cannot consume the whole allowance on a 192-token rewrite;
 only actually used tokens are billed.
 
-The stage resumes from `api-calls.jsonl`, `beta-calibration.json`, and
-`raw-candidates.jsonl`. Reusing an output directory with different inputs or
-configuration is rejected.
+The stage resumes from `api-calls.jsonl`, `beta-calibration.json`,
+`raw-candidates.jsonl`, and `raw-baselines.jsonl`. It exports candidate
+algorithms to `candidates.jsonl`, controls to `baselines.jsonl`, and their union
+to `evaluation-inputs.jsonl`. Reusing an output directory with different inputs
+or configuration is rejected.
 
 ## 4. Detect and validate on Modal
 
 ```bash
 .venv/bin/modal run modal_pipeline.py \
   --stage evaluate \
-  --run-id markllm-qwen3-v1 \
-  --candidates results/remote-pilot/attacks/candidates.jsonl \
+  --run-id markllm-qwen3-exp-v2 \
+  --candidates results/remote-pilot/attacks/evaluation-inputs.jsonl \
   --output results/remote-pilot/modal
 ```
 
-This uploads only candidate text, runs the pinned official MarkLLM detectors,
-and computes multilingual embedding and NLI quality. The result is
+This uploads candidate and control text, runs the pinned official MarkLLM
+detectors, and computes multilingual embedding and NLI quality. The result is
 `candidate-evaluations.jsonl`.
 
 ## 5. Finalize held-out metrics
@@ -175,6 +239,7 @@ and computes multilingual embedding and NLI quality. The result is
 ```bash
 .venv/bin/unmarker-remote-bench finalize \
   --candidates results/remote-pilot/attacks/candidates.jsonl \
+  --baselines results/remote-pilot/attacks/baselines.jsonl \
   --evaluations results/remote-pilot/modal/candidate-evaluations.jsonl \
   --api-calls results/remote-pilot/attacks/api-calls.jsonl \
   --output results/remote-pilot/report
@@ -190,6 +255,11 @@ The report contains fixed-budget and progressive held-out tables with:
 - observed OpenRouter latency, cost, and cost per 1,000 tokens;
 - selected-budget distribution and surrogate pass rate.
 
+The same report contains separate oracle and re-stamp tables. Oracle cost is
+shown both for the precomputed attempt pool and for simulated adaptive stopping.
+Neither control appears in the surrogate fit, progressive candidate ranking, or
+human-review sheet.
+
 Repeat step 3 without the prompt limit only after the pilot artifacts look
 correct. Use a new output directory and, for a formal run, a new immutable run
 ID.
@@ -201,11 +271,16 @@ The main files are:
 - Modal prepare: `generations.jsonl`, `corpus-summary.json`,
   `token-scores.jsonl`, and their manifests;
 - OpenRouter attacks: `api-calls.jsonl`, `beta-calibration.json`,
-  `candidates.jsonl`, and `attack-summary.json`;
+  `candidates.jsonl`, `baselines.jsonl`, `evaluation-inputs.jsonl`, and
+  `attack-summary.json`;
 - Modal evaluation: `candidate-evaluations.jsonl` and manifest;
 - finalization: `summary.json`, `REPORT.md`,
-  `progressive-selections.jsonl`, `human-review.csv`, and the separate blind
-  key.
+  `progressive-selections.jsonl`, `adaptive-oracle-selections.jsonl`,
+  `human-review.csv`, and the separate blind key.
+
+The future `/capabilities` and asynchronous batch API boundary is documented in
+[`BACKEND_CONTRACT.md`](BACKEND_CONTRACT.md), but no HTTP service is introduced
+at this research stage.
 
 The result applies only to the reproduced MarkLLM algorithms and the pinned
 models. It does not establish removal of Claude's watermark or evasion of an

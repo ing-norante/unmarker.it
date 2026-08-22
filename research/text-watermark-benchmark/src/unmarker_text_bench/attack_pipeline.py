@@ -22,6 +22,7 @@ from .self_information import (
     unique_token_strings,
 )
 from .tokenization import tokenize
+from .unicode_hygiene import UnicodeHygieneResult, clean_unicode
 
 
 class Rewriter(Protocol):
@@ -75,6 +76,9 @@ class AttackConfig:
     max_logit_bias_token_ids: int = 300
     development_fraction: float = 0.25
     max_evaluation_prompts_per_language: int | None = None
+    enable_oracle_baseline: bool = True
+    oracle_max_attempts: int = 3
+    enable_restamp_control: bool = True
     send_seed: bool = False
     seed: int = 20260819
 
@@ -99,7 +103,7 @@ PAPER_PROVENANCE = {
 
 
 class AttackRunner:
-    ARTIFACT_SCHEMA_VERSION = 1
+    ARTIFACT_SCHEMA_VERSION = 2
 
     def __init__(
         self,
@@ -122,9 +126,11 @@ class AttackRunner:
         output_dir.mkdir(parents=True, exist_ok=True)
         calls_path = output_dir / "api-calls.jsonl"
         raw_candidates_path = output_dir / "raw-candidates.jsonl"
+        raw_baselines_path = output_dir / "raw-baselines.jsonl"
         manifest_path = output_dir / "attack-manifest.json"
         manifest = self._manifest(generations_path, scores_path)
-        if resume and (calls_path.exists() or raw_candidates_path.exists()):
+        checkpoint_paths = (calls_path, raw_candidates_path, raw_baselines_path)
+        if resume and any(path.exists() for path in checkpoint_paths):
             if (
                 not manifest_path.exists()
                 or json.loads(manifest_path.read_text(encoding="utf-8")) != manifest
@@ -135,12 +141,16 @@ class AttackRunner:
         else:
             calls_path.write_text("", encoding="utf-8")
             raw_candidates_path.write_text("", encoding="utf-8")
+            raw_baselines_path.write_text("", encoding="utf-8")
         _write_json(manifest_path, manifest)
 
         self.calls_path = calls_path
         self.calls = {row["call_key"]: row for row in _read_jsonl(calls_path)}
         candidates = {
             row["candidate_key"]: row for row in _read_jsonl(raw_candidates_path)
+        }
+        baselines = {
+            row["candidate_key"]: row for row in _read_jsonl(raw_baselines_path)
         }
         generations = _read_jsonl(generations_path)
         scores_by_key = {row["score_key"]: row for row in _read_jsonl(scores_path)}
@@ -194,12 +204,60 @@ class AttackRunner:
                     candidates[candidate_key] = candidate
                     _append_jsonl(raw_candidates_path, candidate)
 
+            if self.config.enable_oracle_baseline:
+                for attempt in range(1, self.config.oracle_max_attempts + 1):
+                    candidate_key = f"{case_key}|adaptive-oracle|attempt={attempt}"
+                    if candidate_key in baselines:
+                        continue
+                    baseline = self._generate_baseline(
+                        candidate_key=candidate_key,
+                        generation=generation,
+                        source_text=generation["watermarked_text"],
+                        pipeline="adaptive_oracle_paraphrase",
+                        artifact_kind="adaptive_oracle_attempt",
+                        source_kind="watermarked",
+                        attack_split=attack_splits[generation["sample_id"]],
+                        attempt=attempt,
+                        call_key=candidate_key,
+                    )
+                    baselines[candidate_key] = baseline
+                    _append_jsonl(raw_baselines_path, baseline)
+
+            if self.config.enable_restamp_control:
+                candidate_key = f"{case_key}|restamp-control"
+                if candidate_key not in baselines:
+                    baseline = self._generate_baseline(
+                        candidate_key=candidate_key,
+                        generation=generation,
+                        source_text=generation["unwatermarked_text"],
+                        pipeline="restamp_control",
+                        artifact_kind="restamp_control",
+                        source_kind="clean",
+                        attack_split=attack_splits[generation["sample_id"]],
+                        attempt=1,
+                        call_key=f"{generation['sample_id']}|restamp-control",
+                    )
+                    baselines[candidate_key] = baseline
+                    _append_jsonl(raw_baselines_path, baseline)
+
         ordered = [candidates[key] for key in sorted(candidates)]
+        ordered_baselines = [baselines[key] for key in sorted(baselines)]
         _write_jsonl(output_dir / "candidates.jsonl", ordered)
+        _write_jsonl(output_dir / "baselines.jsonl", ordered_baselines)
+        _write_jsonl(
+            output_dir / "evaluation-inputs.jsonl", [*ordered, *ordered_baselines]
+        )
         summary = {
             "artifact_schema_version": self.ARTIFACT_SCHEMA_VERSION,
             "evaluation_cases": len(evaluation_rows),
             "candidate_count": len(ordered),
+            "baseline_count": len(ordered_baselines),
+            "evaluation_input_count": len(ordered) + len(ordered_baselines),
+            "baseline_breakdown": dict(
+                sorted(
+                    Counter(row["artifact_kind"] for row in ordered_baselines).items()
+                )
+            ),
             "api_call_count": len(self.calls),
             "bira_beta": beta,
             "pipelines": list(self.config.pipelines),
@@ -212,6 +270,22 @@ class AttackRunner:
             ),
             "rewriter": self.rewriter.metadata,
             "paper_provenance": PAPER_PROVENANCE,
+            "controls": {
+                "adaptive_oracle": {
+                    "enabled": self.config.enable_oracle_baseline,
+                    "max_attempts": self.config.oracle_max_attempts,
+                    "role": "target-detector oracle baseline; excluded from candidate ranking",
+                },
+                "restamp": {
+                    "enabled": self.config.enable_restamp_control,
+                    "role": "clean-text false-positive control; excluded from candidate ranking",
+                },
+                "unicode_hygiene": {
+                    "enabled": True,
+                    "nfkc": False,
+                    "role": "conservative post-rewrite normalization with per-output audit",
+                },
+            },
             "warning": (
                 "Candidates have not yet been evaluated by target MarkLLM detectors or neural "
                 "quality validators. Run the remote evaluation stage before drawing conclusions."
@@ -405,7 +479,7 @@ class AttackRunner:
             raise ValueError(f"Unknown attack pipeline: {pipeline}")
         call_keys.append(call["call_key"])
 
-        candidate = self._clean_output(call["text"])
+        candidate, hygiene = self._clean_output(call["text"])
         original_tokens = [value.text.lower() for value in tokenize(original)]
         candidate_tokens = [value.text.lower() for value in tokenize(candidate)]
         distance = levenshtein(original_tokens, candidate_tokens)
@@ -419,6 +493,8 @@ class AttackRunner:
             "language": generation["language"],
             "domain": generation["domain"],
             "algorithm": generation["algorithm"],
+            "artifact_kind": "candidate_algorithm",
+            "source_kind": "watermarked",
             "pipeline": pipeline,
             "budget": budget_name,
             "budget_ratio": budget_ratio,
@@ -435,8 +511,62 @@ class AttackRunner:
             "token_edit_distance": distance,
             "changed_token_ratio": distance / max(len(original_tokens), 1),
             "deterministic_quality": quality.to_dict(),
+            "unicode_hygiene": hygiene.audit_dict(),
             "api_call_keys": list(dict.fromkeys(call_keys)),
             "adaptive_attempts": attempts,
+        }
+
+    def _generate_baseline(
+        self,
+        candidate_key: str,
+        generation: dict[str, Any],
+        source_text: str,
+        pipeline: str,
+        artifact_kind: str,
+        source_kind: str,
+        attack_split: str,
+        attempt: int,
+        call_key: str,
+    ) -> dict[str, Any]:
+        call = self._call(
+            call_key=call_key,
+            stage=pipeline,
+            system_prompt=SYSTEM_PROMPT,
+            user_prompt=self._baseline_prompt(
+                source_text,
+                generation["language"],
+                pipeline,
+                attempt,
+            ),
+        )
+        candidate, hygiene = self._clean_output(call["text"])
+        original_tokens = [value.text.lower() for value in tokenize(source_text)]
+        candidate_tokens = [value.text.lower() for value in tokenize(candidate)]
+        distance = levenshtein(original_tokens, candidate_tokens)
+        quality = deterministic_quality(source_text, candidate, generation["language"])
+        return {
+            "candidate_key": candidate_key,
+            "case_key": f"{generation['sample_id']}|{generation['algorithm']}",
+            "sample_id": generation["sample_id"],
+            "language": generation["language"],
+            "domain": generation["domain"],
+            "algorithm": generation["algorithm"],
+            "pipeline": pipeline,
+            "budget": "adaptive"
+            if artifact_kind == "adaptive_oracle_attempt"
+            else "control",
+            "budget_ratio": 1.0,
+            "attack_split": attack_split,
+            "artifact_kind": artifact_kind,
+            "source_kind": source_kind,
+            "attempt": attempt,
+            "original_text": source_text,
+            "candidate_text": candidate,
+            "token_edit_distance": distance,
+            "changed_token_ratio": distance / max(len(original_tokens), 1),
+            "deterministic_quality": quality.to_dict(),
+            "unicode_hygiene": hygiene.audit_dict(),
+            "api_call_keys": [call["call_key"]],
         }
 
     def _call(
@@ -518,7 +648,29 @@ class AttackRunner:
         )
 
     @staticmethod
-    def _clean_output(text: str) -> str:
+    def _baseline_prompt(
+        source_text: str,
+        language: str,
+        pipeline: str,
+        attempt: int,
+    ) -> str:
+        if pipeline == "adaptive_oracle_paraphrase":
+            instruction = (
+                "Produce a fluent full paraphrase using a materially different wording and "
+                f"sentence structure. This is independent attempt {attempt}; preserve meaning exactly."
+            )
+        else:
+            instruction = (
+                "Produce a fluent full paraphrase of this clean control passage. Do not optimize "
+                "against or refer to any watermark detector."
+            )
+        return (
+            f"{instruction}\n\n{protected_prompt_fragment(source_text, language)}"
+            f"\n\n<SOURCE>\n{source_text}\n</SOURCE>"
+        )
+
+    @staticmethod
+    def _clean_output(text: str) -> tuple[str, UnicodeHygieneResult]:
         value = text.strip()
         if value.startswith("```") and value.endswith("```"):
             lines = value.splitlines()
@@ -526,7 +678,8 @@ class AttackRunner:
         for prefix in ("Rewritten passage:", "Rewritten text:", "Testo riscritto:"):
             if value.lower().startswith(prefix.lower()):
                 value = value[len(prefix) :].lstrip()
-        return value
+        hygiene = clean_unicode(value)
+        return hygiene.text, hygiene
 
     def _manifest(self, generations_path: Path, scores_path: Path) -> dict[str, Any]:
         manifest = {
@@ -624,6 +777,8 @@ class AttackRunner:
             raise ValueError(f"Unsupported pipelines: {sorted(invalid)}")
         if not 0.0 < self.config.development_fraction < 0.5:
             raise ValueError("development_fraction must be in (0, 0.5)")
+        if self.config.oracle_max_attempts < 1:
+            raise ValueError("oracle_max_attempts must be at least 1")
         if (
             self.config.max_evaluation_prompts_per_language is not None
             and self.config.max_evaluation_prompts_per_language < 4

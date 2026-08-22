@@ -13,6 +13,10 @@ from unmarker_text_bench.attack_pipeline import AttackConfig, AttackRunner
 from unmarker_text_bench.final_report import FinalReportRunner
 from unmarker_text_bench.language_model import ReferenceNgramScorer
 from unmarker_text_bench.lexicon import VariantLexicon
+from unmarker_text_bench.markllm_backend import (
+    markllm_algorithm_capabilities,
+    normalize_detection_result,
+)
 from unmarker_text_bench.markllm_gate import (
     DetectionResult,
     Gate2Config,
@@ -43,6 +47,7 @@ from unmarker_text_bench.tokenization import (
     tokenize,
 )
 from unmarker_text_bench.types import Sample
+from unmarker_text_bench.unicode_hygiene import clean_unicode
 from unmarker_text_bench.validators import QualityValidator
 from unmarker_text_bench.watermarks import KgwSurrogate
 
@@ -76,6 +81,36 @@ class TokenizationTests(unittest.TestCase):
             "L'architettura dell'evento non contiene una citazione.", "it"
         )
         self.assertEqual(protected["quotations"], [])
+
+
+class UnicodeHygieneTests(unittest.TestCase):
+    def test_removes_high_confidence_carriers_and_normalizes_spaces(self) -> None:
+        result = clean_unicode("alpha\u200bbeta\u00adgamma\u00a0delta")
+        self.assertEqual(result.text, "alphabetagamma delta")
+        self.assertTrue(result.changed)
+        self.assertEqual(result.removed_count, 2)
+        self.assertEqual(result.replaced_count, 1)
+
+    def test_preserves_emoji_and_script_join_controls(self) -> None:
+        text = "👩\u200d💻 می\u200cرود"
+        result = clean_unicode(text)
+        self.assertEqual(result.text, text)
+        self.assertFalse(result.changed)
+        self.assertEqual(result.preserved_or_reported_count, 2)
+
+    def test_bidi_overrides_are_removed_but_balanced_isolates_survive(self) -> None:
+        text = "safe \u202eabc\u202c and \u2067שלום\u2069"
+        result = clean_unicode(text)
+        self.assertEqual(result.text, "safe abc and \u2067שלום\u2069")
+        self.assertEqual(result.removed_count, 2)
+
+    def test_valid_subdivision_flag_tags_survive(self) -> None:
+        flag = "\U0001f3f4\U000e0067\U000e0062\U000e0065\U000e006e\U000e0067\U000e007f"
+        self.assertEqual(clean_unicode(flag).text, flag)
+
+    def test_nfkc_is_explicit(self) -> None:
+        self.assertEqual(clean_unicode("①").text, "①")
+        self.assertEqual(clean_unicode("①", nfkc=True).text, "1")
 
 
 class PipelineTests(unittest.TestCase):
@@ -227,10 +262,10 @@ class MarkLLMGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             summary = runner.run(Path(directory))
             self.assertEqual(backend.unwatermarked_calls, len(self.prompts))
-            self.assertEqual(backend.watermarked_calls, 6)
+            self.assertEqual(backend.watermarked_calls, 8)
             self.assertEqual(summary["source_prompt_count"], 4)
             self.assertFalse(summary["lexicon_used_for_generation"])
-            self.assertEqual(len(summary["cells"]), 6)
+            self.assertEqual(len(summary["cells"]), 8)
             self.assertTrue((Path(directory) / "generations.jsonl").exists())
             self.assertTrue((Path(directory) / "config.json").exists())
             self.assertTrue(
@@ -262,9 +297,26 @@ class MarkLLMGateTests(unittest.TestCase):
             backend = FakeMarkLLMBackend()
             MarkLLMGateRunner(self.prompts, backend, config).run(output, resume=False)
             self.assertEqual(
-                len([line for line in raw_path.read_text().splitlines() if line]), 12
+                len([line for line in raw_path.read_text().splitlines() if line]), 16
             )
             self.assertEqual(backend.unwatermarked_calls, 4)
+
+
+class MarkLLMBackendContractTests(unittest.TestCase):
+    def test_p_values_are_put_on_higher_is_more_watermarked_axis(self) -> None:
+        detection = normalize_detection_result(
+            "EXP", {"is_watermarked": True, "score": 1e-4}
+        )
+        self.assertTrue(detection.detected)
+        self.assertAlmostEqual(detection.score, 4.0)
+
+    def test_expgumbel_dense_allocation_is_rejected_for_qwen_vocab(self) -> None:
+        capabilities = markllm_algorithm_capabilities(("EXP", "EXPGumbel"), 151_936)
+        self.assertTrue(capabilities["EXP"]["supported"])
+        self.assertFalse(capabilities["EXPGumbel"]["supported"])
+        self.assertGreater(
+            capabilities["EXPGumbel"]["minimum_dense_table_bytes"], 300 * 1024**3
+        )
 
 
 class SelfInformationTests(unittest.TestCase):
@@ -412,7 +464,7 @@ class FakeRewriter:
     ) -> RewriteResponse:
         self.calls += 1
         return RewriteResponse(
-            text="A fluent alternative passage with stable factual content.",
+            text="A fluent alter\u200bnative passage with stable factual content.",
             request_id=f"fake-{self.calls}",
             model="fake-frontier",
             provider="fake-provider",
@@ -479,9 +531,11 @@ class RemotePipelineTests(unittest.TestCase):
                         "algorithm": "KGW",
                         "unwatermarked_text": text,
                         "watermarked_text": original,
+                        "unwatermarked_score": 0.1,
                         "watermarked_score": 0.9,
                         "calibrated_threshold_1pct": 0.5,
                         "calibrated_watermarked_detected": True,
+                        "calibrated_unwatermarked_detected": False,
                     }
                 )
                 scores.append(
@@ -529,6 +583,8 @@ class RemotePipelineTests(unittest.TestCase):
             ).run(generations, scores, attacks)
             self.assertEqual(attack_summary["evaluation_cases"], 8)
             self.assertEqual(attack_summary["candidate_count"], 96)
+            self.assertEqual(attack_summary["baseline_count"], 32)
+            self.assertEqual(attack_summary["evaluation_input_count"], 128)
             candidates = [
                 json.loads(line)
                 for line in (attacks / "candidates.jsonl").read_text().splitlines()
@@ -537,12 +593,26 @@ class RemotePipelineTests(unittest.TestCase):
                 {row["attack_split"] for row in candidates},
                 {"development", "held_out_test"},
             )
+            self.assertTrue(
+                all("\u200b" not in row["candidate_text"] for row in candidates)
+            )
+            self.assertTrue(
+                all(row["unicode_hygiene"]["changed"] for row in candidates)
+            )
 
             evaluations = root / "evaluations.jsonl"
             evaluation_summary = CandidateEvaluationRunner(
                 FakeDetector(), FakeNeuralQuality(), batch_size=7
-            ).run(generations, attacks / "candidates.jsonl", evaluations)
-            self.assertEqual(evaluation_summary["candidates"], 96)
+            ).run(generations, attacks / "evaluation-inputs.jsonl", evaluations)
+            self.assertEqual(evaluation_summary["candidates"], 128)
+            self.assertEqual(
+                evaluation_summary["artifact_breakdown"],
+                {
+                    "adaptive_oracle_attempt": 24,
+                    "candidate_algorithm": 96,
+                    "restamp_control": 8,
+                },
+            )
 
             report_dir = root / "report"
             summary = FinalReportRunner().run(
@@ -550,14 +620,19 @@ class RemotePipelineTests(unittest.TestCase):
                 evaluations,
                 attacks / "api-calls.jsonl",
                 report_dir,
+                baselines_path=attacks / "baselines.jsonl",
             )
             self.assertEqual(
                 summary["benchmark_scope"],
                 "official_markllm_held_out_attack_evaluation",
             )
             self.assertTrue(summary["progressive_cells"])
+            self.assertTrue(summary["adaptive_oracle"]["cells"])
+            self.assertTrue(summary["restamp_control"]["cells"])
+            self.assertEqual(summary["adaptive_oracle"]["cells"][0]["mean_queries"], 1)
             self.assertTrue((report_dir / "REPORT.md").exists())
             self.assertTrue((report_dir / "human-review.csv").exists())
+            self.assertTrue((report_dir / "adaptive-oracle-selections.jsonl").exists())
 
 
 if __name__ == "__main__":

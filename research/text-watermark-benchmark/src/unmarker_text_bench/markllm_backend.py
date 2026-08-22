@@ -3,12 +3,71 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import math
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
 from .markllm_gate import DetectionResult
+
+_P_VALUE_ALGORITHMS = {"EXP", "EXPGumbel", "EXPEdit", "ITSEdit"}
+_NATIVE_GENERATION_ALGORITHMS = {"EXP", "EXPGumbel"}
+_DEFAULT_EXPGUMBEL_MEMORY_LIMIT_BYTES = 16 * 1024**3
+
+
+def normalize_detection_result(
+    algorithm: str, result: dict[str, Any]
+) -> DetectionResult:
+    """Put all detector scores on the common higher-means-more-watermarked axis."""
+
+    raw_score = float(result["score"])
+    if not math.isfinite(raw_score):
+        raise ValueError(f"{algorithm} returned a non-finite detector score")
+    if algorithm in _P_VALUE_ALGORITHMS:
+        if not 0.0 <= raw_score <= 1.0:
+            raise ValueError(f"{algorithm} returned an invalid p-value: {raw_score}")
+        bounded = min(max(raw_score, 1e-300), 1.0)
+        score = -math.log10(bounded)
+    else:
+        score = raw_score
+    return DetectionResult(bool(result["is_watermarked"]), score)
+
+
+def markllm_algorithm_capabilities(
+    algorithms: tuple[str, ...],
+    vocab_size: int,
+    expgumbel_prefix_length: int = 2,
+    expgumbel_memory_limit_bytes: int = _DEFAULT_EXPGUMBEL_MEMORY_LIMIT_BYTES,
+) -> dict[str, dict[str, Any]]:
+    capabilities: dict[str, dict[str, Any]] = {}
+    for algorithm in algorithms:
+        if algorithm != "EXPGumbel":
+            capabilities[algorithm] = {
+                "supported": True,
+                "official_generation": (
+                    "native"
+                    if algorithm in _NATIVE_GENERATION_ALGORITHMS
+                    else "logits_processor"
+                ),
+            }
+            continue
+        # The pinned official implementation materializes both a float32 uniform
+        # matrix and its Gumbel transform with shape (V * prefix, V).
+        estimated_bytes = 2 * vocab_size * expgumbel_prefix_length * vocab_size * 4
+        capabilities[algorithm] = {
+            "supported": estimated_bytes <= expgumbel_memory_limit_bytes,
+            "official_generation": "native",
+            "minimum_dense_table_bytes": estimated_bytes,
+            "memory_limit_bytes": expgumbel_memory_limit_bytes,
+            "reason": (
+                None
+                if estimated_bytes <= expgumbel_memory_limit_bytes
+                else "official MarkLLM allocates dense uniform and Gumbel VxV tables"
+            ),
+        }
+    return capabilities
 
 
 class OfficialMarkLLMBackend:
@@ -32,6 +91,9 @@ class OfficialMarkLLMBackend:
         top_k: int = 20,
         use_chat_template: bool = True,
         enable_thinking: bool = False,
+        config_overrides: dict[str, dict[str, Any]] | None = None,
+        generated_config_dir: Path | None = None,
+        expgumbel_memory_limit_bytes: int = _DEFAULT_EXPGUMBEL_MEMORY_LIMIT_BYTES,
     ) -> None:
         self.markllm_root = markllm_root.resolve()
         self.model_name = model_name
@@ -44,6 +106,16 @@ class OfficialMarkLLMBackend:
         self.top_k = top_k
         self.use_chat_template = use_chat_template
         self.enable_thinking = enable_thinking
+        self.config_overrides = config_overrides or {}
+        self._temporary_config_dir = (
+            tempfile.TemporaryDirectory(prefix="unmarker-markllm-config-")
+            if generated_config_dir is None
+            else None
+        )
+        self.generated_config_dir = generated_config_dir or Path(
+            self._temporary_config_dir.name
+        )
+        self.expgumbel_memory_limit_bytes = expgumbel_memory_limit_bytes
         self._validate_source_tree()
         if str(self.markllm_root) not in sys.path:
             sys.path.insert(0, str(self.markllm_root))
@@ -51,6 +123,7 @@ class OfficialMarkLLMBackend:
         try:
             import torch
             from transformers import (
+                AutoConfig,
                 AutoModelForCausalLM,
                 AutoTokenizer,
                 LogitsProcessorList,
@@ -71,6 +144,27 @@ class OfficialMarkLLMBackend:
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_name, revision=model_revision
         )
+        model_config = AutoConfig.from_pretrained(model_name, revision=model_revision)
+        self.algorithm_capabilities = markllm_algorithm_capabilities(
+            algorithms,
+            int(model_config.vocab_size),
+            expgumbel_memory_limit_bytes=expgumbel_memory_limit_bytes,
+        )
+        unsupported = {
+            algorithm: capability
+            for algorithm, capability in self.algorithm_capabilities.items()
+            if not capability["supported"]
+        }
+        if unsupported:
+            details = "; ".join(
+                f"{algorithm}: needs at least {capability['minimum_dense_table_bytes'] / 1024**3:.1f} GiB"
+                for algorithm, capability in unsupported.items()
+            )
+            raise ValueError(
+                "Official MarkLLM algorithm is unsafe for this vocabulary before allocation: "
+                f"{details}. Use EXP for the same exponential/Gumbel watermark family or a "
+                "model with a much smaller vocabulary."
+            )
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         model_kwargs: dict[str, Any] = {
@@ -113,12 +207,15 @@ class OfficialMarkLLMBackend:
             **self.generation_kwargs,
         )
         self.watermarks: dict[str, Any] = {}
+        self.effective_config_paths: dict[str, Path] = {}
         for algorithm in algorithms:
-            config_path = self.markllm_root / "config" / f"{algorithm}.json"
-            if not config_path.exists():
+            source_config_path = self.markllm_root / "config" / f"{algorithm}.json"
+            if not source_config_path.exists():
                 raise FileNotFoundError(
-                    f"Missing MarkLLM algorithm config: {config_path}"
+                    f"Missing MarkLLM algorithm config: {source_config_path}"
                 )
+            config_path = self._materialize_config(algorithm, source_config_path)
+            self.effective_config_paths[algorithm] = config_path
             self.watermarks[algorithm] = AutoWatermark.load(
                 algorithm,
                 algorithm_config=str(config_path),
@@ -143,11 +240,19 @@ class OfficialMarkLLMBackend:
             "top_k": self.top_k,
             "use_chat_template": self.use_chat_template,
             "enable_thinking": self.enable_thinking,
+            "score_transforms": {
+                algorithm: (
+                    "negative_log10_p_value"
+                    if algorithm in _P_VALUE_ALGORITHMS
+                    else "identity"
+                )
+                for algorithm in self.algorithms
+            },
+            "algorithm_capabilities": self.algorithm_capabilities,
+            "config_overrides": self.config_overrides,
             "runtime": self._runtime_metadata(),
             "algorithm_config_sha256": {
-                algorithm: self._sha256(
-                    self.markllm_root / "config" / f"{algorithm}.json"
-                )
+                algorithm: self._sha256(self.effective_config_paths[algorithm])
                 for algorithm in self.algorithms
             },
         }
@@ -157,6 +262,26 @@ class OfficialMarkLLMBackend:
 
     def generate_watermarked(self, algorithm: str, prompt: str, seed: int) -> str:
         watermark = self.watermarks[algorithm]
+        if algorithm in _NATIVE_GENERATION_ALGORITHMS:
+            self._seed(seed)
+            rendered_prompt, _ = self._render_prompt(prompt)
+            generated = watermark.generate_watermarked_text(rendered_prompt).strip()
+            prompt_ids = self.tokenizer.encode(
+                rendered_prompt, add_special_tokens=True, return_tensors="pt"
+            )[0]
+            decoded_prompt = self.tokenizer.decode(
+                prompt_ids, skip_special_tokens=True
+            ).strip()
+            if not generated.startswith(decoded_prompt):
+                raise ValueError(
+                    f"Could not remove the prompt from native {algorithm} generation"
+                )
+            continuation = generated[len(decoded_prompt) :].strip()
+            if not continuation:
+                raise ValueError(
+                    f"Native {algorithm} generation returned no continuation"
+                )
+            return continuation
         processor = watermark.logits_processor
         if hasattr(processor, "state"):
             processor.state = None
@@ -168,7 +293,7 @@ class OfficialMarkLLMBackend:
 
     def detect(self, algorithm: str, text: str) -> DetectionResult:
         result = self.watermarks[algorithm].detect_watermark(text)
-        return DetectionResult(bool(result["is_watermarked"]), float(result["score"]))
+        return normalize_detection_result(algorithm, result)
 
     def count_tokens(self, text: str) -> int:
         return len(self.tokenizer(text, add_special_tokens=False)["input_ids"])
@@ -211,6 +336,20 @@ class OfficialMarkLLMBackend:
             self.torch.cuda.manual_seed_all(seed)
         elif self.device == "mps" and hasattr(self.torch, "mps"):
             self.torch.mps.manual_seed(seed)
+
+    def _materialize_config(self, algorithm: str, source: Path) -> Path:
+        overrides = self.config_overrides.get(algorithm)
+        if not overrides:
+            return source
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        payload.update(overrides)
+        self.generated_config_dir.mkdir(parents=True, exist_ok=True)
+        target = self.generated_config_dir / f"{algorithm}.json"
+        target.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        return target
 
     def _resolve_device(self, requested: str) -> str:
         if requested != "auto":
@@ -279,6 +418,7 @@ class OfficialMarkLLMDetectorBackend:
         device: str = "cpu",
         config_overrides: dict[str, dict[str, Any]] | None = None,
         generated_config_dir: Path | None = None,
+        expgumbel_memory_limit_bytes: int = _DEFAULT_EXPGUMBEL_MEMORY_LIMIT_BYTES,
     ) -> None:
         self.markllm_root = markllm_root.resolve()
         self.tokenizer_name = tokenizer_name
@@ -287,6 +427,7 @@ class OfficialMarkLLMDetectorBackend:
         self.device = device
         self.config_overrides = config_overrides or {}
         self.generated_config_dir = generated_config_dir
+        self.expgumbel_memory_limit_bytes = expgumbel_memory_limit_bytes
         self._validate_source_tree()
         if str(self.markllm_root) not in sys.path:
             sys.path.insert(0, str(self.markllm_root))
@@ -307,6 +448,25 @@ class OfficialMarkLLMDetectorBackend:
             revision=tokenizer_revision,
         )
         self.vocab_size = int(model_config.vocab_size)
+        self.algorithm_capabilities = markllm_algorithm_capabilities(
+            algorithms,
+            self.vocab_size,
+            expgumbel_memory_limit_bytes=expgumbel_memory_limit_bytes,
+        )
+        unsupported = {
+            algorithm: capability
+            for algorithm, capability in self.algorithm_capabilities.items()
+            if not capability["supported"]
+        }
+        if unsupported:
+            details = "; ".join(
+                f"{algorithm}: needs at least {capability['minimum_dense_table_bytes'] / 1024**3:.1f} GiB"
+                for algorithm, capability in unsupported.items()
+            )
+            raise ValueError(
+                "Official MarkLLM detector is unsafe for this vocabulary before allocation: "
+                f"{details}."
+            )
         transformers_config = TransformersConfig(
             model=None,
             tokenizer=self.tokenizer,
@@ -347,6 +507,15 @@ class OfficialMarkLLMDetectorBackend:
             "tokenizer_length": len(self.tokenizer),
             "algorithms": list(self.algorithms),
             "config_overrides": self.config_overrides,
+            "algorithm_capabilities": self.algorithm_capabilities,
+            "score_transforms": {
+                algorithm: (
+                    "negative_log10_p_value"
+                    if algorithm in _P_VALUE_ALGORITHMS
+                    else "identity"
+                )
+                for algorithm in self.algorithms
+            },
             "algorithm_config_sha256": {
                 algorithm: self._sha256(
                     self.markllm_root / "config" / f"{algorithm}.json"
@@ -357,7 +526,7 @@ class OfficialMarkLLMDetectorBackend:
 
     def detect(self, algorithm: str, text: str) -> DetectionResult:
         result = self.watermarks[algorithm].detect_watermark(text)
-        return DetectionResult(bool(result["is_watermarked"]), float(result["score"]))
+        return normalize_detection_result(algorithm, result)
 
     def count_tokens(self, text: str) -> int:
         return len(self.tokenizer(text, add_special_tokens=False)["input_ids"])

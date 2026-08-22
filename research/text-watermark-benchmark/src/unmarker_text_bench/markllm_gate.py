@@ -43,7 +43,7 @@ class MarkLLMGenerationBackend(Protocol):
 
 @dataclass(frozen=True)
 class Gate2Config:
-    algorithms: tuple[str, ...] = ("KGW", "Unigram", "SynthID")
+    algorithms: tuple[str, ...] = ("KGW", "Unigram", "SynthID", "EXP")
     target_fpr: float = 0.01
     min_calibration_prompts_per_language: int = 100
     min_evaluation_prompts_per_language: int = 100
@@ -321,6 +321,9 @@ class MarkLLMGateRunner:
             "top_k",
             "use_chat_template",
             "enable_thinking",
+            "score_transforms",
+            "algorithm_capabilities",
+            "config_overrides",
             "algorithm_config_sha256",
         )
         manifest = {

@@ -26,7 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--model", default=DEFAULT_EVIDENCE_MODEL)
     parser.add_argument("--model-revision", default=DEFAULT_EVIDENCE_MODEL_REVISION)
-    parser.add_argument("--algorithms", default="KGW,Unigram,SynthID")
+    parser.add_argument("--algorithms", default="KGW,Unigram,SynthID,EXP")
     parser.add_argument(
         "--device", choices=("auto", "cpu", "mps", "cuda"), default="auto"
     )
@@ -72,6 +72,9 @@ def main() -> None:
         min_new_tokens=min(args.min_generated_tokens, args.max_new_tokens),
         use_chat_template=not args.raw_prompt,
         enable_thinking=args.enable_thinking,
+        config_overrides={"EXP": {"sequence_length": args.max_new_tokens}}
+        if "EXP" in algorithms
+        else None,
     )
     summary = MarkLLMGateRunner(prompts, backend, config).run(
         args.output,

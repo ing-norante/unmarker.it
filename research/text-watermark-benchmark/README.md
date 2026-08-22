@@ -15,6 +15,12 @@ self-information scoring, target detection, and neural quality validation;
 OpenRouter supplies the constrained frontier rewriter. It does not change the
 React application's dependency graph and requires no Ollama process.
 
+The remote run also produces two controls that are deliberately excluded from
+the candidate-algorithm ranking: an adaptive target-detector oracle paraphrase
+baseline and a clean-text re-stamp control. Every rewrite passes through a
+conservative, separately runnable Unicode hygiene module with a per-output
+audit trail.
+
 ## Current scope
 
 The default run is dependency-free and deterministic. It uses:
@@ -104,6 +110,7 @@ src/unmarker_text_bench/
   openrouter_backend.py provider-pinned constrained rewrite client
   remote_evaluation.py official detectors and multilingual neural validation
   final_report.py     development-fitted surrogate and held-out reports
+  unicode_hygiene.py conservative invisible-carrier cleanup and audit
 modal_pipeline.py     resumable Modal GPU jobs and artifact transfer
 tests/
   test_benchmark.py
@@ -133,6 +140,26 @@ negation preservation. Both are regression gates, not independent quality
 evidence, and are omitted from the primary result table.
 
 The human review sheet is required before treating an experiment as product evidence.
+
+## Conservative Unicode hygiene
+
+The Unicode module removes only high-confidence invisible carriers and
+canonicalizes space-like characters. It preserves valid emoji ZWJ sequences,
+script shaping controls, balanced bidi embeddings/isolates, CJK variation
+selectors, and subdivision-flag tags. Unknown format controls and private-use
+characters are reported rather than silently deleted. NFKC compatibility
+normalization is disabled unless explicitly requested.
+
+```bash
+printf 'alpha\u200bbeta' | uv run unmarker-unicode-hygiene
+
+uv run unmarker-unicode-hygiene input.txt \
+  --output cleaned.txt \
+  --report unicode-audit.json
+```
+
+This hygiene pass is useful independently, but its effect must not be presented
+as evidence of statistical watermark removal.
 
 ## Shared budget policies
 

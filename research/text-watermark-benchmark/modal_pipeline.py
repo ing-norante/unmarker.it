@@ -71,6 +71,7 @@ def generate_corpus(
     run_id: str,
     prompts_jsonl: str,
     allow_small_smoke: bool = False,
+    algorithms: tuple[str, ...] = ("KGW", "Unigram", "SynthID", "EXP"),
 ) -> dict:
     from unmarker_text_bench.markllm_backend import OfficialMarkLLMBackend
     from unmarker_text_bench.markllm_gate import (
@@ -88,7 +89,6 @@ def generate_corpus(
     ):
         raise ValueError("This run id already contains a different prompt corpus")
     prompts_path.write_text(prompts_jsonl, encoding="utf-8")
-    algorithms = ("KGW", "Unigram", "SynthID")
     backend = OfficialMarkLLMBackend(
         markllm_root=Path(REMOTE_MARKLLM_ROOT),
         model_name=GENERATION_MODEL,
@@ -102,6 +102,9 @@ def generate_corpus(
         top_k=20,
         use_chat_template=True,
         enable_thinking=False,
+        config_overrides={"EXP": {"sequence_length": 192}}
+        if "EXP" in algorithms
+        else None,
     )
     runner = MarkLLMGateRunner(
         load_prompts(prompts_path),
@@ -171,18 +174,29 @@ def evaluate_candidates(run_id: str) -> dict:
 
     run_dir = _remote_run_dir(run_id)
     generations = run_dir / "corpus" / "generations.jsonl"
-    candidates = run_dir / "attacks" / "candidates.jsonl"
+    candidates = run_dir / "attacks" / "evaluation-inputs.jsonl"
     if not generations.exists() or not candidates.exists():
         raise FileNotFoundError(
-            "Both corpus generations and uploaded candidates are required"
+            "Both corpus generations and uploaded evaluation inputs are required"
         )
-    algorithms = ("KGW", "Unigram", "SynthID")
+    algorithms = tuple(
+        sorted(
+            {
+                str(row["algorithm"])
+                for row in _read_jsonl(generations)
+                if row["split"] == "evaluation"
+            }
+        )
+    )
     detector = OfficialMarkLLMDetectorBackend(
         markllm_root=Path(REMOTE_MARKLLM_ROOT),
         tokenizer_name=GENERATION_MODEL,
         tokenizer_revision=GENERATION_MODEL_REVISION,
         algorithms=algorithms,
         device="cuda",
+        config_overrides={"EXP": {"sequence_length": 192}}
+        if "EXP" in algorithms
+        else None,
     )
     quality = NeuralQualityEvaluator(
         embedding_model=EMBEDDING_MODEL,
@@ -212,6 +226,8 @@ def main(
     candidates: str = "",
     output: str = "",
     allow_small_smoke: bool = False,
+    algorithms: str = "KGW,Unigram,SynthID,EXP",
+    prompts_per_cell: int = 0,
 ) -> None:
     """Run `prepare`, `evaluate`, or `download` from a Modal-authenticated machine."""
 
@@ -221,10 +237,30 @@ def main(
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     if stage == "prepare":
+        selected_algorithms = tuple(
+            value.strip() for value in algorithms.split(",") if value.strip()
+        )
+        if not selected_algorithms:
+            raise ValueError("--algorithms must contain at least one MarkLLM algorithm")
         prompt_text = Path(prompts).read_text(encoding="utf-8")
+        if prompts_per_cell:
+            if prompts_per_cell < 1:
+                raise ValueError("--prompts-per-cell must be at least 1")
+            if not allow_small_smoke:
+                raise ValueError(
+                    "--prompts-per-cell is an integration-only option; also pass "
+                    "--allow-small-smoke"
+                )
+            prompt_text = _limit_prompts_per_cell(prompt_text, prompts_per_cell)
         print(
             json.dumps(
-                generate_corpus.remote(run_id, prompt_text, allow_small_smoke), indent=2
+                generate_corpus.remote(
+                    run_id,
+                    prompt_text,
+                    allow_small_smoke,
+                    selected_algorithms,
+                ),
+                indent=2,
             )
         )
         print(json.dumps(score_corpus.remote(run_id), indent=2))
@@ -233,7 +269,7 @@ def main(
         if not candidates:
             raise ValueError("--candidates is required for the evaluate stage")
         with run_volume.batch_upload(force=True) as upload:
-            upload.put_file(candidates, f"/{run_id}/attacks/candidates.jsonl")
+            upload.put_file(candidates, f"/{run_id}/attacks/evaluation-inputs.jsonl")
         print(json.dumps(evaluate_candidates.remote(run_id), indent=2))
         _download_file(
             f"/{run_id}/evaluation/candidate-evaluations.jsonl",
@@ -294,3 +330,34 @@ def _download_file(remote_path: str, local_path: Path) -> None:
         if error.__class__.__name__ in {"NotFoundError", "FileNotFoundError"}:
             raise FileNotFoundError(remote_path) from error
         raise
+
+
+def _read_jsonl(path: Path) -> list[dict]:
+    with path.open(encoding="utf-8") as handle:
+        return [json.loads(line) for line in handle if line.strip()]
+
+
+def _limit_prompts_per_cell(prompts_jsonl: str, limit: int) -> str:
+    counts: dict[tuple[str, str], int] = {}
+    selected = []
+    for line_number, line in enumerate(prompts_jsonl.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            cell = (str(row["language"]), str(row["split"]))
+        except (json.JSONDecodeError, KeyError) as error:
+            raise ValueError(f"Invalid prompt JSONL at line {line_number}") from error
+        if counts.get(cell, 0) >= limit:
+            continue
+        selected.append(row)
+        counts[cell] = counts.get(cell, 0) + 1
+    required = {
+        (language, split)
+        for language in ("en", "it")
+        for split in ("calibration", "evaluation")
+    }
+    missing = sorted(required - set(counts))
+    if missing:
+        raise ValueError(f"Prompt subset is missing language/split cells: {missing}")
+    return "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in selected)

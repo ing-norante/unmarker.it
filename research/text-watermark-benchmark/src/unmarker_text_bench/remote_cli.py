@@ -49,6 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
     attack.add_argument("--beta-calibration-per-language", type=int, default=10)
     attack.add_argument("--initial-bira-beta", type=float, default=-10.0)
     attack.add_argument("--max-evaluation-prompts-per-language", type=int)
+    attack.add_argument("--oracle-max-attempts", type=int, default=3)
+    attack.add_argument("--no-oracle-baseline", action="store_true")
+    attack.add_argument("--no-restamp-control", action="store_true")
     attack.add_argument("--allow-provider-fallbacks", action="store_true")
     attack.add_argument("--send-seed", action="store_true")
     attack.add_argument("--no-resume", action="store_true")
@@ -59,11 +62,15 @@ def build_parser() -> argparse.ArgumentParser:
     estimate.add_argument("--generations", type=Path, required=True)
     estimate.add_argument("--evaluation-prompts-per-language", type=int)
     estimate.add_argument("--beta-calibration-per-language", type=int, default=10)
+    estimate.add_argument("--oracle-max-attempts", type=int, default=3)
+    estimate.add_argument("--no-oracle-baseline", action="store_true")
+    estimate.add_argument("--no-restamp-control", action="store_true")
 
     finalize = subparsers.add_parser(
         "finalize", help="Build held-out metrics and review sheet"
     )
     finalize.add_argument("--candidates", type=Path, required=True)
+    finalize.add_argument("--baselines", type=Path, required=True)
     finalize.add_argument("--evaluations", type=Path, required=True)
     finalize.add_argument("--api-calls", type=Path, required=True)
     finalize.add_argument("--output", type=Path, required=True)
@@ -105,6 +112,9 @@ def main() -> None:
             max_evaluation_prompts_per_language=(
                 args.max_evaluation_prompts_per_language
             ),
+            enable_oracle_baseline=not args.no_oracle_baseline,
+            oracle_max_attempts=args.oracle_max_attempts,
+            enable_restamp_control=not args.no_restamp_control,
             send_seed=args.send_seed,
         )
         summary = AttackRunner(rewriter, bias_tokenizer, config).run(
@@ -139,15 +149,29 @@ def main() -> None:
             min(len(values), args.beta_calibration_per_language)
             for values in calibration_by_language.values()
         )
+        candidate_grid_calls = cases * minimum_calls_per_case
+        oracle_calls = (
+            cases * args.oracle_max_attempts if not args.no_oracle_baseline else 0
+        )
+        restamp_calls = prompts if not args.no_restamp_control else 0
         print(
             json.dumps(
                 {
                     "independent_evaluation_prompts": prompts,
                     "watermark_cases": cases,
                     "minimum_openrouter_calls": (
-                        cases * minimum_calls_per_case + calibration_calls
+                        candidate_grid_calls
+                        + oracle_calls
+                        + restamp_calls
+                        + calibration_calls
                     ),
                     "minimum_calls_per_case": minimum_calls_per_case,
+                    "call_breakdown": {
+                        "candidate_grid": candidate_grid_calls,
+                        "adaptive_oracle_pool": oracle_calls,
+                        "restamp_control": restamp_calls,
+                        "bira_beta_calibration": calibration_calls,
+                    },
                     "adaptive_bira_retries_not_included": True,
                 },
                 indent=2,
@@ -159,6 +183,7 @@ def main() -> None:
             args.evaluations,
             args.api_calls,
             args.output,
+            baselines_path=args.baselines,
         )
         print(json.dumps(summary, indent=2, ensure_ascii=False))
 

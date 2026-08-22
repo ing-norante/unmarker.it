@@ -11,7 +11,7 @@ from typing import Any
 
 
 class FinalReportRunner:
-    ARTIFACT_SCHEMA_VERSION = 1
+    ARTIFACT_SCHEMA_VERSION = 2
 
     def run(
         self,
@@ -19,15 +19,17 @@ class FinalReportRunner:
         evaluations_path: Path,
         api_calls_path: Path,
         output_dir: Path,
+        baselines_path: Path | None = None,
     ) -> dict[str, Any]:
         output_dir.mkdir(parents=True, exist_ok=True)
         candidates = _read_jsonl(candidates_path)
+        baselines = _read_jsonl(baselines_path) if baselines_path else []
         evaluations = _read_jsonl(evaluations_path)
         calls = {row["call_key"]: row for row in _read_jsonl(api_calls_path)}
         evaluation_by_key = {row["candidate_key"]: row for row in evaluations}
         missing = [
             row["candidate_key"]
-            for row in candidates
+            for row in [*candidates, *baselines]
             if row["candidate_key"] not in evaluation_by_key
         ]
         if missing:
@@ -38,12 +40,32 @@ class FinalReportRunner:
             {**candidate, **evaluation_by_key[candidate["candidate_key"]]}
             for candidate in candidates
         ]
+        baseline_rows = [
+            {**baseline, **evaluation_by_key[baseline["candidate_key"]]}
+            for baseline in baselines
+        ]
 
         surrogate = self._fit_surrogate(rows)
         held_out = [row for row in rows if row["attack_split"] == "held_out_test"]
         fixed = self._fixed_budget_metrics(held_out, calls)
         selected = self._select_progressive(held_out, surrogate)
         progressive = self._progressive_metrics(selected, calls, held_out)
+        held_out_baselines = [
+            row for row in baseline_rows if row["attack_split"] == "held_out_test"
+        ]
+        oracle_pool = [
+            row
+            for row in held_out_baselines
+            if row["artifact_kind"] == "adaptive_oracle_attempt"
+        ]
+        oracle_selected = self._select_oracle(oracle_pool)
+        oracle_cells = self._oracle_metrics(oracle_selected, calls, oracle_pool)
+        restamp_rows = [
+            row
+            for row in held_out_baselines
+            if row["artifact_kind"] == "restamp_control"
+        ]
+        restamp_cells = self._restamp_metrics(restamp_rows, calls)
         summary = {
             "artifact_schema_version": self.ARTIFACT_SCHEMA_VERSION,
             "benchmark_scope": "official_markllm_held_out_attack_evaluation",
@@ -51,18 +73,54 @@ class FinalReportRunner:
             "candidate_count": len(rows),
             "development_candidate_count": len(rows) - len(held_out),
             "held_out_candidate_count": len(held_out),
+            "baseline_count": len(baseline_rows),
+            "held_out_baseline_count": len(held_out_baselines),
             "independent_held_out_source_prompts": len(
                 {row["sample_id"] for row in held_out}
             ),
             "surrogate": surrogate,
             "fixed_budget_cells": fixed,
             "progressive_cells": progressive,
+            "adaptive_oracle": {
+                "role": "target-detector adaptive upper-bound baseline, not a candidate algorithm",
+                "selection_uses_target_detector": True,
+                "max_attempts": max(
+                    (int(row["attempt"]) for row in oracle_pool), default=0
+                ),
+                "held_out_attempt_pool_size": len(oracle_pool),
+                "cells": oracle_cells,
+                "observed_precomputed_pool": self._cost_summary(oracle_pool, calls),
+                "simulated_adaptive_queries": self._cost_summary(
+                    [
+                        row
+                        for selection in oracle_selected
+                        for row in oracle_pool
+                        if row["candidate_key"] in selection["attempted_candidate_keys"]
+                    ],
+                    calls,
+                ),
+            },
+            "restamp_control": {
+                "role": "clean-text paraphrase control for false-positive introduction",
+                "cells": restamp_cells,
+                "held_out_rows": len(restamp_rows),
+                "observed_cost": self._cost_summary(restamp_rows, calls),
+            },
             "human_evaluation_status": "pending",
             "human_evaluation_artifact": "human-review.csv",
             "boundaries": [
                 "Target detector thresholds were calibrated on independent clean generations.",
                 "Surrogate thresholds were fitted on the development split only.",
                 "All headline attack metrics use held-out source prompts only.",
+                (
+                    "The adaptive-oracle paraphrase uses held-out target-detector outcomes for "
+                    "stopping and is reported only as an upper-bound baseline, never ranked as "
+                    "a candidate algorithm."
+                ),
+                (
+                    "The re-stamp control paraphrases clean model output and measures whether "
+                    "rewriting introduces target-detector false positives."
+                ),
                 (
                     "A candidate counts as quality-passing only if deterministic protected-span, "
                     "multilingual semantic-similarity, and bidirectional-NLI gates all pass."
@@ -75,11 +133,140 @@ class FinalReportRunner:
         }
         _write_json(output_dir / "summary.json", summary)
         _write_jsonl(output_dir / "progressive-selections.jsonl", selected)
+        _write_jsonl(output_dir / "adaptive-oracle-selections.jsonl", oracle_selected)
         self._write_human_review(selected, output_dir)
         (output_dir / "REPORT.md").write_text(
             self._render_markdown(summary), encoding="utf-8"
         )
         return summary
+
+    def _select_oracle(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in rows:
+            groups[row["case_key"]].append(row)
+        selected = []
+        for _, items in sorted(groups.items()):
+            ordered = sorted(items, key=lambda row: int(row["attempt"]))
+            chosen = ordered[-1]
+            attempted = []
+            success = False
+            for row in ordered:
+                attempted.append(row["candidate_key"])
+                if bool(row["quality_pass"]) and not bool(row["target_detected"]):
+                    chosen = row
+                    success = True
+                    break
+            selected.append(
+                {
+                    **chosen,
+                    "oracle_success": success,
+                    "attempted_candidate_keys": attempted,
+                }
+            )
+        return selected
+
+    def _oracle_metrics(
+        self,
+        selected: list[dict[str, Any]],
+        calls: dict[str, dict[str, Any]],
+        pool: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        by_key = {row["candidate_key"]: row for row in pool}
+        groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+        for row in selected:
+            groups[(row["algorithm"], row["language"])].append(row)
+        cells = []
+        for (algorithm, language), items in sorted(groups.items()):
+            attempted_calls = [
+                call_key
+                for item in items
+                for candidate_key in item["attempted_candidate_keys"]
+                for call_key in by_key[candidate_key]["api_call_keys"]
+            ]
+            cell = self._metric_cell(
+                items,
+                calls,
+                "adaptive_oracle_paraphrase",
+                "target-oracle",
+                algorithm,
+                language,
+                call_keys=attempted_calls,
+            )
+            cell.update(
+                {
+                    "oracle_success_rate": _mean(
+                        row["oracle_success"] for row in items
+                    ),
+                    "mean_queries": mean(
+                        len(row["attempted_candidate_keys"]) for row in items
+                    ),
+                    "selected_attempt_distribution": _counts(
+                        str(row["attempt"]) for row in items
+                    ),
+                }
+            )
+            cells.append(cell)
+        return cells
+
+    def _restamp_metrics(
+        self,
+        rows: list[dict[str, Any]],
+        calls: dict[str, dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+        for row in rows:
+            groups[(row["algorithm"], row["language"])].append(row)
+        cells = []
+        for (algorithm, language), items in sorted(groups.items()):
+            initially_negative = [row for row in items if not row["preattack_detected"]]
+            cost = self._cost_summary(items, calls)
+            cells.append(
+                {
+                    "pipeline": "restamp_control",
+                    "algorithm": algorithm,
+                    "language": language,
+                    "independent_source_prompts": len(
+                        {row["sample_id"] for row in items}
+                    ),
+                    "clean_fpr_before": _mean(
+                        row["preattack_detected"] for row in items
+                    ),
+                    "clean_fpr_after": _mean(row["target_detected"] for row in items),
+                    "false_positive_introduction_rate": _mean(
+                        row["target_detected"] for row in initially_negative
+                    ),
+                    "quality_pass_rate": _mean(row["quality_pass"] for row in items),
+                    "mean_changed_token_ratio": mean(
+                        float(row["changed_token_ratio"]) for row in items
+                    ),
+                    **cost,
+                }
+            )
+        return cells
+
+    @staticmethod
+    def _cost_summary(
+        rows: list[dict[str, Any]], calls: dict[str, dict[str, Any]]
+    ) -> dict[str, Any]:
+        call_keys = list(
+            dict.fromkeys(key for row in rows for key in row["api_call_keys"])
+        )
+        relevant = [calls[key] for key in call_keys]
+        tokens = sum(
+            int(call["prompt_tokens"]) + int(call["completion_tokens"])
+            for call in relevant
+        )
+        cost = sum(float(call["cost_usd"] or 0.0) for call in relevant)
+        return {
+            "openrouter_api_calls": len(relevant),
+            "openrouter_cost_usd": cost,
+            "openrouter_cost_per_1k_tokens_usd": (
+                cost * 1000 / tokens if tokens else None
+            ),
+            "openrouter_latency_ms": sum(
+                float(call["latency_ms"]) for call in relevant
+            ),
+        }
 
     def _fit_surrogate(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -389,6 +576,52 @@ class FinalReportRunner:
                     quality=cell["quality_pass_rate"],
                     edits=cell["mean_changed_token_ratio"],
                     cost=cell["openrouter_cost_usd"],
+                )
+            )
+        lines.extend(
+            [
+                "",
+                "## Adaptive target-oracle baseline",
+                "",
+                "This is an upper-bound baseline: target-detector outcomes choose when to stop. It is not a candidate algorithm.",
+                "",
+                "| Watermark | Lang | TPR before | TPR after | Oracle success | Mean queries | Quality pass | Cost (USD) |",
+                "|---|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for cell in summary["adaptive_oracle"]["cells"]:
+            lines.append(
+                "| {algorithm} | {language} | {pre:.1%} | {post:.1%} | "
+                "{success:.1%} | {queries:.2f} | {quality:.1%} | {cost:.4f} |".format(
+                    algorithm=cell["algorithm"],
+                    language=cell["language"],
+                    pre=cell["preattack_tpr_at_1pct_fpr"],
+                    post=cell["postattack_tpr_at_1pct_fpr"],
+                    success=cell["oracle_success_rate"],
+                    queries=cell["mean_queries"],
+                    quality=cell["quality_pass_rate"],
+                    cost=cell["openrouter_cost_usd"],
+                )
+            )
+        lines.extend(
+            [
+                "",
+                "## Clean re-stamp control",
+                "",
+                "| Watermark | Lang | Clean FPR before | Clean FPR after | Introduced FP | Quality pass |",
+                "|---|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for cell in summary["restamp_control"]["cells"]:
+            lines.append(
+                "| {algorithm} | {language} | {before:.1%} | {after:.1%} | "
+                "{introduced:.1%} | {quality:.1%} |".format(
+                    algorithm=cell["algorithm"],
+                    language=cell["language"],
+                    before=cell["clean_fpr_before"],
+                    after=cell["clean_fpr_after"],
+                    introduced=cell["false_positive_introduction_rate"],
+                    quality=cell["quality_pass_rate"],
                 )
             )
         lines.extend(
