@@ -33,6 +33,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "audit:dev": "vite --config research/text-watermark-benchmark/audit-app/vite.config.ts",
+    "audit:build": "tsc -p research/text-watermark-benchmark/audit-app/tsconfig.json && vite build --config research/text-watermark-benchmark/audit-app/vite.config.ts",
+    "audit:test": "vitest run --config research/text-watermark-benchmark/audit-app/vite.config.ts",
     "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist/server && node scripts/prerender.mjs && node scripts/verify-localization.mjs",
     "lint": "eslint .",
     "test": "vitest run",

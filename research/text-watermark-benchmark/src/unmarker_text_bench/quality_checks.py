@@ -5,6 +5,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from .number_context import number_context_conflicts
 from .tokenization import (
     extract_entities,
     extract_negations,
@@ -20,6 +21,7 @@ QUOTED_RE = re.compile(r'(?:"([^"]+)"|“([^”]+)”|‘([^’]+)’)')
 class DeterministicQuality:
     entities_preserved: bool
     numbers_preserved: bool
+    number_contexts_preserved: bool
     urls_preserved: bool
     emails_preserved: bool
     quotations_preserved: bool
@@ -29,6 +31,7 @@ class DeterministicQuality:
     actual: dict[str, list[str]]
     failure_reasons: tuple[str, ...] = ()
     introduced_entities: tuple[dict[str, Any], ...] = ()
+    number_context_conflicts: tuple[dict[str, Any], ...] = ()
     protected_text_sha256: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -68,6 +71,7 @@ def deterministic_quality(
         return DeterministicQuality(
             entities_preserved=bool(payload["entities_preserved"]),
             numbers_preserved=bool(payload["numbers_preserved"]),
+            number_contexts_preserved=bool(payload["number_contexts_preserved"]),
             urls_preserved=bool(payload["urls_preserved"]),
             emails_preserved=bool(payload["emails_preserved"]),
             quotations_preserved=bool(payload["quotations_preserved"]),
@@ -77,6 +81,7 @@ def deterministic_quality(
             actual=payload["actual"],
             failure_reasons=tuple(payload["failure_reasons"]),
             introduced_entities=tuple(payload["introduced_entities"]),
+            number_context_conflicts=tuple(payload["number_context_conflicts"]),
             protected_text_sha256=payload["protected_text_sha256"],
         )
     expected = extract_protected(original, language)
@@ -85,9 +90,11 @@ def deterministic_quality(
     def same(field: str) -> bool:
         return Counter(expected[field]) == Counter(actual[field])
 
+    context_conflicts = number_context_conflicts(original, candidate, language)
     checks = {
         "entities_preserved": same("entities"),
         "numbers_preserved": same("numbers"),
+        "number_contexts_preserved": not context_conflicts,
         "urls_preserved": same("urls"),
         "emails_preserved": same("emails"),
         "quotations_preserved": same("quotations"),
@@ -98,6 +105,7 @@ def deterministic_quality(
         passes=all(checks.values()),
         expected=expected,
         actual=actual,
+        number_context_conflicts=context_conflicts,
         failure_reasons=tuple(
             name.removesuffix("_preserved")
             for name, passed in checks.items()
@@ -112,7 +120,10 @@ def protected_prompt_fragment(text: str, language: str) -> str:
     if not nonempty:
         return "There are no extracted protected spans. Preserve all facts and polarity anyway."
     lines = [
-        "The following values must remain verbatim and with the same multiplicity:"
+        (
+            "The following values must remain verbatim, with the same multiplicity, "
+            "and attached to the same facts and entities:"
+        )
     ]
     for field, values in nonempty.items():
         lines.append(f"- {field}: {values!r}")

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .attack_pipeline import AttackConfig, AttackRunner
 from .final_report import FinalReportRunner
+from .human_audit import HumanAuditRunner
 from .llm_judge import (
     DEFAULT_JUDGE_MODEL,
     DEFAULT_JUDGE_PROVIDER,
@@ -112,6 +113,24 @@ def build_parser() -> argparse.ArgumentParser:
     judge.add_argument("--max-workers", type=int, default=4)
     judge.add_argument("--manual-audit-size", type=int, default=48)
     judge.add_argument("--no-resume", action="store_true")
+
+    human_audit = subparsers.add_parser(
+        "human-audit",
+        help="Validate, join, and summarize a completed blinded human audit",
+    )
+    human_audit.add_argument("--reviewed-audit", type=Path, required=True)
+    human_audit.add_argument("--audit-template", type=Path, required=True)
+    human_audit.add_argument("--audit-key", type=Path, required=True)
+    human_audit.add_argument("--selections", type=Path, required=True)
+    human_audit.add_argument("--output", type=Path, required=True)
+    human_audit.add_argument("--judge-evaluations", type=Path)
+    human_audit.add_argument("--report-summary", type=Path)
+    human_audit.add_argument("--secondary-reviewed", type=Path)
+    human_audit.add_argument("--minimum-meaning", type=int, default=4)
+    human_audit.add_argument("--minimum-fluency", type=int, default=4)
+    human_audit.add_argument("--balanced-core-size", type=int, default=24)
+    human_audit.add_argument("--secondary-random-size", type=int, default=6)
+    human_audit.add_argument("--secondary-seed", type=int, default=20260824)
     return parser
 
 
@@ -185,9 +204,7 @@ def main() -> None:
             oracle_max_attempts=args.oracle_max_attempts,
             enable_restamp_control=not args.no_restamp_control,
             send_seed=args.send_seed,
-            development_prompts_per_language=(
-                args.development_prompts_per_language
-            ),
+            development_prompts_per_language=(args.development_prompts_per_language),
             quality_profile=args.quality_profile,
             max_workers=args.max_workers,
         )
@@ -289,6 +306,24 @@ def main() -> None:
             args.output,
             resume=not args.no_resume,
             manual_audit_size=args.manual_audit_size,
+        )
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+    elif args.command == "human-audit":
+        summary = HumanAuditRunner(
+            minimum_meaning=args.minimum_meaning,
+            minimum_fluency=args.minimum_fluency,
+            balanced_core_size=args.balanced_core_size,
+            secondary_random_size=args.secondary_random_size,
+            secondary_seed=args.secondary_seed,
+        ).run(
+            args.reviewed_audit,
+            args.audit_template,
+            args.audit_key,
+            args.selections,
+            args.output,
+            judge_evaluations_path=args.judge_evaluations,
+            report_summary_path=args.report_summary,
+            secondary_reviewed_path=args.secondary_reviewed,
         )
         print(json.dumps(summary, indent=2, ensure_ascii=False))
 

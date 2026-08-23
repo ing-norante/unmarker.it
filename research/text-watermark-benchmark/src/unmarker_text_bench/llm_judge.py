@@ -183,11 +183,7 @@ class LlmJudgeRunner:
             "candidate_key": candidate_key,
             **assessment,
             "llm_screen_pass": llm_screen_pass,
-            **{
-                key: value
-                for key, value in asdict(response).items()
-                if key != "data"
-            },
+            **{key: value for key, value in asdict(response).items() if key != "data"},
         }
 
     def _candidate_seed(self, candidate_key: str) -> int:
@@ -206,7 +202,14 @@ class LlmJudgeRunner:
             return []
         ordered = sorted(rows, key=_stable_row_key)
         if len(ordered) <= requested_size:
-            return ordered
+            return [
+                {
+                    **row,
+                    "manual_audit_selection_stage": "balanced_core",
+                    "manual_audit_selection_reason": "complete_population",
+                }
+                for row in ordered
+            ]
         stratified_target = min(24, requested_size)
         groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
         for row in ordered:
@@ -219,7 +222,13 @@ class LlmJudgeRunner:
             for key in group_keys:
                 index = positions[key]
                 if index < len(groups[key]):
-                    stratified.append(groups[key][index])
+                    stratified.append(
+                        {
+                            **groups[key][index],
+                            "manual_audit_selection_stage": "balanced_core",
+                            "manual_audit_selection_reason": "stratified_stable_sample",
+                        }
+                    )
                     positions[key] += 1
                     advanced = True
                     if len(stratified) == stratified_target:
@@ -233,11 +242,25 @@ class LlmJudgeRunner:
             if row["candidate_key"] not in selected_keys
             and bool(row.get("quality_pass")) != bool(row["llm_screen_pass"])
         ]
-        selected = [*stratified, *disagreements[: requested_size - len(stratified)]]
+        selected = [
+            *stratified,
+            *[
+                {
+                    **row,
+                    "manual_audit_selection_stage": "disagreement_extension",
+                    "manual_audit_selection_reason": "deterministic_llm_disagreement",
+                }
+                for row in disagreements[: requested_size - len(stratified)]
+            ],
+        ]
         selected_keys = {row["candidate_key"] for row in selected}
         if len(selected) < requested_size:
             selected.extend(
-                row
+                {
+                    **row,
+                    "manual_audit_selection_stage": "deterministic_fill_extension",
+                    "manual_audit_selection_reason": "deterministic_stable_fill",
+                }
                 for row in ordered
                 if row["candidate_key"] not in selected_keys
             )
@@ -265,11 +288,11 @@ class LlmJudgeRunner:
                 {
                     "review_id": review_id,
                     "candidate_key": row["candidate_key"],
-                    "selection_reason": (
-                        "deterministic_llm_disagreement"
-                        if bool(row.get("quality_pass"))
-                        != bool(row["llm_screen_pass"])
-                        else "stratified_or_fill"
+                    "selection_stage": row.get(
+                        "manual_audit_selection_stage", "unknown"
+                    ),
+                    "selection_reason": row.get(
+                        "manual_audit_selection_reason", "unknown"
                     ),
                 }
             )

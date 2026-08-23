@@ -12,7 +12,9 @@ requires substantially more edits.
 
 The result is evidence about official MarkLLM EXP with the pinned Qwen/OpenRouter
 stack only. It is not evidence about Claude or an undisclosed production
-watermark. Human audit remains pending.
+watermark. The primary 48-row human audit is complete; it remains exploratory
+because it has one reviewer and the operational pass threshold was not
+preregistered.
 
 ## Executed design
 
@@ -24,7 +26,8 @@ watermark. Human audit remains pending.
 - 1,720 Qwen rewrite calls through the pinned DeepInfra route;
 - 1,600 Modal evaluations with GLiNER, multilingual embeddings, and
   bidirectional NLI;
-- 240 blinded GPT-5.6 Terra quality judgments and a 48-row manual audit sheet.
+- 240 blinded GPT-5.6 Terra quality judgments and a completed 48-row manual
+  audit: 24 balanced-core rows plus 24 disagreement-enriched diagnostics.
 
 OpenRouter rewrite cost was $0.2703 and judge cost was $0.9525, for $1.2228
 total. Modal GPU cost is not included in these figures. One SIRA output ended
@@ -98,7 +101,46 @@ not solve the quality problem.
 The blinded Terra pre-screen passed 72.9% of the 240 progressive selections,
 flagged material errors in 22.1%, and disagreed with deterministic/neural gates
 on 73 rows. Mean fluency and naturalness were 4.72/5. The 48-row blinded manual
-audit remains required because the judge is not human ground truth.
+audit confirms that the judge is a useful pre-screen, not human ground truth.
+
+## Human audit
+
+The completed audit exactly matches the blinded template: all 48 IDs are
+unique, all required judgments are present, and the language, source, candidate,
+and row order are unchanged. Aggregate descriptive scores were 4.71/5 for
+meaning and 4.42/5 for fluency, with two factual/polarity errors.
+The reviewed CSV SHA-256 is
+`2c5bec46de7ec1ea1fc2067b689392a65d5592c2f61a7ef3b0bce08ae204cac5`.
+
+Primary comparisons use only the first 24 rows: a stable balanced sample with
+three rows per language/pipeline cell. The other 24 rows deliberately enrich
+automatic-system disagreements and are not a population-rate estimate. A
+provisional human quality pass means meaning >= 4, fluency >= 4, and no
+factual/polarity error; this threshold is exploratory, not preregistered.
+
+| Pipeline | Balanced rows | Human quality pass | Quality-preserving conditional evasion | Mean token edits |
+|---|---:|---:|---:|---:|
+| Simple paraphrase | 6 | 100.0% | 40.0% (2/5) | 24.5% |
+| SIRA | 6 | 66.7% | 50.0% (3/6) | 35.9% |
+| BIRA | 6 | 100.0% | 80.0% (4/5) | 37.5% |
+| Position-aware BIRA | 6 | 100.0% | 66.7% (4/6) | 34.1% |
+
+The core has only six rows per pipeline, so it cannot rank BIRA against
+position-aware BIRA. Across the balanced core, the LLM judge agreed with the
+provisional human pass on 22/24 rows (91.7%); the deterministic/neural gate
+agreed on 15/24 (62.5%) and rejected nine human-passing candidates.
+
+One human error exposed a specific validator blind spot. A position-aware
+candidate changed `Born in 1960` to `Born in 1990` and moved the political-career
+decade in the other direction. The number multiset stayed unchanged, so exact
+number preservation passed. The new conservative number-context validator
+detects this binding swap and flags only that candidate in a post-hoc scan of
+all 240 progressive selections. This diagnostic was added after the run and
+must be applied prospectively before affecting headline metrics.
+
+The importer produced a new 12-row blinded second-review sheet containing all
+six primary quality failures plus six stable random balanced-core controls.
+Independent review and adjudication remain pending.
 
 ## Decision
 
@@ -109,9 +151,9 @@ baseline is neither observed nor statistically established here.
 
 The next evidence gate should:
 
-1. complete the 48-row blinded human audit;
-2. fix or constrain entity, number, and negation preservation before tuning the
-   attack ranking further;
+1. complete the independent 12-row second review and adjudicate disagreements;
+2. run the new number-context gate prospectively alongside entity and negation
+   preservation before tuning the attack ranking further;
 3. repeat with a larger held-out set and a detector calibration sample large
    enough to resolve a 1% FPR;
 4. add another executable official watermark family and at least one additional

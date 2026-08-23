@@ -612,6 +612,12 @@ class FinalReportRunner:
             "exact_number_preservation_rate": _mean(
                 row["deterministic_quality"]["numbers_preserved"] for row in items
             ),
+            "number_context_binding_preservation_rate": _mean(
+                row["deterministic_quality"].get(
+                    "number_contexts_preserved", True
+                )
+                for row in items
+            ),
             "mean_semantic_similarity": mean(
                 float(row["semantic_similarity"]) for row in items
             ),

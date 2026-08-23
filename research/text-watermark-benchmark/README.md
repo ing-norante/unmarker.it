@@ -147,6 +147,17 @@ negation preservation. Both are regression gates, not independent quality
 evidence, and are omitted from the primary result table.
 
 The human review sheet is required before treating an experiment as product evidence.
+The local Vite [human audit review desk](audit-app/README.md) can be used to
+complete either generated CSV with keyboard shortcuts, browser autosave, and a
+contract-preserving reviewed export. It does not load the blind key or send
+review data to a backend.
+
+`unmarker-remote-bench human-audit` validates a completed export against its
+blind template, records reproducibility hashes, reports the balanced core
+separately from disagreement-enriched diagnostics, updates the Gate report, and
+generates a blinded second-review sample. The deterministic quality contract
+also checks high-confidence number-to-context swaps in addition to exact number
+multiplicity; this prevents two preserved years from silently exchanging facts.
 
 The Gate 2b GLiNER threshold pilot uses human-annotated UNER English-EWT and
 KIND Wikinews rows with a common PER/ORG/LOC label set. Source commits and file

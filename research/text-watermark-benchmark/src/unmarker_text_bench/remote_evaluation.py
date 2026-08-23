@@ -216,7 +216,7 @@ class CandidateEvaluationRunner:
                 else None
             ),
             "deterministic_quality_contract": (
-                "gliner-source-manifest-and-source-aware-candidate-diff-v1"
+                "gliner-source-manifest-source-aware-candidate-diff-and-number-context-v2"
                 if self.protected_spans is not None
                 else "legacy-candidate-artifact-v1"
             ),

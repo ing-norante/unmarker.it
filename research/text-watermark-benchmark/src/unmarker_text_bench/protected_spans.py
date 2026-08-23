@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from .number_context import number_context_conflicts
 from .tokenization import extract_negations, extract_numbers, extract_urls
 
 GLINER_MODEL = "urchade/gliner_multi-v2.1"
@@ -183,7 +184,10 @@ def protected_prompt_fragment(record: ProtectedSpanRecord) -> str:
     if not nonempty:
         return "There are no extracted protected spans. Preserve all facts and polarity anyway."
     lines = [
-        "The following values must remain verbatim and with the same multiplicity:"
+        (
+            "The following values must remain verbatim, with the same multiplicity, "
+            "and attached to the same facts and entities:"
+        )
     ]
     for field, values in nonempty.items():
         lines.append(f"- {field}: {values!r}")
@@ -241,7 +245,16 @@ def validate_record(
             and (original_text is None or _surface_count(original_text, text) == 0)
         ]
 
-    checks = {"entities_preserved": entities_preserved, **structured_checks}
+    context_conflicts = (
+        number_context_conflicts(original_text, candidate, record.language)
+        if original_text is not None
+        else ()
+    )
+    checks = {
+        "entities_preserved": entities_preserved,
+        **structured_checks,
+        "number_contexts_preserved": not context_conflicts,
+    }
     failure_reasons = [
         name.removesuffix("_preserved") for name, passed in checks.items() if not passed
     ]
@@ -260,6 +273,7 @@ def validate_record(
         "passes": all(checks.values()) and not introduced,
         "failure_reasons": failure_reasons,
         "introduced_entities": introduced,
+        "number_context_conflicts": list(context_conflicts),
         "expected": expected,
         "actual": actual,
         "protected_text_sha256": record.text_sha256,

@@ -288,9 +288,44 @@ uv run unmarker-remote-bench finalize \
 The judge sees only language, source, and candidate. Its assessment is a
 quality pre-screen, never an evasion oracle. It writes a 48-row blinded manual
 audit: 24 stratified candidates plus up to 24 deterministic/judge
-disagreements, with deterministic fill if necessary. When there are at most 48
-progressive rows, every row is included. Complete `manual-audit.csv`; the judge
-does not replace human evaluation.
+disagreements, with deterministic fill if necessary. The blind key records the
+selection stage explicitly. When there are at most 48 progressive rows, every
+row is included. Complete `manual-audit.csv`; the judge does not replace human
+evaluation.
+
+### 7. Import the completed human audit
+
+Export the reviewed sheet from the local Vite review desk, then run:
+
+```bash
+uv run unmarker-remote-bench human-audit \
+  --reviewed-audit /absolute/path/to/manual-audit.reviewed.csv \
+  --audit-template results/gate2b-exp-pilot-v1/judge/manual-audit.csv \
+  --audit-key results/gate2b-exp-pilot-v1/judge/manual-audit-key.json \
+  --selections results/gate2b-exp-pilot-v1/report/progressive-selections.jsonl \
+  --judge-evaluations results/gate2b-exp-pilot-v1/judge/llm-judge.jsonl \
+  --report-summary results/gate2b-exp-pilot-v1/report/summary.json \
+  --output results/gate2b-exp-pilot-v1/human-audit
+```
+
+The importer verifies the immutable blind fields against the template, stores
+input hashes, separates the 24-row balanced core from the diagnostic extension,
+joins pipeline/detector metadata, and updates the report status without changing
+the original automatic metrics. The default human-pass mapping (meaning >= 4,
+fluency >= 4, no factual/polarity error) is explicitly labeled exploratory and
+not preregistered.
+
+It also writes `second-review.csv`: every primary quality failure plus six
+stable random controls from the balanced core, reordered and blinded. Complete
+that file independently in the same Vite app, then rerun the command with:
+
+```bash
+  --secondary-reviewed /absolute/path/to/second-review.reviewed.csv
+```
+
+The second pass calculates exact agreement, within-one agreement, quadratic
+weighted kappa for the ordinal scores, Cohen's kappa for flags/pass decisions,
+and writes `adjudication.csv` for every disagreement.
 
 Only after Gate 2b shows a useful signal should the formal profile expand to
 1,000 clean calibration, 50 development, and 100 held-out prompts per language
