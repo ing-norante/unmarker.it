@@ -46,6 +46,46 @@ describe("audit CSV", () => {
     expect(reparsed).toEqual(parsed);
   });
 
+  it("imports and exports the adjudication contract without altering reviewer votes", () => {
+    const header = [
+      "adjudication_id",
+      "primary_review_id",
+      "language",
+      "source_text",
+      "candidate_text",
+      "reviewer_1_meaning",
+      "reviewer_2_meaning",
+      "adjudicated_meaning_1_to_5",
+      "reviewer_1_fluency",
+      "reviewer_2_fluency",
+      "adjudicated_fluency_1_to_5",
+      "reviewer_1_factual_or_polarity_error",
+      "reviewer_2_factual_or_polarity_error",
+      "adjudicated_factual_or_polarity_error",
+      "adjudication_notes",
+    ].join(",");
+    const csv = `${header}\nadjudication-00001,audit-00042,en,Source,Candidate,4,5,,3,5,,false,false,,\n`;
+
+    const document = parseAuditCsv(csv);
+    expect(document.mode).toBe("adjudication");
+    expect(document.rows[0].review_id).toBe("adjudication-00001");
+    expect(document.rows[0].reviewer_1_meaning).toBe("4");
+
+    document.rows[0].meaning_preservation_1_to_5 = "5";
+    document.rows[0].fluency_1_to_5 = "4";
+    document.rows[0].factual_or_polarity_error = "false";
+    document.rows[0].notes = "Decisione finale";
+    const exported = parseAuditCsv(serializeAuditCsv(document));
+
+    expect(exported.rows[0].meaning_preservation_1_to_5).toBe("5");
+    expect(exported.rows[0].fluency_1_to_5).toBe("4");
+    expect(exported.rows[0].adjudicated_factual_or_polarity_error).toBe(
+      "false",
+    );
+    expect(exported.rows[0].reviewer_1_meaning).toBe("4");
+    expect(exported.rows[0].notes).toBe("Decisione finale");
+  });
+
   it("rejects malformed ratings and duplicate identifiers", () => {
     const invalidRating = `${manualHeader}\na,it,Source,Candidate,6,2,false,\n`;
     expect(() => parseAuditCsv(invalidRating)).toThrow(AuditCsvError);

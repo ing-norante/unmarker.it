@@ -162,6 +162,60 @@ class HumanAuditTests(unittest.TestCase):
             self.assertEqual(summary["secondary_agreement"]["adjudication_rows"], 1)
             self.assertEqual(len(self._read_csv(output / "adjudication.csv")), 1)
 
+            adjudication = self._read_csv(output / "adjudication.csv")
+            for row in adjudication:
+                row["adjudicated_meaning_1_to_5"] = row["reviewer_1_meaning"]
+                row["adjudicated_fluency_1_to_5"] = row["reviewer_1_fluency"]
+                row["adjudicated_factual_or_polarity_error"] = row[
+                    "reviewer_1_factual_or_polarity_error"
+                ]
+                row["adjudication_notes"] = "Resolved by protocol."
+            adjudicated_review = root / "adjudication.reviewed.csv"
+            self._write_rows(adjudicated_review, adjudication)
+
+            final = runner.run(
+                paths["reviewed"],
+                paths["template"],
+                paths["key"],
+                paths["selections"],
+                output,
+                judge_evaluations_path=paths["judge"],
+                report_summary_path=paths["report"],
+                secondary_reviewed_path=secondary_reviewed,
+                adjudicated_audit_path=adjudicated_review,
+            )
+
+            self.assertEqual(
+                final["human_evaluation_status"],
+                "complete_two_reviewer_adjudicated",
+            )
+            self.assertEqual(final["adjudicator_count"], 1)
+            self.assertEqual(final["adjudication"]["rows"], 1)
+            self.assertEqual(final["adjudication"]["consensus_rows"], 3)
+            self.assertTrue((output / "adjudication.reviewed.csv").exists())
+            self.assertTrue((output / "adjudication.joined.jsonl").exists())
+            report = json.loads(paths["report"].read_text())
+            self.assertEqual(
+                report["human_evaluation_status"],
+                "complete_two_reviewer_adjudicated",
+            )
+
+    def test_adjudication_requires_secondary_review(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = self._fixtures(root)
+            with self.assertRaisesRegex(
+                ValueError, "--adjudicated-audit requires --secondary-reviewed"
+            ):
+                HumanAuditRunner(balanced_core_size=4).run(
+                    paths["reviewed"],
+                    paths["template"],
+                    paths["key"],
+                    paths["selections"],
+                    root / "output",
+                    adjudicated_audit_path=root / "adjudication.reviewed.csv",
+                )
+
     def test_changed_blind_text_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -279,6 +333,15 @@ class HumanAuditTests(unittest.TestCase):
     def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
         with path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=FIELDS)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    @staticmethod
+    def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
+        if not rows:
+            raise ValueError("Cannot write an empty fixture")
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
             writer.writeheader()
             writer.writerows(rows)
 

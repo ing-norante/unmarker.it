@@ -70,6 +70,13 @@ function statusLabel(row: AuditRecord): string {
   return "Da fare";
 }
 
+function reviewerFlagLabel(value: string): string {
+  const flag = parseAuditFlag(value);
+  if (flag === "error") return "errore";
+  if (flag === "correct") return "corretto";
+  return "non indicato";
+}
+
 function renderDiff(segments: DiffSegment[]) {
   return segments.map((segment, index) => (
     <span className={`diff-${segment.kind}`} key={`${segment.kind}-${index}`}>
@@ -212,8 +219,8 @@ function EmptyState({
         <p className="section-kicker">Inizia una sessione</p>
         <h2 id="intake-title">Apri il foglio di audit</h2>
         <p>
-          Sono accettati <code>manual-audit.csv</code> e{" "}
-          <code>human-review.csv</code>. Il file non lascia mai il browser.
+          Sono accettati i fogli di review e <code>adjudication.csv</code>. Il
+          file non lascia mai il browser.
         </p>
         <div
           className={dragging ? "drop-zone is-dragging" : "drop-zone"}
@@ -646,7 +653,8 @@ export default function App() {
               <header className="record-heading">
                 <div>
                   <p className="section-kicker">
-                    Record {String(activeNumber).padStart(2, "0")} /{" "}
+                    {session.mode === "adjudication" ? "Caso" : "Record"}{" "}
+                    {String(activeNumber).padStart(2, "0")} /{" "}
                     {String(summary.total).padStart(2, "0")}
                   </p>
                   <h2>{activeRow.review_id}</h2>
@@ -685,13 +693,56 @@ export default function App() {
               aria-label="Valutazione del record corrente"
             >
               <div className="score-heading">
-                <p className="section-kicker">Scheda di giudizio</p>
+                <p className="section-kicker">
+                  {session.mode === "adjudication"
+                    ? "Decisione finale"
+                    : "Scheda di giudizio"}
+                </p>
                 <span
                   className={`score-status score-status-${getReviewStatus(activeRow)}`}
                 >
                   {statusLabel(activeRow)}
                 </span>
               </div>
+
+              {session.mode === "adjudication" && (
+                <section
+                  className="reviewer-votes"
+                  aria-label="Valutazioni dei due revisori"
+                >
+                  <p>Valutazioni precedenti</p>
+                  <div>
+                    <article>
+                      <span>Revisore 1</span>
+                      <strong>
+                        M {activeRow.reviewer_1_meaning} · F{" "}
+                        {activeRow.reviewer_1_fluency}
+                      </strong>
+                      <small>
+                        {reviewerFlagLabel(
+                          activeRow.reviewer_1_factual_or_polarity_error,
+                        )}
+                      </small>
+                    </article>
+                    <article>
+                      <span>Revisore 2</span>
+                      <strong>
+                        M {activeRow.reviewer_2_meaning} · F{" "}
+                        {activeRow.reviewer_2_fluency}
+                      </strong>
+                      <small>
+                        {reviewerFlagLabel(
+                          activeRow.reviewer_2_factual_or_polarity_error,
+                        )}
+                      </small>
+                    </article>
+                  </div>
+                  <small>
+                    M = significato · F = fluidità. Decidi rileggendo i testi,
+                    non facendo la media.
+                  </small>
+                </section>
+              )}
 
               <RatingScale
                 field="meaning_preservation_1_to_5"

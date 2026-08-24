@@ -7,7 +7,7 @@ import {
   type AuditRecord,
 } from "./model";
 
-const REQUIRED_COLUMNS = [
+const REVIEW_REQUIRED_COLUMNS = [
   "review_id",
   "language",
   "candidate_text",
@@ -15,6 +15,31 @@ const REQUIRED_COLUMNS = [
   FLAG_FIELD,
   "notes",
 ] as const;
+
+const ADJUDICATION_REQUIRED_COLUMNS = [
+  "adjudication_id",
+  "primary_review_id",
+  "language",
+  "candidate_text",
+  "reviewer_1_meaning",
+  "reviewer_2_meaning",
+  "adjudicated_meaning_1_to_5",
+  "reviewer_1_fluency",
+  "reviewer_2_fluency",
+  "adjudicated_fluency_1_to_5",
+  "reviewer_1_factual_or_polarity_error",
+  "reviewer_2_factual_or_polarity_error",
+  "adjudicated_factual_or_polarity_error",
+  "adjudication_notes",
+] as const;
+
+const ADJUDICATION_EXPORT_FIELDS: Record<string, keyof AuditRecord> = {
+  adjudication_id: "review_id",
+  adjudicated_meaning_1_to_5: "meaning_preservation_1_to_5",
+  adjudicated_fluency_1_to_5: "fluency_1_to_5",
+  adjudicated_factual_or_polarity_error: "factual_or_polarity_error",
+  adjudication_notes: "notes",
+};
 
 export class AuditCsvError extends Error {
   constructor(message: string) {
@@ -99,11 +124,24 @@ export function parseAuditCsv(input: string): AuditDocument {
     );
   }
 
-  const missing = REQUIRED_COLUMNS.filter(
+  const missingReview = REVIEW_REQUIRED_COLUMNS.filter(
     (column) => !columns.includes(column),
   );
-  if (missing.length)
-    throw new AuditCsvError(`Colonne mancanti: ${missing.join(", ")}.`);
+  const missingAdjudication = ADJUDICATION_REQUIRED_COLUMNS.filter(
+    (column) => !columns.includes(column),
+  );
+  const mode =
+    missingReview.length === 0
+      ? "review"
+      : missingAdjudication.length === 0
+        ? "adjudication"
+        : null;
+  if (!mode) {
+    throw new AuditCsvError(
+      `Formato non riconosciuto. Audit: mancano ${missingReview.join(", ")}. ` +
+        `Adjudication: mancano ${missingAdjudication.join(", ")}.`,
+    );
+  }
 
   const sourceColumn = columns.includes("source_text")
     ? "source_text"
@@ -132,7 +170,20 @@ export function parseAuditCsv(input: string): AuditDocument {
       column,
       values[index] ?? "",
     ]);
-    const row = Object.fromEntries(entries) as AuditRecord;
+    const raw = Object.fromEntries(entries) as AuditRecord;
+    const row =
+      mode === "adjudication"
+        ? ({
+            ...raw,
+            review_id: raw.adjudication_id,
+            meaning_preservation_1_to_5:
+              raw.adjudicated_meaning_1_to_5,
+            fluency_1_to_5: raw.adjudicated_fluency_1_to_5,
+            factual_or_polarity_error:
+              raw.adjudicated_factual_or_polarity_error,
+            notes: raw.adjudication_notes,
+          } as AuditRecord)
+        : raw;
 
     if (!row.review_id.trim())
       throw new AuditCsvError(`Riga ${rowNumber}: review_id è vuoto.`);
@@ -163,7 +214,7 @@ export function parseAuditCsv(input: string): AuditDocument {
     return row;
   });
 
-  return { columns, sourceColumn, rows };
+  return { mode, columns, sourceColumn, rows };
 }
 
 function escapeField(value: string): string {
@@ -172,11 +223,18 @@ function escapeField(value: string): string {
 }
 
 export function serializeAuditCsv(document: AuditDocument): string {
+  const valueForColumn = (row: AuditRecord, column: string) => {
+    if (document.mode === "adjudication") {
+      const canonical = ADJUDICATION_EXPORT_FIELDS[column];
+      if (canonical) return row[canonical] ?? "";
+    }
+    return row[column] ?? "";
+  };
   const lines = [
     document.columns.map(escapeField).join(","),
     ...document.rows.map((row) =>
       document.columns
-        .map((column) => escapeField(row[column] ?? ""))
+        .map((column) => escapeField(valueForColumn(row, column)))
         .join(","),
     ),
   ];

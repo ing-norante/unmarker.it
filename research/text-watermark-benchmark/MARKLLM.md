@@ -327,6 +327,22 @@ The second pass calculates exact agreement, within-one agreement, quadratic
 weighted kappa for the ordinal scores, Cohen's kappa for flags/pass decisions,
 and writes `adjudication.csv` for every disagreement.
 
+Open `adjudication.csv` in the same Vite app. It shows both reviewers' scores
+next to the source and candidate, while keeping the final decision fields
+separate. Export the completed sheet as `adjudication.reviewed.csv`, then rerun
+the importer with both reviewed inputs:
+
+```bash
+  --secondary-reviewed /absolute/path/to/second-review.reviewed.csv \
+  --adjudicated-audit /absolute/path/to/adjudication.reviewed.csv
+```
+
+The importer protects both reviewers' original votes, snapshots the completed
+adjudication, writes `adjudication.joined.jsonl` with the 12-row diagnostic
+consensus, and changes the status to `complete_two_reviewer_adjudicated`. This
+consensus remains diagnostic because the reliability subset is enriched and
+does not replace the 24-row balanced core.
+
 Only after Gate 2b shows a useful signal should the formal profile expand to
 1,000 clean calibration, 50 development, and 100 held-out prompts per language
 and add the remaining watermark schemes and model families.

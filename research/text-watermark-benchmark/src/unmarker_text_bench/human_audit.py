@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable
@@ -30,10 +31,16 @@ REQUIRED_FIELDS = (
 IMMUTABLE_FIELDS = ("review_id", "language", "candidate_text")
 VALID_RATINGS = {"1", "2", "3", "4", "5"}
 VALID_FLAGS = {"true", "false"}
+ADJUDICATION_RATING_FIELDS = (
+    "adjudicated_meaning_1_to_5",
+    "adjudicated_fluency_1_to_5",
+)
+ADJUDICATION_FLAG_FIELD = "adjudicated_factual_or_polarity_error"
+ADJUDICATION_NOTES_FIELD = "adjudication_notes"
 
 
 class HumanAuditRunner:
-    ARTIFACT_SCHEMA_VERSION = 1
+    ARTIFACT_SCHEMA_VERSION = 2
 
     def __init__(
         self,
@@ -67,7 +74,10 @@ class HumanAuditRunner:
         judge_evaluations_path: Path | None = None,
         report_summary_path: Path | None = None,
         secondary_reviewed_path: Path | None = None,
+        adjudicated_audit_path: Path | None = None,
     ) -> dict[str, Any]:
+        if adjudicated_audit_path is not None and secondary_reviewed_path is None:
+            raise ValueError("--adjudicated-audit requires --secondary-reviewed")
         reviewed, reviewed_fields = _read_csv(reviewed_audit_path)
         template, template_fields = _read_csv(audit_template_path)
         source_column = _source_column(reviewed_fields)
@@ -121,6 +131,7 @@ class HumanAuditRunner:
             source_column,
         )
         secondary_agreement = None
+        adjudication = None
         if secondary_reviewed_path is not None:
             secondary_agreement = self._secondary_agreement(
                 secondary_reviewed_path,
@@ -130,6 +141,26 @@ class HumanAuditRunner:
                 output_dir,
                 source_column,
             )
+            if adjudicated_audit_path is not None:
+                adjudication_template_path = output_dir / "adjudication.csv"
+                if (
+                    adjudicated_audit_path.resolve()
+                    == adjudication_template_path.resolve()
+                ):
+                    raise ValueError(
+                        "--adjudicated-audit must point to an exported reviewed "
+                        "copy, not the generated adjudication.csv template"
+                    )
+                adjudication = self._adjudication(
+                    adjudicated_audit_path,
+                    adjudication_template_path,
+                    secondary_reviewed_path,
+                    second_template_path,
+                    output_dir / "second-review-key.json",
+                    joined,
+                    output_dir,
+                    source_column,
+                )
 
         summary = self._summary(
             joined,
@@ -140,6 +171,7 @@ class HumanAuditRunner:
             judge_evaluations_path,
             secondary,
             secondary_agreement,
+            adjudication,
             number_context_population,
         )
         _write_json(output_dir / "human-audit.summary.json", summary)
@@ -303,6 +335,7 @@ class HumanAuditRunner:
         judge_path: Path | None,
         secondary: dict[str, Any],
         secondary_agreement: dict[str, Any] | None,
+        adjudication: dict[str, Any] | None,
         number_context_population: dict[str, Any],
     ) -> dict[str, Any]:
         core = [row for row in rows if row["selection_stage"] == "balanced_core"]
@@ -311,6 +344,7 @@ class HumanAuditRunner:
             raise ValueError("Human audit has no balanced-core rows")
         status = "complete_single_reviewer_exploratory"
         reviewer_count = 1
+        adjudicator_count = 0
         if secondary_agreement is not None:
             reviewer_count = 2
             status = (
@@ -318,10 +352,32 @@ class HumanAuditRunner:
                 if secondary_agreement["adjudication_rows"] == 0
                 else "complete_two_reviewer_pending_adjudication"
             )
+        if adjudication is not None:
+            adjudicator_count = 1
+            status = "complete_two_reviewer_adjudicated"
+
+        if adjudication is not None:
+            review_boundary = (
+                "Independent second review and adjudication are complete for the "
+                "12-row enriched diagnostic subset; this subset is not a population "
+                "estimate."
+            )
+        elif secondary_agreement is not None:
+            review_boundary = (
+                "Independent second review is complete for the 12-row enriched "
+                f"diagnostic subset; {secondary_agreement['adjudication_rows']} "
+                "rating disagreements still require adjudication."
+            )
+        else:
+            review_boundary = (
+                "There is one primary reviewer, so the result is exploratory until "
+                "independent review and adjudication are complete."
+            )
         summary = {
             "artifact_schema_version": self.ARTIFACT_SCHEMA_VERSION,
             "human_evaluation_status": status,
             "reviewer_count": reviewer_count,
+            "adjudicator_count": adjudicator_count,
             "reviewed_rows": len(rows),
             "integrity": {
                 "immutable_fields_match_template": True,
@@ -413,10 +469,11 @@ class HumanAuditRunner:
                 ),
             },
             "secondary_agreement": secondary_agreement,
+            "adjudication": adjudication,
             "boundaries": [
                 "The operational human-pass threshold was not preregistered and is reported with continuous scores and sensitivity counts.",
                 "Only the balanced core is suitable for primary pipeline comparisons; the extension is enriched for automatic-system disagreements.",
-                "There is one primary reviewer, so the result is exploratory until independent review and adjudication are complete.",
+                review_boundary,
                 "The number-context check is post hoc and must be rerun prospectively before it can affect headline benchmark metrics.",
                 "Six balanced rows per pipeline cannot establish an algorithm winner.",
             ],
@@ -573,15 +630,14 @@ class HumanAuditRunner:
             "seed": self.secondary_seed,
         }
 
-    def _secondary_agreement(
+    def _secondary_pairs(
         self,
         reviewed_path: Path,
         template_path: Path,
         key_path: Path,
         primary_rows: list[dict[str, Any]],
-        output_dir: Path,
         source_column: str,
-    ) -> dict[str, Any]:
+    ) -> list[dict[str, Any]]:
         secondary, fields = _read_csv(reviewed_path)
         template, template_fields = _read_csv(template_path)
         self._validate_primary(secondary, fields, template, template_fields)
@@ -610,8 +666,27 @@ class HumanAuditRunner:
                     "secondary_quality_pass": quality_pass,
                     "source_text": row[source_column],
                     "candidate_text": row["candidate_text"],
+                    "selection_reason": str(key.get("selection_reason", "")),
                 }
             )
+        return pairs
+
+    def _secondary_agreement(
+        self,
+        reviewed_path: Path,
+        template_path: Path,
+        key_path: Path,
+        primary_rows: list[dict[str, Any]],
+        output_dir: Path,
+        source_column: str,
+    ) -> dict[str, Any]:
+        pairs = self._secondary_pairs(
+            reviewed_path,
+            template_path,
+            key_path,
+            primary_rows,
+            source_column,
+        )
         disagreements = [
             pair
             for pair in pairs
@@ -702,6 +777,200 @@ class HumanAuditRunner:
             "reviewed_audit_sha256": _sha256(reviewed_path),
         }
 
+    def _adjudication(
+        self,
+        reviewed_path: Path,
+        template_path: Path,
+        secondary_reviewed_path: Path,
+        secondary_template_path: Path,
+        secondary_key_path: Path,
+        primary_rows: list[dict[str, Any]],
+        output_dir: Path,
+        source_column: str,
+    ) -> dict[str, Any]:
+        reviewed, fields = _read_csv(reviewed_path)
+        template, template_fields = _read_csv(template_path)
+        self._validate_adjudication(reviewed, fields, template, template_fields)
+
+        pairs = self._secondary_pairs(
+            secondary_reviewed_path,
+            secondary_template_path,
+            secondary_key_path,
+            primary_rows,
+            source_column,
+        )
+        decisions_by_primary = {row["primary_review_id"]: row for row in reviewed}
+        disagreements = [
+            pair
+            for pair in pairs
+            if pair["primary"]["human_meaning"] != pair["secondary_meaning"]
+            or pair["primary"]["human_fluency"] != pair["secondary_fluency"]
+            or pair["primary"]["human_material_error"]
+            != pair["secondary_material_error"]
+        ]
+        if set(decisions_by_primary) != {
+            pair["primary"]["review_id"] for pair in disagreements
+        }:
+            raise ValueError(
+                "Adjudication primary review IDs do not exactly match disagreements"
+            )
+
+        consensus_rows = []
+        for pair in pairs:
+            primary = pair["primary"]
+            decision = decisions_by_primary.get(primary["review_id"])
+            if decision is None:
+                meaning = primary["human_meaning"]
+                fluency = primary["human_fluency"]
+                material_error = primary["human_material_error"]
+                decision_source = "reviewer_agreement"
+                notes = ""
+            else:
+                meaning = int(decision[ADJUDICATION_RATING_FIELDS[0]])
+                fluency = int(decision[ADJUDICATION_RATING_FIELDS[1]])
+                material_error = (
+                    decision[ADJUDICATION_FLAG_FIELD].strip().lower() == "true"
+                )
+                decision_source = "adjudicator"
+                notes = decision[ADJUDICATION_NOTES_FIELD]
+            quality_pass = (
+                meaning >= self.minimum_meaning
+                and fluency >= self.minimum_fluency
+                and not material_error
+            )
+            consensus_rows.append(
+                {
+                    "primary_review_id": primary["review_id"],
+                    "secondary_review_id": pair["secondary_review_id"],
+                    "language": primary["language"],
+                    "candidate_key": primary["candidate_key"],
+                    "pipeline": primary["pipeline"],
+                    "budget": primary["budget"],
+                    "selection_reason": pair["selection_reason"],
+                    "source_text": pair["source_text"],
+                    "candidate_text": pair["candidate_text"],
+                    "reviewer_1_meaning": primary["human_meaning"],
+                    "reviewer_2_meaning": pair["secondary_meaning"],
+                    "consensus_meaning": meaning,
+                    "reviewer_1_fluency": primary["human_fluency"],
+                    "reviewer_2_fluency": pair["secondary_fluency"],
+                    "consensus_fluency": fluency,
+                    "reviewer_1_material_error": primary["human_material_error"],
+                    "reviewer_2_material_error": pair["secondary_material_error"],
+                    "consensus_material_error": material_error,
+                    "reviewer_1_quality_pass": primary["human_quality_pass"],
+                    "reviewer_2_quality_pass": pair["secondary_quality_pass"],
+                    "consensus_quality_pass": quality_pass,
+                    "decision_source": decision_source,
+                    "adjudication_notes": notes,
+                }
+            )
+
+        snapshot_path = output_dir / "adjudication.reviewed.csv"
+        if reviewed_path.resolve() != snapshot_path.resolve():
+            shutil.copyfile(reviewed_path, snapshot_path)
+        _write_jsonl(output_dir / "adjudication.joined.jsonl", consensus_rows)
+
+        adjudicated_rows = [
+            row for row in consensus_rows if row["decision_source"] == "adjudicator"
+        ]
+        return {
+            "status": "complete",
+            "rows": len(adjudicated_rows),
+            "consensus_rows": len(consensus_rows),
+            "consensus_mean_meaning": mean(
+                row["consensus_meaning"] for row in consensus_rows
+            ),
+            "consensus_mean_fluency": mean(
+                row["consensus_fluency"] for row in consensus_rows
+            ),
+            "consensus_material_error_count": sum(
+                row["consensus_material_error"] for row in consensus_rows
+            ),
+            "consensus_quality_pass_count": sum(
+                row["consensus_quality_pass"] for row in consensus_rows
+            ),
+            "consensus_quality_pass_rate": _ratio(
+                sum(row["consensus_quality_pass"] for row in consensus_rows),
+                len(consensus_rows),
+            ),
+            "consensus_quality_pass_matches_reviewer_1": _agreement(
+                [int(row["consensus_quality_pass"]) for row in consensus_rows],
+                [int(row["reviewer_1_quality_pass"]) for row in consensus_rows],
+            ),
+            "consensus_quality_pass_matches_reviewer_2": _agreement(
+                [int(row["consensus_quality_pass"]) for row in consensus_rows],
+                [int(row["reviewer_2_quality_pass"]) for row in consensus_rows],
+            ),
+            "reviewed_audit_sha256": _sha256(reviewed_path),
+            "artifact": "adjudication.reviewed.csv",
+            "joined_artifact": "adjudication.joined.jsonl",
+        }
+
+    @staticmethod
+    def _validate_adjudication(
+        reviewed: list[dict[str, str]],
+        reviewed_fields: list[str],
+        template: list[dict[str, str]],
+        template_fields: list[str],
+    ) -> None:
+        required = {
+            "adjudication_id",
+            "primary_review_id",
+            "language",
+            "candidate_text",
+            *ADJUDICATION_RATING_FIELDS,
+            ADJUDICATION_FLAG_FIELD,
+            ADJUDICATION_NOTES_FIELD,
+        }
+        missing = sorted(required.difference(reviewed_fields))
+        if missing:
+            raise ValueError(f"Adjudication is missing columns: {missing}")
+        if reviewed_fields != template_fields:
+            raise ValueError("Adjudication column order differs from its template")
+        if len(reviewed) != len(template):
+            raise ValueError("Adjudication row count differs from its template")
+        if not reviewed:
+            raise ValueError("Adjudication is empty")
+
+        source_column = _source_column(reviewed_fields)
+        mutable = {
+            *ADJUDICATION_RATING_FIELDS,
+            ADJUDICATION_FLAG_FIELD,
+            ADJUDICATION_NOTES_FIELD,
+        }
+        immutable = [field for field in reviewed_fields if field not in mutable]
+        identifiers = set()
+        for index, (row, expected) in enumerate(
+            zip(reviewed, template, strict=True), start=2
+        ):
+            adjudication_id = row["adjudication_id"]
+            if adjudication_id in identifiers:
+                raise ValueError(
+                    f"Duplicate adjudication_id at CSV row {index}: {adjudication_id}"
+                )
+            identifiers.add(adjudication_id)
+            if any(row[field] != expected[field] for field in immutable):
+                raise ValueError(
+                    "Adjudication input fields changed at CSV row "
+                    f"{index}: {adjudication_id}"
+                )
+            if not row[source_column].strip() or not row["candidate_text"].strip():
+                raise ValueError(
+                    f"Adjudication text is empty at CSV row {index}: {adjudication_id}"
+                )
+            for field in ADJUDICATION_RATING_FIELDS:
+                if row[field].strip() not in VALID_RATINGS:
+                    raise ValueError(
+                        f"Invalid or missing {field} at CSV row {index}: "
+                        f"{adjudication_id}"
+                    )
+            if row[ADJUDICATION_FLAG_FIELD].strip().lower() not in VALID_FLAGS:
+                raise ValueError(
+                    f"Invalid or missing {ADJUDICATION_FLAG_FIELD} at CSV row "
+                    f"{index}: {adjudication_id}"
+                )
+
     @staticmethod
     def _update_report_summary(
         path: Path,
@@ -720,16 +989,52 @@ class HumanAuditRunner:
         report["human_evaluation"] = {
             "summary_artifact": relative_summary,
             "reviewer_count": human_summary["reviewer_count"],
+            "adjudicator_count": human_summary["adjudicator_count"],
             "reviewed_rows": human_summary["reviewed_rows"],
             "balanced_core": human_summary["balanced_core"]["overall"],
             "secondary_review_status": human_summary["secondary_review"]["status"],
+            "secondary_agreement": human_summary["secondary_agreement"],
+            "adjudication": human_summary["adjudication"],
         }
-        boundary = (
-            "Human evaluation is complete for one exploratory reviewer; independent "
-            "second review and adjudication remain required before algorithm promotion."
-        )
-        if boundary not in report.get("boundaries", []):
-            report.setdefault("boundaries", []).append(boundary)
+        known_human_boundaries = {
+            (
+                "Human evaluation is complete for one exploratory reviewer; "
+                "independent second review and adjudication remain required before "
+                "algorithm promotion."
+            ),
+            (
+                "Independent second review is complete; adjudication of rating "
+                "disagreements remains required before algorithm promotion."
+            ),
+            (
+                "Independent second review and adjudication are complete for the "
+                "diagnostic subset; the sample remains too small for algorithm "
+                "promotion."
+            ),
+        }
+        report["boundaries"] = [
+            value
+            for value in report.get("boundaries", [])
+            if value not in known_human_boundaries
+        ]
+        if human_summary["adjudication"] is not None:
+            boundary = (
+                "Independent second review and adjudication are complete for the "
+                "diagnostic subset; the sample remains too small for algorithm "
+                "promotion."
+            )
+        elif human_summary["secondary_agreement"] is not None:
+            boundary = (
+                "Independent second review is complete; adjudication of rating "
+                "disagreements remains required before algorithm promotion."
+            )
+        else:
+            boundary = (
+                "Human evaluation is complete for one exploratory reviewer; "
+                "independent second review and adjudication remain required before "
+                "algorithm promotion."
+            )
+        report.setdefault("boundaries", []).append(boundary)
         _write_json(path, report)
         markdown_path = path.parent / "REPORT.md"
         if markdown_path.exists():
@@ -743,9 +1048,16 @@ class HumanAuditRunner:
                 "See `../human-audit/HUMAN_AUDIT.md`; no algorithm is promoted."
             )
             if old in current:
-                markdown_path.write_text(
-                    current.replace(old, replacement), encoding="utf-8"
+                current = current.replace(old, replacement)
+            else:
+                current = re.sub(
+                    r"Human evaluation status: `[^`]+`\. See "
+                    r"`\.\./human-audit/HUMAN_AUDIT\.md`; no algorithm is "
+                    r"promoted\.",
+                    replacement,
+                    current,
                 )
+            markdown_path.write_text(current, encoding="utf-8")
 
     @staticmethod
     def _render_markdown(summary: dict[str, Any]) -> str:
@@ -785,6 +1097,38 @@ class HumanAuditRunner:
                 "",
                 f"- LLM judge vs human, balanced core: `{alignment.get('llm_judge_vs_human_balanced_core', {}).get('accuracy', 'n/a')}` accuracy.",
                 f"- Combined deterministic/neural gate vs human, balanced core: `{alignment['combined_quality_gate_vs_human_balanced_core']['accuracy']}` accuracy.",
+            ]
+        )
+        agreement = summary["secondary_agreement"]
+        if agreement is not None:
+            lines.extend(
+                [
+                    "",
+                    "## Independent second review",
+                    "",
+                    f"- Rows: `{agreement['rows']}`.",
+                    f"- Meaning: `{agreement['meaning_exact_agreement']:.1%}` exact, `{agreement['meaning_within_one_agreement']:.1%}` within one, QWK `{agreement['meaning_quadratic_weighted_kappa']:.3f}`.",
+                    f"- Fluency: `{agreement['fluency_exact_agreement']:.1%}` exact, `{agreement['fluency_within_one_agreement']:.1%}` within one, QWK `{agreement['fluency_quadratic_weighted_kappa']:.3f}`.",
+                    f"- Material-error Cohen kappa: `{agreement['material_error_kappa']:.3f}`.",
+                    f"- Quality-pass Cohen kappa: `{agreement['quality_pass_kappa']:.3f}`.",
+                    f"- Rating disagreements requiring adjudication: `{agreement['adjudication_rows']}`.",
+                ]
+            )
+        adjudication = summary["adjudication"]
+        if adjudication is not None:
+            lines.extend(
+                [
+                    "",
+                    "## Adjudicated diagnostic consensus",
+                    "",
+                    f"- Adjudicated disagreements: `{adjudication['rows']}`.",
+                    f"- Consensus sample: `{adjudication['consensus_rows']}` rows.",
+                    f"- Consensus quality pass: `{adjudication['consensus_quality_pass_count']}/{adjudication['consensus_rows']}` (`{adjudication['consensus_quality_pass_rate']:.1%}`).",
+                    f"- Consensus material errors: `{adjudication['consensus_material_error_count']}`.",
+                ]
+            )
+        lines.extend(
+            [
                 "",
                 "## Boundaries",
                 "",

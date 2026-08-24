@@ -10,6 +10,7 @@ export type Rating = "" | "1" | "2" | "3" | "4" | "5";
 export type AuditFlag = "unset" | "error" | "correct";
 export type ReviewStatus = "empty" | "partial" | "complete";
 export type ReviewFilter = "all" | "open" | "complete" | "errors";
+export type AuditMode = "review" | "adjudication";
 
 export interface AuditRecord {
   [key: string]: string;
@@ -23,6 +24,7 @@ export interface AuditRecord {
 }
 
 export interface AuditDocument {
+  mode: AuditMode;
   columns: string[];
   sourceColumn: "source_text" | "original_text";
   rows: AuditRecord[];

@@ -126,6 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     human_audit.add_argument("--judge-evaluations", type=Path)
     human_audit.add_argument("--report-summary", type=Path)
     human_audit.add_argument("--secondary-reviewed", type=Path)
+    human_audit.add_argument("--adjudicated-audit", type=Path)
     human_audit.add_argument("--minimum-meaning", type=int, default=4)
     human_audit.add_argument("--minimum-fluency", type=int, default=4)
     human_audit.add_argument("--balanced-core-size", type=int, default=24)
@@ -324,6 +325,7 @@ def main() -> None:
             judge_evaluations_path=args.judge_evaluations,
             report_summary_path=args.report_summary,
             secondary_reviewed_path=args.secondary_reviewed,
+            adjudicated_audit_path=args.adjudicated_audit,
         )
         print(json.dumps(summary, indent=2, ensure_ascii=False))
 

@@ -4,7 +4,9 @@ A local-only Vite interface for completing the blinded human quality audit. It
 accepts both benchmark artifacts:
 
 - `judge/manual-audit.csv`, whose source column is `source_text`;
-- `report/human-review.csv`, whose source column is `original_text`.
+- `report/human-review.csv`, whose source column is `original_text`;
+- `human-audit/adjudication.csv`, whose final ratings are kept separate from
+  the two reviewer scores.
 
 The app validates the audit contract before showing any row. All ratings are
 autosaved in browser `localStorage`, keyed by a fingerprint of the imported
@@ -34,6 +36,16 @@ research/text-watermark-benchmark/results/gate2b-exp-pilot-20260822-01/human-aud
 
 That 12-row sheet is newly blinded and must be completed by a reviewer who has
 not seen the primary ratings or the private key.
+
+After agreement calculation, open the generated disagreement sheet:
+
+```text
+research/text-watermark-benchmark/results/gate2b-exp-pilot-20260822-01/human-audit/adjudication.csv
+```
+
+In adjudication mode the app shows the two previous votes, but the adjudicator
+must decide from the source and candidate rather than average the scores.
+Export the completed file as `adjudication.reviewed.csv`.
 
 Importing the same original file later restores its local session. Use
 **Esporta CSV** at any time for a recoverable checkpoint; the app labels an

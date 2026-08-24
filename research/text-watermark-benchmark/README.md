@@ -155,9 +155,12 @@ review data to a backend.
 `unmarker-remote-bench human-audit` validates a completed export against its
 blind template, records reproducibility hashes, reports the balanced core
 separately from disagreement-enriched diagnostics, updates the Gate report, and
-generates a blinded second-review sample. The deterministic quality contract
-also checks high-confidence number-to-context swaps in addition to exact number
-multiplicity; this prevents two preserved years from silently exchanging facts.
+generates a blinded second-review sample. It also calculates inter-rater
+agreement, emits disagreement-only adjudication, and can reimport the final
+decisions into a traceable diagnostic consensus. The deterministic quality
+contract also checks high-confidence number-to-context swaps in addition to
+exact number multiplicity; this prevents two preserved years from silently
+exchanging facts.
 
 The Gate 2b GLiNER threshold pilot uses human-annotated UNER English-EWT and
 KIND Wikinews rows with a common PER/ORG/LOC label set. Source commits and file

@@ -12,9 +12,11 @@ requires substantially more edits.
 
 The result is evidence about official MarkLLM EXP with the pinned Qwen/OpenRouter
 stack only. It is not evidence about Claude or an undisclosed production
-watermark. The primary 48-row human audit is complete; it remains exploratory
-because it has one reviewer and the operational pass threshold was not
-preregistered.
+watermark. The primary 48-row human audit is complete, and a second reviewer
+independently scored a 12-row enriched subset. The result remains exploratory:
+the primary sample has one reviewer, the reliability subset is deliberately
+enriched rather than representative, and the operational pass threshold was
+not preregistered.
 
 ## Executed design
 
@@ -138,9 +140,21 @@ detects this binding swap and flags only that candidate in a post-hoc scan of
 all 240 progressive selections. This diagnostic was added after the run and
 must be applied prospectively before affecting headline metrics.
 
-The importer produced a new 12-row blinded second-review sheet containing all
+The independent reviewer completed the 12-row blinded reliability sheet: all
 six primary quality failures plus six stable random balanced-core controls.
-Independent review and adjudication remain pending.
+The reviewed CSV SHA-256 is
+`4edf1d0c05747d628db05a576bbd6c3f9d21cd2e65ba8890ee565b3887d6bb5e`.
+Meaning scores agree exactly on 7/12 rows (58.3%), within one point on 11/12
+(91.7%), with quadratic weighted kappa 0.500. Fluency agrees exactly on 8/12
+(66.7%), within one point on 11/12 (91.7%), with quadratic weighted kappa
+0.563. The factual/polarity flag agrees on all 12 rows (Cohen kappa 1.000).
+
+The thresholded quality-pass decision agrees on 9/12 rows with Cohen kappa
+0.500. All three pass disagreements come from fluency scores that cross the
+3-to-4 threshold, so they are especially relevant to the exploratory pass
+mapping. Seven rows differ on at least one raw rating and have been exported
+for adjudication. Until those decisions are completed, the human-evaluation
+status is `complete_two_reviewer_pending_adjudication`.
 
 ## Decision
 
@@ -151,7 +165,7 @@ baseline is neither observed nor statistically established here.
 
 The next evidence gate should:
 
-1. complete the independent 12-row second review and adjudicate disagreements;
+1. adjudicate the seven disagreements in the independent-review subset;
 2. run the new number-context gate prospectively alongside entity and negation
    preservation before tuning the attack ranking further;
 3. repeat with a larger held-out set and a detector calibration sample large
