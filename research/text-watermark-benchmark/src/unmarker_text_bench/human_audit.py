@@ -846,6 +846,7 @@ class HumanAuditRunner:
                     "candidate_key": primary["candidate_key"],
                     "pipeline": primary["pipeline"],
                     "budget": primary["budget"],
+                    "selection_stage": primary["selection_stage"],
                     "selection_reason": pair["selection_reason"],
                     "source_text": pair["source_text"],
                     "candidate_text": pair["candidate_text"],
@@ -873,6 +874,41 @@ class HumanAuditRunner:
 
         adjudicated_rows = [
             row for row in consensus_rows if row["decision_source"] == "adjudicator"
+        ]
+        consensus_by_primary = {row["primary_review_id"]: row for row in consensus_rows}
+        adjusted_rows = []
+        quality_pass_changes = []
+        for primary in primary_rows:
+            consensus = consensus_by_primary.get(primary["review_id"])
+            if consensus is None:
+                adjusted_rows.append(primary)
+                continue
+            adjusted = {
+                **primary,
+                "human_meaning": consensus["consensus_meaning"],
+                "human_fluency": consensus["consensus_fluency"],
+                "human_material_error": consensus["consensus_material_error"],
+                "human_quality_pass": consensus["consensus_quality_pass"],
+                "human_notes": consensus["adjudication_notes"],
+            }
+            adjusted["human_quality_preserving_evasion"] = bool(
+                adjusted["human_quality_pass"]
+                and adjusted["preattack_detected"]
+                and not adjusted["target_detected"]
+            )
+            adjusted_rows.append(adjusted)
+            if primary["human_quality_pass"] != adjusted["human_quality_pass"]:
+                quality_pass_changes.append(
+                    {
+                        "review_id": primary["review_id"],
+                        "selection_stage": primary["selection_stage"],
+                        "pipeline": primary["pipeline"],
+                        "primary_quality_pass": primary["human_quality_pass"],
+                        "consensus_quality_pass": adjusted["human_quality_pass"],
+                    }
+                )
+        adjusted_core = [
+            row for row in adjusted_rows if row["selection_stage"] == "balanced_core"
         ]
         return {
             "status": "complete",
@@ -902,6 +938,20 @@ class HumanAuditRunner:
                 [int(row["consensus_quality_pass"]) for row in consensus_rows],
                 [int(row["reviewer_2_quality_pass"]) for row in consensus_rows],
             ),
+            "quality_pass_changes_vs_primary": quality_pass_changes,
+            "adjudication_adjusted_sensitivity": {
+                "role": (
+                    "post-hoc sensitivity only; overlays consensus on independently "
+                    "reviewed rows and retains primary ratings elsewhere"
+                ),
+                "consensus_overlay_rows": len(consensus_rows),
+                "primary_only_rows": len(primary_rows) - len(consensus_by_primary),
+                "balanced_core": {
+                    "overall": _aggregate(adjusted_core),
+                    "by_pipeline": _grouped(adjusted_core, "pipeline"),
+                },
+                "all_reviewed_descriptive_only": _aggregate(adjusted_rows),
+            },
             "reviewed_audit_sha256": _sha256(reviewed_path),
             "artifact": "adjudication.reviewed.csv",
             "joined_artifact": "adjudication.joined.jsonl",
@@ -1116,6 +1166,8 @@ class HumanAuditRunner:
             )
         adjudication = summary["adjudication"]
         if adjudication is not None:
+            adjusted = adjudication["adjudication_adjusted_sensitivity"]
+            adjusted_core = adjusted["balanced_core"]["overall"]
             lines.extend(
                 [
                     "",
@@ -1125,6 +1177,14 @@ class HumanAuditRunner:
                     f"- Consensus sample: `{adjudication['consensus_rows']}` rows.",
                     f"- Consensus quality pass: `{adjudication['consensus_quality_pass_count']}/{adjudication['consensus_rows']}` (`{adjudication['consensus_quality_pass_rate']:.1%}`).",
                     f"- Consensus material errors: `{adjudication['consensus_material_error_count']}`.",
+                    f"- Quality-pass decisions changed vs primary: `{len(adjudication['quality_pass_changes_vs_primary'])}`.",
+                    "",
+                    "## Adjudication-adjusted sensitivity",
+                    "",
+                    f"This post-hoc view overlays consensus on {adjusted['consensus_overlay_rows']} independently reviewed rows and retains the primary ratings for the other {adjusted['primary_only_rows']}; it does not replace the primary analysis.",
+                    "",
+                    f"- Balanced-core quality pass: `{adjusted_core['human_quality_pass_count']}/{adjusted_core['rows']}` (`{adjusted_core['human_quality_pass_rate']:.1%}`).",
+                    f"- Balanced-core quality-preserving conditional evasion: `{adjusted_core['human_quality_preserving_evasion_count']}/{adjusted_core['preattack_detected_count']}` (`{adjusted_core['human_quality_preserving_conditional_evasion_rate']:.1%}`).",
                 ]
             )
         lines.extend(

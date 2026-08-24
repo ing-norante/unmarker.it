@@ -13,10 +13,10 @@ requires substantially more edits.
 The result is evidence about official MarkLLM EXP with the pinned Qwen/OpenRouter
 stack only. It is not evidence about Claude or an undisclosed production
 watermark. The primary 48-row human audit is complete, and a second reviewer
-independently scored a 12-row enriched subset. The result remains exploratory:
-the primary sample has one reviewer, the reliability subset is deliberately
-enriched rather than representative, and the operational pass threshold was
-not preregistered.
+independently scored a 12-row enriched subset whose disagreements were fully
+adjudicated. The result remains exploratory: the primary sample has one
+reviewer, the reliability subset is deliberately enriched rather than
+representative, and the operational pass threshold was not preregistered.
 
 ## Executed design
 
@@ -152,9 +152,26 @@ Meaning scores agree exactly on 7/12 rows (58.3%), within one point on 11/12
 The thresholded quality-pass decision agrees on 9/12 rows with Cohen kappa
 0.500. All three pass disagreements come from fluency scores that cross the
 3-to-4 threshold, so they are especially relevant to the exploratory pass
-mapping. Seven rows differ on at least one raw rating and have been exported
-for adjudication. Until those decisions are completed, the human-evaluation
-status is `complete_two_reviewer_pending_adjudication`.
+mapping. Seven rows differ on at least one raw rating and were adjudicated. The
+completed adjudication SHA-256 is
+`a5a7e989b1402da35abfd15ef6faf71cd6d8814b82cd472f799070e4353ddb78`,
+and the final status is `complete_two_reviewer_adjudicated`.
+
+The 12-row adjudicated consensus passes 10/12 candidates and retains both
+material errors. It changes four primary pass decisions from fail to pass: one
+balanced-core SIRA row and three disagreement-extension rows. The consensus
+pass agrees with reviewer 1 on 8/12 rows and reviewer 2 on 11/12, so the final
+decisions are operationally more permissive than the primary review. This is a
+diagnostic consensus, not a population-rate estimate.
+
+As a post-hoc sensitivity, overlaying this consensus on the 12 reviewed rows
+while retaining primary ratings for the other 36 raises balanced-core quality
+pass from 22/24 to 23/24 and all-audited descriptive pass from 42/48 to 46/48.
+It does not change balanced-core quality-preserving conditional evasion, which
+remains 13/22 (59.1%), because the changed core candidate did not evade the
+detector. SIRA's adjusted core quality pass becomes 5/6, but its
+quality-preserving conditional evasion remains 3/6 (50.0%). The substantive
+Gate decision is therefore unchanged.
 
 ## Decision
 
@@ -165,9 +182,10 @@ baseline is neither observed nor statistically established here.
 
 The next evidence gate should:
 
-1. adjudicate the seven disagreements in the independent-review subset;
-2. run the new number-context gate prospectively alongside entity and negation
+1. run the new number-context gate prospectively alongside entity and negation
    preservation before tuning the attack ranking further;
+2. preregister the pass mapping, add calibration examples around the fluency
+   3-to-4 boundary, and double-score a representative balanced sample;
 3. repeat with a larger held-out set and a detector calibration sample large
    enough to resolve a 1% FPR;
 4. add another executable official watermark family and at least one additional

@@ -192,6 +192,12 @@ class HumanAuditTests(unittest.TestCase):
             self.assertEqual(final["adjudicator_count"], 1)
             self.assertEqual(final["adjudication"]["rows"], 1)
             self.assertEqual(final["adjudication"]["consensus_rows"], 3)
+            self.assertEqual(
+                final["adjudication"]["adjudication_adjusted_sensitivity"][
+                    "balanced_core"
+                ]["overall"]["rows"],
+                4,
+            )
             self.assertTrue((output / "adjudication.reviewed.csv").exists())
             self.assertTrue((output / "adjudication.joined.jsonl").exists())
             report = json.loads(paths["report"].read_text())
