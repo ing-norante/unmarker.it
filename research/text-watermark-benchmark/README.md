@@ -19,6 +19,13 @@ The completed official-EXP pilot and its non-promotion decision are documented
 in [`GATE2B_RESULTS.md`](GATE2B_RESULTS.md). Raw generations and licensed NER
 gold artifacts remain untracked.
 
+The next independent-detector stage is documented in
+[`GENERIC_DETECTORS.md`](GENERIC_DETECTORS.md). It turns the 60 held-out
+originals and 240 selected rewrites into one hash-locked corpus, evaluates it
+with Copyleaks and GPTZero through resumable API adapters, runs the official
+Binoculars implementation on Modal, and reports native-label conditional
+evasion without claiming a locally calibrated false-positive rate.
+
 The remote run also produces two controls that are deliberately excluded from
 the candidate-algorithm ranking: an adaptive target-detector oracle paraphrase
 baseline and a clean-text re-stamp control. Every rewrite passes through a
@@ -119,8 +126,10 @@ src/unmarker_text_bench/
   final_report.py     development-fitted surrogate and held-out reports
   unicode_hygiene.py conservative invisible-carrier cleanup and audit
 modal_pipeline.py     resumable Modal GPU jobs and artifact transfer
+modal_binoculars.py   pinned official Binoculars detector on Modal
 tests/
   test_benchmark.py
+  test_generic_detectors.py
 ```
 
 The interfaces in `types.py` are the seam for future components:
