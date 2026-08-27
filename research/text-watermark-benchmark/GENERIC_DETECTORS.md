@@ -6,8 +6,9 @@ rewrites without Copyleaks or GPTZero. The primary open matrix is:
 - official Binoculars on Modal;
 - official Fast-DetectGPT plus the official LogRank baseline in one Modal pass;
 - IBM's released RADAR classifier;
-- an XLM-R large classifier fine-tuned on a pinned, balanced English/Italian
-  subset of the COLING 2025 multilingual machine-generated-text corpus.
+- an exploratory XLM-R large classifier fine-tuned on pinned English COLING
+  human/machine rows, Italian COLING machine rows, and disjoint Italian
+  Wikipedia human rows.
 
 The benchmark does not treat native 0.5 cutoffs as comparable. Each detector is
 calibrated separately for English and Italian on 1,000 independent human
@@ -25,7 +26,9 @@ weak Italian cells must not be averaged into a positive product claim.
 Fast-DetectGPT and LogRank also share the same GPT-Neo scoring model, so their
 agreement is correlated evidence rather than two independent votes. The XLM-R
 model is an Unmarker-trained derivative of the shared-task recipe, not an
-official released detector.
+official released detector. Its Italian human and machine classes come from
+different source corpora, so its held-out literary stress result is a required
+admission gate rather than an optional diagnostic.
 
 ## Reproducibility contract
 
@@ -89,16 +92,22 @@ the existing Modal run volume by the normal scan commands.
 uv run modal run modal_open_detectors.py \
   --action train-xlmr \
   --model-id xlmr-en-it-coling-v1 \
+  --controls results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
+  --benchmark results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
   --train-per-language-label 10000 \
   --dev-per-language-label 2000 \
+  --italian-train-per-label 4000 \
+  --italian-dev-per-label 1000 \
   --epochs 2 \
   --max-length 256
 ```
 
 The immutable model is stored in the `unmarker-open-detector-models` Modal
 volume. Its training manifest contains aggregate and per-language development
-accuracy and macro-F1. Choose a new model ID for a different training contract;
-an existing ID is never overwritten.
+accuracy and macro-F1, exact cell counts, and hashes of the control/benchmark
+corpora whose Wikipedia article IDs were excluded. The resulting recipe has
+28,000 train rows and 6,000 development rows. Choose a new model ID for a
+different training contract; an existing completed ID is never overwritten.
 
 ## 4. Score the human controls
 
@@ -106,18 +115,18 @@ Run all three jobs. They are resumable under their run IDs.
 
 ```bash
 uv run modal run modal_binoculars.py \
-  --run-id generic-controls-v1 \
+  --run-id generic-controls-v2 \
   --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
   --output results/gate2b-exp-pilot-20260822-01/generic-detectors/controls
 
 uv run modal run modal_fast_detect_gpt.py \
-  --run-id generic-controls-v1 \
+  --run-id generic-controls-v2 \
   --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
   --output results/gate2b-exp-pilot-20260822-01/generic-detectors/controls
 
 uv run modal run modal_open_detectors.py \
   --action scan \
-  --run-id generic-controls-v1 \
+  --run-id generic-controls-v2 \
   --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
   --output results/gate2b-exp-pilot-20260822-01/generic-detectors/controls \
   --detectors radar,xlmr_mgt \
@@ -152,6 +161,29 @@ detector/language cell before using that cell in conclusions. For the private
 Italian book, inspect both passage FPR and the stricter fraction of chapters
 having at least one false positive. Multiple excerpts from one chapter are not
 counted as independent chapters.
+
+### Reference control result (2026-08-27)
+
+The `generic-controls-v2` run completed all 3,492 controls with zero failed
+rows for every detector. Thresholds were fitted on 1,000 controls per language;
+the table below reports the disjoint 500-control evaluation FPR and the 492-row,
+164-chapter Italian literary stress test.
+
+| detector | EN eval FPR | IT eval FPR | book passage FPR | chapters with any FP |
+| --- | ---: | ---: | ---: | ---: |
+| Binoculars | 1.0% | 1.8% | 0.20% | 0.61% |
+| Fast-DetectGPT | 0.8% | 2.6% | 0.41% | 1.22% |
+| LogRank | 0.6% | 1.8% | 0.00% | 0.00% |
+| RADAR | 1.6% | 1.4% | 1.22% | 3.66% |
+| XLM-R derivative | 1.0% | 2.0% | 97.97% | 100.00% |
+
+XLM-R reached aggregate development macro-F1 0.9234 (EN 0.8886, IT 0.9920),
+but failed the independent Italian literary admission gate catastrophically.
+That combination is consistent with a source/domain shortcut caused by using
+Wikipedia for the Italian human class. The model is retained as a negative
+research control, but it must not participate in product claims or detector
+intersections until it is retrained on source-matched Italian human/machine
+data and passes a new untouched-domain stress test.
 
 ## 6. Score the 300 benchmark texts
 

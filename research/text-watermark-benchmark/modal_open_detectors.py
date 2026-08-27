@@ -67,10 +67,15 @@ def train_xlmr(
     model_id: str,
     train_per_language_label: int = 10_000,
     dev_per_language_label: int = 2_000,
+    italian_train_per_label: int = 4_000,
+    italian_dev_per_label: int = 1_000,
+    wikipedia_exclusions_json: str = "{}",
     seed: int = 20260827,
     epochs: float = 2.0,
     max_length: int = 256,
 ) -> dict:
+    import shutil
+
     import numpy as np
     from sklearn.metrics import accuracy_score, f1_score
     from transformers import (
@@ -82,6 +87,15 @@ def train_xlmr(
     )
 
     from datasets import Dataset, load_dataset
+    from unmarker_text_bench.detector_controls import (
+        CONFIGS as WIKIPEDIA_CONFIGS,
+    )
+    from unmarker_text_bench.detector_controls import (
+        DATASET_NAME as WIKIPEDIA_DATASET,
+    )
+    from unmarker_text_bench.detector_controls import (
+        DATASET_REVISION as WIKIPEDIA_REVISION,
+    )
     from unmarker_text_bench.generic_detectors import utc_now, write_json
     from unmarker_text_bench.open_detector_models import (
         XLMR_BASE_MODEL,
@@ -89,36 +103,75 @@ def train_xlmr(
     )
 
     _validate_identifier(model_id)
-    if min(train_per_language_label, dev_per_language_label, max_length) < 1:
+    if (
+        min(
+            train_per_language_label,
+            dev_per_language_label,
+            italian_train_per_label,
+            italian_dev_per_label,
+            max_length,
+        )
+        < 1
+    ):
         raise ValueError("Training sizes and max_length must be positive")
+    exclusions = json.loads(wikipedia_exclusions_json)
+    excluded_article_ids = {str(value) for value in exclusions.get("article_ids", [])}
+    if not excluded_article_ids:
+        raise ValueError("Pinned Wikipedia article exclusions are required")
     output_dir = MODELS_ROOT / "xlmr_mgt" / model_id
     if (output_dir / "training-manifest.json").exists():
         raise ValueError(
             f"Model {model_id!r} already exists; choose a new immutable ID"
         )
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=False)
     set_seed(seed)
 
-    train_rows = _balanced_rows(
+    train_targets = {
+        ("en", 0): train_per_language_label,
+        ("en", 1): train_per_language_label,
+        ("it", 1): italian_train_per_label,
+    }
+    dev_targets = {
+        ("en", 0): dev_per_language_label,
+        ("en", 1): dev_per_language_label,
+        ("it", 1): italian_dev_per_label,
+    }
+    train_rows = _targeted_rows(
         load_dataset(
             COLING_DATASET,
             split="train",
             streaming=True,
             revision=COLING_REVISION,
         ),
-        train_per_language_label,
+        train_targets,
         seed,
     )
-    dev_rows = _balanced_rows(
+    dev_rows = _targeted_rows(
         load_dataset(
             COLING_DATASET,
             split="dev",
             streaming=True,
             revision=COLING_REVISION,
         ),
-        dev_per_language_label,
+        dev_targets,
         seed + 1,
     )
+    italian_human_rows = _wikipedia_human_rows(
+        load_dataset(
+            WIKIPEDIA_DATASET,
+            WIKIPEDIA_CONFIGS["it"],
+            split="train",
+            streaming=True,
+            revision=WIKIPEDIA_REVISION,
+        ),
+        italian_train_per_label + italian_dev_per_label,
+        seed + 2,
+        excluded_article_ids,
+    )
+    train_rows.extend(italian_human_rows[:italian_train_per_label])
+    dev_rows.extend(italian_human_rows[italian_train_per_label:])
     tokenizer = AutoTokenizer.from_pretrained(
         XLMR_BASE_MODEL, revision=XLMR_BASE_REVISION, cache_dir=HF_CACHE_ROOT
     )
@@ -207,13 +260,24 @@ def train_xlmr(
         "base_revision": XLMR_BASE_REVISION,
         "dataset": COLING_DATASET,
         "dataset_revision": COLING_REVISION,
+        "italian_human_dataset": WIKIPEDIA_DATASET,
+        "italian_human_dataset_revision": WIKIPEDIA_REVISION,
+        "italian_human_dataset_config": WIKIPEDIA_CONFIGS["it"],
+        "wikipedia_exclusion_contract": {
+            "excluded_article_count": len(excluded_article_ids),
+            "sources": exclusions.get("sources", {}),
+        },
         "seed": seed,
         "train_per_language_label": train_per_language_label,
         "dev_per_language_label": dev_per_language_label,
+        "italian_train_per_label": italian_train_per_label,
+        "italian_dev_per_label": italian_dev_per_label,
         "epochs": epochs,
         "max_length": max_length,
         "train_rows": len(train_rows),
         "dev_rows": len(dev_rows),
+        "train_cell_rows": _cell_counts(train_rows),
+        "dev_cell_rows": _cell_counts(dev_rows),
         "train_metrics": {
             key: float(value) for key, value in train_output.metrics.items()
         },
@@ -223,7 +287,8 @@ def train_xlmr(
         "language_dev_metrics": language_metrics,
         "limitations": [
             "This is an Unmarker-trained derivative, not an official released detector.",
-            "The training corpus is balanced only for English and Italian.",
+            "COLING train has no Italian human rows, so disjoint pinned Wikipedia supplies the Italian human class.",
+            "English uses 10k rows per class while Italian uses 4k per class because COLING exposes only 4,174 Italian machine train rows.",
             "Published COLING results show Italian can remain near chance; inspect the per-language metric before use.",
         ],
     }
@@ -302,17 +367,27 @@ def main(
     manifest: str = "",
     output: str = "",
     detectors: str = "radar,xlmr_mgt",
+    controls: str = "",
+    benchmark: str = "",
     train_per_language_label: int = 10_000,
     dev_per_language_label: int = 2_000,
+    italian_train_per_label: int = 4_000,
+    italian_dev_per_label: int = 1_000,
     seed: int = 20260827,
     epochs: float = 2.0,
     max_length: int = 256,
 ) -> None:
     if action == "train-xlmr":
+        if not controls or not benchmark:
+            raise ValueError("train-xlmr requires controls and benchmark JSONL paths")
+        exclusions = _wikipedia_exclusions(Path(controls), Path(benchmark))
         payload = train_xlmr.remote(
             model_id,
             train_per_language_label,
             dev_per_language_label,
+            italian_train_per_label,
+            italian_dev_per_label,
+            json.dumps(exclusions, sort_keys=True),
             seed,
             epochs,
             max_length,
@@ -336,8 +411,10 @@ def main(
     print(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
 
 
-def _balanced_rows(stream: object, per_cell: int, seed: int) -> list[dict]:
-    counts = {(language, label): 0 for language in ("en", "it") for label in (0, 1)}
+def _targeted_rows(
+    stream: object, targets: dict[tuple[str, int], int], seed: int
+) -> list[dict]:
+    counts = {cell: 0 for cell in targets}
     rows = []
     shuffled = stream.shuffle(seed=seed, buffer_size=50_000)
     for example in shuffled:
@@ -345,15 +422,75 @@ def _balanced_rows(stream: object, per_cell: int, seed: int) -> list[dict]:
         label = int(example.get("label", -1))
         cell = (language, label)
         text = str(example.get("text", "")).strip()
-        if cell not in counts or counts[cell] >= per_cell or len(text) < 200:
+        if cell not in counts or counts[cell] >= targets[cell] or len(text) < 200:
             continue
         rows.append({"text": text, "labels": label, "language": language})
         counts[cell] += 1
-        if all(value == per_cell for value in counts.values()):
+        if all(counts[cell] == targets[cell] for cell in targets):
             break
-    if not all(value == per_cell for value in counts.values()):
-        raise RuntimeError(f"Could not fill balanced COLING cells: {counts}")
+    if not all(counts[cell] == targets[cell] for cell in targets):
+        raise RuntimeError(
+            f"Could not fill targeted COLING cells: counts={counts}, targets={targets}"
+        )
     return rows
+
+
+def _wikipedia_human_rows(
+    stream: object,
+    requested: int,
+    seed: int,
+    excluded_article_ids: set[str],
+) -> list[dict]:
+    rows = []
+    seen: set[str] = set()
+    shuffled = stream.shuffle(seed=seed, buffer_size=50_000)
+    for example in shuffled:
+        article_id = str(example.get("id", ""))
+        text = str(example.get("text", "")).strip()
+        if (
+            not article_id
+            or article_id in excluded_article_ids
+            or article_id in seen
+            or len(text) < 800
+        ):
+            continue
+        rows.append({"text": text, "labels": 0, "language": "it"})
+        seen.add(article_id)
+        if len(rows) == requested:
+            break
+    if len(rows) != requested:
+        raise RuntimeError(
+            f"Only found {len(rows)}/{requested} disjoint Italian Wikipedia rows"
+        )
+    return rows
+
+
+def _cell_counts(rows: list[dict]) -> dict[str, int]:
+    counts = {f"{language}:{label}": 0 for language in ("en", "it") for label in (0, 1)}
+    for row in rows:
+        counts[f"{row['language']}:{row['labels']}"] += 1
+    return counts
+
+
+def _wikipedia_exclusions(controls_path: Path, benchmark_path: Path) -> dict:
+    from unmarker_text_bench.generic_detectors import read_jsonl
+
+    article_ids: set[str] = set()
+    for row in read_jsonl(controls_path):
+        article_id = (row.get("source") or {}).get("article_id")
+        if article_id:
+            article_ids.add(str(article_id))
+    for row in read_jsonl(benchmark_path):
+        match = re.fullmatch(r"wikipedia-(?:en|it)-(.+)", str(row.get("sample_id")))
+        if match:
+            article_ids.add(match.group(1))
+    return {
+        "article_ids": sorted(article_ids),
+        "sources": {
+            "controls_sha256": hashlib.sha256(controls_path.read_bytes()).hexdigest(),
+            "benchmark_sha256": hashlib.sha256(benchmark_path.read_bytes()).hexdigest(),
+        },
+    }
 
 
 def _validate_identifier(value: str) -> None:

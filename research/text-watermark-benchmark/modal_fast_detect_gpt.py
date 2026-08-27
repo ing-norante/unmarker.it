@@ -24,10 +24,22 @@ MODEL_VERSION = (
     f"gpt-j-6b@{REFERENCE_REVISION[:12]}:"
     f"gpt-neo-2.7b@{SCORING_REVISION[:12]}"
 )
+HF_METADATA_FILES = [
+    "config.json",
+    "generation_config.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "special_tokens_map.json",
+    "added_tokens.json",
+    "vocab.json",
+    "merges.txt",
+]
+REFERENCE_RUNTIME_FILES = [*HF_METADATA_FILES, "pytorch_model.bin"]
+SCORING_RUNTIME_FILES = [*HF_METADATA_FILES, "model.safetensors"]
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("git")
+    .apt_install("curl")
     .uv_pip_install(
         "torch==2.5.1",
         "transformers==4.46.3",
@@ -36,10 +48,42 @@ image = (
         "numpy==1.26.4",
         "tqdm==4.67.1",
         "huggingface-hub==0.26.2",
+        "datasets==3.1.0",
+        "matplotlib==3.9.2",
+        "scikit-learn==1.5.2",
     )
     .run_commands(
-        f"git clone https://github.com/baoguangsheng/fast-detect-gpt.git {REMOTE_FAST_DETECT_ROOT}",
-        f"git -C {REMOTE_FAST_DETECT_ROOT} checkout {FAST_DETECT_COMMIT}",
+        f"mkdir -p {REMOTE_FAST_DETECT_ROOT}/scripts",
+        (
+            "curl --fail --location --retry 3 "
+            f"https://raw.githubusercontent.com/baoguangsheng/fast-detect-gpt/{FAST_DETECT_COMMIT}/scripts/fast_detect_gpt.py "
+            f"--output {REMOTE_FAST_DETECT_ROOT}/scripts/fast_detect_gpt.py"
+        ),
+        (
+            "curl --fail --location --retry 3 "
+            f"https://raw.githubusercontent.com/baoguangsheng/fast-detect-gpt/{FAST_DETECT_COMMIT}/scripts/baselines.py "
+            f"--output {REMOTE_FAST_DETECT_ROOT}/scripts/baselines.py"
+        ),
+        (
+            "curl --fail --location --retry 3 "
+            f"https://raw.githubusercontent.com/baoguangsheng/fast-detect-gpt/{FAST_DETECT_COMMIT}/scripts/data_builder.py "
+            f"--output {REMOTE_FAST_DETECT_ROOT}/scripts/data_builder.py"
+        ),
+        (
+            "curl --fail --location --retry 3 "
+            f"https://raw.githubusercontent.com/baoguangsheng/fast-detect-gpt/{FAST_DETECT_COMMIT}/scripts/custom_datasets.py "
+            f"--output {REMOTE_FAST_DETECT_ROOT}/scripts/custom_datasets.py"
+        ),
+        (
+            "curl --fail --location --retry 3 "
+            f"https://raw.githubusercontent.com/baoguangsheng/fast-detect-gpt/{FAST_DETECT_COMMIT}/scripts/model.py "
+            f"--output {REMOTE_FAST_DETECT_ROOT}/scripts/model.py"
+        ),
+        (
+            "curl --fail --location --retry 3 "
+            f"https://raw.githubusercontent.com/baoguangsheng/fast-detect-gpt/{FAST_DETECT_COMMIT}/scripts/metrics.py "
+            f"--output {REMOTE_FAST_DETECT_ROOT}/scripts/metrics.py"
+        ),
     )
     .add_local_dir(PROJECT_ROOT / "src", remote_path=REMOTE_PACKAGE_ROOT, copy=True)
     .env(
@@ -131,10 +175,16 @@ def scan_fast_detect_gpt(
     ]
     if pending:
         reference_path = snapshot_download(
-            REFERENCE_MODEL, revision=REFERENCE_REVISION, cache_dir=HF_CACHE_ROOT
+            REFERENCE_MODEL,
+            revision=REFERENCE_REVISION,
+            cache_dir=HF_CACHE_ROOT,
+            allow_patterns=REFERENCE_RUNTIME_FILES,
         )
         scoring_path = snapshot_download(
-            SCORING_MODEL, revision=SCORING_REVISION, cache_dir=HF_CACHE_ROOT
+            SCORING_MODEL,
+            revision=SCORING_REVISION,
+            cache_dir=HF_CACHE_ROOT,
+            allow_patterns=SCORING_RUNTIME_FILES,
         )
         reference_tokenizer = AutoTokenizer.from_pretrained(reference_path)
         scoring_tokenizer = AutoTokenizer.from_pretrained(scoring_path)
