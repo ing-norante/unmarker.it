@@ -1,50 +1,56 @@
-# Generic AI detector matrix
+# Open generic AI detector matrix
 
-This stage evaluates the 60 held-out AI originals and the 240 selected Gate 2b
-rewrites with three detectors that do not know the EXP watermark key:
+This stage evaluates the 60 held-out AI originals and 240 selected Gate 2b
+rewrites without Copyleaks or GPTZero. The primary open matrix is:
 
-- Copyleaks AI Text Detector API;
-- GPTZero v2 API;
-- the official Binoculars implementation on a Modal L40S.
+- official Binoculars on Modal;
+- official Fast-DetectGPT plus the official LogRank baseline in one Modal pass;
+- IBM's released RADAR classifier;
+- an XLM-R large classifier fine-tuned on a pinned, balanced English/Italian
+  subset of the COLING 2025 multilingual machine-generated-text corpus.
 
-It answers whether the rewrites stop being classified as AI-like by these
-independent detectors. It does **not** establish provenance, prove human
-authorship, or report TPR at 1% FPR. The 300-document corpus contains no
-independent human controls, so commercial provider labels and Binoculars'
-published global threshold cannot be recalibrated here.
+The benchmark does not treat native 0.5 cutoffs as comparable. Each detector is
+calibrated separately for English and Italian on 1,000 independent human
+controls at a target 1% FPR. A disjoint 500-control split per language estimates
+the realized out-of-sample FPR. Detector scores, native decisions, calibrated
+decisions, model revisions, latency, and raw diagnostic fields are retained.
+
+This is evidence about detector behavior, not proof of human authorship. RADAR
+is English-oriented, and published COLING shared-task results show that Italian
+detection can remain near chance. Both languages therefore remain separate;
+weak Italian cells must not be averaged into a positive product claim.
+Fast-DetectGPT and LogRank also share the same GPT-Neo scoring model, so their
+agreement is correlated evidence rather than two independent votes. The XLM-R
+model is an Unmarker-trained derivative of the shared-task recipe, not an
+official released detector.
 
 ## Reproducibility contract
 
-`prepare` reads `progressive-selections.jsonl`, verifies that every held-out
-sample has exactly the four benchmark pipelines, deduplicates the original text,
-and emits:
+The code pins:
 
-- `documents.jsonl`: 60 originals plus 240 rewrites;
-- `manifest.json`: source and corpus hashes, counts, length checks, and schema.
+- `ahans30/Binoculars` at
+  `c8ae2f90d50ee696418bc71d8d9e5020e5f9d7b8`;
+- `baoguangsheng/fast-detect-gpt` at
+  `971b05202bac2bb504d60c0ac0812fea7a8f7c82`;
+- GPT-J 6B at `47e169305d2e8376be1d31e765533382721b2cc1`;
+- GPT-Neo 2.7B at `e24fa291132763e59f4a5422741b424fb5d59056`;
+- `TrustSafeAI/RADAR-Vicuna-7B` at
+  `4ff1f23a69a36aa1df47b0933be6279f1b896c9b`;
+- `FacebookAI/xlm-roberta-large` at
+  `c23d21b0620b635a76227c604d44e43a9f0ee389`;
+- `Jinyan1/COLING_2025_MGT_multingual` at
+  `da603651a8929a3790937c2c2b01bde23662111f`;
+- `wikimedia/wikipedia` controls at
+  `b04c8d1ceb2f5cd4588862100d08de323dccfbaa`.
 
-Every detector result is joined by `document_id` and `text_sha256`. API runs use
-an append-only checkpoint, retry 429/5xx responses, resume successful calls, and
-compact the checkpoint into a canonical `results.jsonl`. Raw provider responses,
-model versions, latency, request IDs, and billable units (when returned) are
-retained; credentials are never written to artifacts.
+The 2023 Wikipedia snapshot is pinned and excludes the benchmark article IDs,
+but it is not guaranteed to be free of AI-assisted edits. It also represents
+only encyclopedic prose. The independent evaluation split makes the empirical
+FPR visible instead of assuming that the fitted quantile generalizes.
 
-Binoculars is isolated from the MarkLLM image because its official stack uses
-Transformers 4.31. The Modal job pins:
+All commands below run from `research/text-watermark-benchmark`.
 
-- `ahans30/Binoculars` at `c8ae2f90d50ee696418bc71d8d9e5020e5f9d7b8`;
-- `tiiuae/falcon-7b` at `ec89142b67d748a1865ea4451372db8313ada0d8`;
-- `tiiuae/falcon-7b-instruct` at
-  `8782b5c5d8c9290412416618f36a133653e85285`;
-- the official low-FPR score threshold `0.8536432310785527` and 512-token cap.
-
-That threshold was not fitted on this corpus and is especially exploratory for
-Italian. The report keeps English and Italian separate.
-
-## Run the 300-document matrix
-
-Run all commands from `research/text-watermark-benchmark`.
-
-### 1. Build and verify the corpus
+## 1. Freeze the 300 benchmark documents
 
 ```bash
 uv run unmarker-generic-detectors prepare \
@@ -52,96 +58,151 @@ uv run unmarker-generic-detectors prepare \
   --output results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus
 ```
 
-The expected contract is exactly 300 unique texts: 30 originals and 120
-rewrites per language. All current texts also pass Copyleaks' 255-character
-minimum.
+The expected contract is 300 unique texts: 30 originals and 120 rewrites per
+language.
 
-### 2. Run Binoculars on Modal
+## 2. Build independent human controls
+
+```bash
+uv run --extra markllm unmarker-generic-detectors build-controls \
+  --benchmark results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
+  --calibration-per-language 1000 \
+  --evaluation-per-language 500
+```
+
+This writes 3,000 length-matched human documents plus
+`controls-manifest.json`. Article IDs already used to prompt the 60 AI
+originals are excluded.
+
+## 3. Train the bilingual XLM-R detector once
+
+```bash
+uv run modal run modal_open_detectors.py \
+  --action train-xlmr \
+  --model-id xlmr-en-it-coling-v1 \
+  --train-per-language-label 10000 \
+  --dev-per-language-label 2000 \
+  --epochs 2 \
+  --max-length 256
+```
+
+The immutable model is stored in the `unmarker-open-detector-models` Modal
+volume. Its training manifest contains aggregate and per-language development
+accuracy and macro-F1. Choose a new model ID for a different training contract;
+an existing ID is never overwritten.
+
+## 4. Score the human controls
+
+Run all three jobs. They are resumable under their run IDs.
 
 ```bash
 uv run modal run modal_binoculars.py \
-  --run-id gate2b-generic-20260824 \
-  --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
-  --output results/gate2b-exp-pilot-20260822-01/generic-detectors
+  --run-id generic-controls-v1 \
+  --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/controls
+
+uv run modal run modal_fast_detect_gpt.py \
+  --run-id generic-controls-v1 \
+  --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/controls
+
+uv run modal run modal_open_detectors.py \
+  --action scan \
+  --run-id generic-controls-v1 \
+  --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/controls \
+  --detectors radar,xlmr_mgt \
+  --model-id xlmr-en-it-coling-v1
 ```
 
-The first run builds a separate image and downloads both pinned Falcon models to
-the existing Hugging Face cache volume. The remote checkpoint is committed after
-each batch. Re-running the same command with the same run ID resumes without
-rescoring completed documents. A different corpus under the same run ID is
-rejected.
+Fast-DetectGPT emits two result directories: `fast_detect_gpt` and `logrank`.
+LogRank deliberately has no native Boolean decision; it becomes decidable only
+after local calibration.
 
-### 3. Configure the commercial APIs
-
-Add these variables to a private env file (the repository root `.env` is
-accepted):
-
-```dotenv
-COPYLEAKS_EMAIL=...
-COPYLEAKS_API_KEY=...
-GPTZERO_API_KEY=...
-```
-
-The production Copyleaks run consumes credits. Its default sensitivity is 2,
-`sandbox` is false, and `explain` is false. The GPTZero adapter uses the provider
-default model and records the version when the response exposes it.
-
-### 4. Run the API detectors
+## 5. Fit and audit the 1% FPR thresholds
 
 ```bash
-uv run unmarker-generic-detectors scan-api \
-  --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
-  --output results/gate2b-exp-pilot-20260822-01/generic-detectors \
-  --env-file ../../.env \
-  --detectors copyleaks,gptzero \
-  --max-workers 2
+uv run unmarker-generic-detectors calibrate \
+  --controls results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
+  --results \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/binoculars/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/fast_detect_gpt/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/logrank/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/radar/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/xlmr_mgt/results.jsonl \
+  --target-fpr 0.01 \
+  --minimum-calibration-rows 1000 \
+  --minimum-evaluation-rows 500 \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/calibration.json
 ```
 
-This schedules 300 calls per commercial detector. Re-running resumes successful
-documents and retries failures. To isolate credentials or quota, either detector
-can be selected alone. `--copyleaks-sandbox` is only an integration check: its
-mock outputs must not enter the evidence report.
+The threshold uses a strict empirical operator (`score > threshold` or
+`score < threshold`) so ties cannot silently exceed the allowed calibration
+false positives. Inspect `evaluation_fpr` and its Wilson interval for every
+detector/language cell before using that cell in conclusions.
 
-### 5. Build the complete report
+## 6. Score the 300 benchmark texts
+
+```bash
+uv run modal run modal_binoculars.py \
+  --run-id generic-benchmark-v1 \
+  --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors
+
+uv run modal run modal_fast_detect_gpt.py \
+  --run-id generic-benchmark-v1 \
+  --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors
+
+uv run modal run modal_open_detectors.py \
+  --action scan \
+  --run-id generic-benchmark-v1 \
+  --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors \
+  --detectors radar,xlmr_mgt \
+  --model-id xlmr-en-it-coling-v1
+```
+
+The existing Binoculars result can be reused only if its corpus hash and model
+contract match. Never reuse a threshold fitted on benchmark AI scores.
+
+## 7. Produce the calibrated report
 
 ```bash
 uv run unmarker-generic-detectors report \
   --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
   --results \
-    results/gate2b-exp-pilot-20260822-01/generic-detectors/copyleaks/results.jsonl \
-    results/gate2b-exp-pilot-20260822-01/generic-detectors/gptzero/results.jsonl \
     results/gate2b-exp-pilot-20260822-01/generic-detectors/binoculars/results.jsonl \
-  --required-detectors copyleaks,gptzero,binoculars \
-  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/report
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/fast_detect_gpt/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/logrank/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/radar/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/xlmr_mgt/results.jsonl \
+  --calibration results/gate2b-exp-pilot-20260822-01/generic-detectors/calibration.json \
+  --required-detectors binoculars,fast_detect_gpt,logrank,radar,xlmr_mgt \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/report-open
 ```
 
-The main outputs are `summary.json`, `joined-results.jsonl`, and `REPORT.md`.
-Metrics are split by detector, language, and pipeline:
+The report contains original TPR, post-rewrite detection, conditional evasion,
+quality-preserving conditional evasion, score deltas, and the intersection of
+all detectors. All rates have Wilson 95% intervals. The intersection is useful
+only when the matrix is complete and every included detector/language cell has
+acceptable held-out control FPR and non-trivial original TPR.
 
-- original AI detection rate;
-- post-rewrite AI detection rate;
-- conditional evasion only where that detector recognized the original;
-- quality-preserving conditional evasion using the existing Gate 2b quality
-  decision;
-- detector-score change;
-- pass-all-detectors intersection on complete rows.
+## Local fallback
 
-Every binomial rate includes a Wilson 95% interval. “Quality-preserving
-conditional evasion” uses every detector-recognized original as its denominator
-and counts a success only when the rewrite both evades that detector and passes
-the existing Gate 2b quality decision.
+RADAR or the trained XLM-R model can also be scanned with
+`unmarker-generic-detectors scan-local` after installing the `detectors` extra.
+This is a portability fallback, not the reference run; the reference artifacts
+come from the pinned Modal images.
 
-Do not rank algorithms from the pass-all intersection unless all three detector
-matrices are complete. Do not relabel these native-score results as
-`TPR@1%FPR`; that requires a new, matched human-control corpus and detector-level
-threshold calibration.
-
-## Tests
+## Tests and static checks
 
 ```bash
 uv run python -m unittest discover -s tests -v
+uv run python -m py_compile \
+  modal_binoculars.py modal_fast_detect_gpt.py modal_open_detectors.py
 ```
 
-The tests cover corpus integrity, provider response normalization, secret-free
-artifacts, resume behavior, conditional evasion, and cross-detector joins. They
-use fake HTTP transports and consume no provider credits.
+No commercial detector credentials and no Codex/ChatGPT quota are required.
+Modal GPU execution still incurs Modal compute usage.

@@ -2429,6 +2429,11 @@ version = "0.1.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
+detectors = [
+    { name = "sentencepiece" },
+    { name = "torch" },
+    { name = "transformers" },
+]
 markllm = [
     { name = "datasets" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -2456,13 +2461,16 @@ requires-dist = [
     { name = "modal", marker = "extra == 'modal'", specifier = "==1.5.4" },
     { name = "numpy", marker = "extra == 'markllm'", specifier = ">=1.26" },
     { name = "scikit-learn", marker = "extra == 'markllm'", specifier = ">=1.5" },
+    { name = "sentencepiece", marker = "extra == 'detectors'", specifier = ">=0.2" },
+    { name = "torch", marker = "extra == 'detectors'", specifier = ">=2.5" },
     { name = "torch", marker = "extra == 'markllm'", specifier = ">=2.2" },
     { name = "tqdm", marker = "extra == 'markllm'", specifier = ">=4.66" },
+    { name = "transformers", marker = "extra == 'detectors'", specifier = ">=5.15,<5.16" },
     { name = "transformers", marker = "extra == 'markllm'", specifier = ">=4.46" },
     { name = "transformers", marker = "extra == 'ner'", specifier = ">=5.15,<5.16" },
     { name = "transformers", marker = "extra == 'remote'", specifier = ">=5.15,<5.16" },
 ]
-provides-extras = ["markllm", "remote", "ner", "modal"]
+provides-extras = ["markllm", "remote", "ner", "detectors", "modal"]
 
 [[package]]
 name = "urllib3"

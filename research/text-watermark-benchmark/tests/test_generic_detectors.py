@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import json
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 from urllib.request import Request
 
+from unmarker_text_bench.detector_calibration import DetectorCalibrator
+from unmarker_text_bench.detector_controls import HumanControlCorpusBuilder
 from unmarker_text_bench.generic_detectors import (
     CopyleaksDetector,
     DetectionRunner,
@@ -49,6 +53,70 @@ class GenericDetectorTests(unittest.TestCase):
             write_jsonl(selections, self._selections()[:-1])
             with self.assertRaisesRegex(ValueError, "exactly the four"):
                 GenericCorpusBuilder().run(selections, root / "corpus")
+
+    def test_human_controls_are_split_and_exclude_benchmark_articles(self) -> None:
+        class FakeStream:
+            def __init__(self, rows: list[dict[str, Any]]) -> None:
+                self.rows = rows
+
+            def shuffle(self, **_: Any) -> FakeStream:
+                return self
+
+            def __iter__(self):
+                return iter(self.rows)
+
+        def load_dataset(_: str, config: str, **__: Any) -> FakeStream:
+            language = "it" if config.endswith(".it") else "en"
+            body = " ".join(f"word{index}" for index in range(240))
+            return FakeStream(
+                [
+                    {
+                        "id": identifier,
+                        "title": f"Article {identifier}",
+                        "text": body,
+                        "url": f"https://example.test/{identifier}",
+                    }
+                    for identifier in (f"used-{language}", "fresh-1", "fresh-2")
+                ]
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            benchmark_path = root / "benchmark.jsonl"
+            benchmark = []
+            for language in ("en", "it"):
+                row = self._document(f"benchmark-{language}")
+                row.update(
+                    {
+                        "language": language,
+                        "sample_id": f"wikipedia-{language}-used-{language}",
+                        "word_count": 144,
+                    }
+                )
+                benchmark.append(row)
+            write_jsonl(benchmark_path, benchmark)
+            fake_datasets = types.SimpleNamespace(load_dataset=load_dataset)
+            with mock.patch.dict("sys.modules", {"datasets": fake_datasets}):
+                manifest = HumanControlCorpusBuilder().run(
+                    benchmark_path,
+                    root / "controls" / "documents.jsonl",
+                    calibration_per_language=1,
+                    evaluation_per_language=1,
+                )
+            controls = read_jsonl(root / "controls" / "documents.jsonl")
+
+            self.assertEqual(manifest["document_count"], 4)
+            self.assertEqual(
+                {(row["language"], row["control_split"]) for row in controls},
+                {
+                    ("en", "calibration"),
+                    ("en", "evaluation"),
+                    ("it", "calibration"),
+                    ("it", "evaluation"),
+                },
+            )
+            self.assertFalse(any("used-" in row["document_id"] for row in controls))
+            self.assertTrue((root / "controls" / "controls-manifest.json").exists())
 
     def test_copyleaks_adapter_authenticates_and_normalizes_summary(self) -> None:
         requests: list[Request] = []
@@ -175,6 +243,7 @@ class GenericDetectorTests(unittest.TestCase):
                             "status": "success",
                             "score": 0.9 if detected else 0.1,
                             "score_name": "test",
+                            "score_direction": "higher_is_ai",
                             "native_ai_detected": detected,
                             "native_label": "AI" if detected else "HUMAN",
                             "model_version": "test",
@@ -201,6 +270,138 @@ class GenericDetectorTests(unittest.TestCase):
             self.assertEqual(intersection["rate"], 1.0)
             self.assertTrue(summary["complete_matrix"])
             self.assertTrue((root / "report" / "REPORT.md").exists())
+
+    def test_calibration_fits_strict_language_thresholds_and_report_uses_them(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            controls = []
+            control_results = []
+            for language in ("en", "it"):
+                for split, count in (("calibration", 100), ("evaluation", 20)):
+                    for index in range(count):
+                        document = self._document(f"{language}-{split}-{index}")
+                        document.update(
+                            {
+                                "language": language,
+                                "role": "human_control",
+                                "pipeline": "human_control",
+                                "control_split": split,
+                            }
+                        )
+                        controls.append(document)
+                        control_results.append(
+                            {
+                                "detector_id": "alpha",
+                                "document_id": document["document_id"],
+                                "text_sha256": document["text_sha256"],
+                                "language": language,
+                                "status": "success",
+                                "score": float(index),
+                                "score_name": "test",
+                                "score_direction": "higher_is_ai",
+                                "native_ai_detected": False,
+                                "model_version": "test-v1",
+                            }
+                        )
+            controls_path = root / "controls.jsonl"
+            control_results_path = root / "alpha-controls" / "results.jsonl"
+            write_jsonl(controls_path, controls)
+            write_jsonl(control_results_path, control_results)
+            calibration_path = root / "calibration.json"
+            calibration = DetectorCalibrator().run(
+                controls_path,
+                [control_results_path],
+                calibration_path,
+                minimum_calibration_rows=100,
+                minimum_evaluation_rows=20,
+            )
+
+            for language in ("en", "it"):
+                cell = calibration["detectors"]["alpha"]["languages"][language]
+                self.assertEqual(cell["operator"], "gt")
+                self.assertEqual(cell["threshold"], 98.0)
+                self.assertEqual(cell["calibration_false_positives"], 1)
+                self.assertEqual(cell["evaluation_false_positives"], 0)
+
+            selections = root / "selections.jsonl"
+            write_jsonl(selections, self._selections())
+            GenericCorpusBuilder().run(selections, root / "corpus")
+            documents = read_jsonl(root / "corpus" / "documents.jsonl")
+            benchmark_results = root / "alpha" / "results.jsonl"
+            write_jsonl(
+                benchmark_results,
+                [
+                    {
+                        "detector_id": "alpha",
+                        "document_id": document["document_id"],
+                        "text_sha256": document["text_sha256"],
+                        "language": document["language"],
+                        "status": "success",
+                        "score": 99.0 if document["role"] == "ai_original" else 0.0,
+                        "score_name": "test",
+                        "score_direction": "higher_is_ai",
+                        "native_ai_detected": False,
+                        "model_version": "test-v1",
+                    }
+                    for document in documents
+                ],
+            )
+            summary = GenericDetectorReport().run(
+                root / "corpus" / "documents.jsonl",
+                [benchmark_results],
+                root / "report",
+                calibration_path=calibration_path,
+            )
+            self.assertEqual(
+                summary["metrics"]["alpha"]["en"]["original"]["ai_detected"], 1
+            )
+            self.assertEqual(
+                summary["metrics"]["alpha"]["en"]["pipelines"]["bira"][
+                    "conditional_evasion"
+                ]["rate"],
+                1.0,
+            )
+            self.assertEqual(
+                summary["calibration_status"],
+                "local-per-detector-language-human-controls",
+            )
+
+    def test_detector_without_native_threshold_is_not_counted_as_human(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            selections = root / "selections.jsonl"
+            write_jsonl(selections, self._selections())
+            GenericCorpusBuilder().run(selections, root / "corpus")
+            documents = read_jsonl(root / "corpus" / "documents.jsonl")
+            results_path = root / "logrank" / "results.jsonl"
+            write_jsonl(
+                results_path,
+                [
+                    {
+                        "detector_id": "logrank",
+                        "document_id": document["document_id"],
+                        "text_sha256": document["text_sha256"],
+                        "language": document["language"],
+                        "status": "success",
+                        "score": -1.0,
+                        "score_name": "negative_mean_log_rank",
+                        "score_direction": "higher_is_ai",
+                        "native_ai_detected": None,
+                    }
+                    for document in documents
+                ],
+            )
+            summary = GenericDetectorReport().run(
+                root / "corpus" / "documents.jsonl",
+                [results_path],
+                root / "report",
+            )
+            original = summary["metrics"]["logrank"]["en"]["original"]
+            self.assertEqual(original["rows"], 0)
+            self.assertEqual(original["undecided_rows"], 1)
+            self.assertIsNone(original["detection_rate"])
 
     @staticmethod
     def _selections() -> list[dict[str, Any]]:

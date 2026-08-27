@@ -130,6 +130,7 @@ def scan_binoculars(
         threshold = float(detector.threshold)
         offset = 0
         active_batch_size = batch_size
+        batches_since_commit = 0
         while offset < len(pending):
             batch = pending[offset : offset + active_batch_size]
             started = time.perf_counter()
@@ -158,7 +159,10 @@ def scan_binoculars(
                     )
                 latest[str(document["document_id"])] = result
             offset += len(batch)
-            run_volume.commit()
+            batches_since_commit += 1
+            if batches_since_commit >= 10:
+                run_volume.commit()
+                batches_since_commit = 0
         del detector
         torch.cuda.empty_cache()
         hf_cache.commit()

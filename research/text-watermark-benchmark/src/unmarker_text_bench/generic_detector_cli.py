@@ -26,6 +26,17 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--selections", type=Path, required=True)
     prepare.add_argument("--output", type=Path, required=True)
 
+    controls = commands.add_parser(
+        "build-controls",
+        help="Build independent, length-matched human controls from pinned Wikipedia",
+    )
+    controls.add_argument("--benchmark", type=Path, required=True)
+    controls.add_argument("--output", type=Path, required=True)
+    controls.add_argument("--calibration-per-language", type=int, default=1_000)
+    controls.add_argument("--evaluation-per-language", type=int, default=500)
+    controls.add_argument("--seed", type=int, default=20260827)
+    controls.add_argument("--shuffle-buffer", type=int, default=20_000)
+
     scan = commands.add_parser(
         "scan-api", help="Run resumable Copyleaks and/or GPTZero API scans"
     )
@@ -39,8 +50,28 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--copyleaks-sandbox", action="store_true")
     scan.add_argument("--copyleaks-explain", action="store_true")
 
+    scan_local = commands.add_parser(
+        "scan-local", help="Run RADAR and/or a fine-tuned XLM-R detector locally"
+    )
+    scan_local.add_argument("--manifest", type=Path, required=True)
+    scan_local.add_argument("--output", type=Path, required=True)
+    scan_local.add_argument("--detectors", default="radar")
+    scan_local.add_argument("--xlmr-model")
+    scan_local.add_argument("--device", default="auto")
+    scan_local.add_argument("--no-resume", action="store_true")
+
+    calibrate = commands.add_parser(
+        "calibrate", help="Fit per-detector/language thresholds on human controls"
+    )
+    calibrate.add_argument("--controls", type=Path, required=True)
+    calibrate.add_argument("--results", type=Path, nargs="+", required=True)
+    calibrate.add_argument("--output", type=Path, required=True)
+    calibrate.add_argument("--target-fpr", type=float, default=0.01)
+    calibrate.add_argument("--minimum-calibration-rows", type=int, default=1_000)
+    calibrate.add_argument("--minimum-evaluation-rows", type=int, default=500)
+
     report = commands.add_parser(
-        "report", help="Join detector results and calculate native-label metrics"
+        "report", help="Join detector results and calculate calibrated metrics"
     )
     report.add_argument("--manifest", type=Path, required=True)
     report.add_argument("--results", type=Path, nargs="+", required=True)
@@ -50,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Comma-separated detector IDs required for a complete report",
     )
+    report.add_argument(
+        "--calibration",
+        type=Path,
+        help="Optional per-language human-control calibration artifact",
+    )
     return parser
 
 
@@ -57,6 +93,17 @@ def main() -> None:
     args = build_parser().parse_args()
     if args.command == "prepare":
         payload = GenericCorpusBuilder().run(args.selections, args.output)
+    elif args.command == "build-controls":
+        from .detector_controls import HumanControlCorpusBuilder
+
+        payload = HumanControlCorpusBuilder().run(
+            args.benchmark,
+            args.output,
+            calibration_per_language=args.calibration_per_language,
+            evaluation_per_language=args.evaluation_per_language,
+            seed=args.seed,
+            shuffle_buffer=args.shuffle_buffer,
+        )
     elif args.command == "scan-api":
         if args.env_file:
             _load_env_file(
@@ -89,12 +136,48 @@ def main() -> None:
                 )
             )
         payload = {"runs": summaries}
+    elif args.command == "scan-local":
+        from .open_detector_models import radar_detector, xlmr_detector
+
+        requested = _csv(args.detectors)
+        unknown = sorted(set(requested) - {"radar", "xlmr_mgt"})
+        if unknown:
+            raise ValueError(f"Unsupported local detectors: {unknown}")
+        if "xlmr_mgt" in requested and not args.xlmr_model:
+            raise ValueError("--xlmr-model is required when scanning xlmr_mgt")
+        summaries = []
+        for detector_id in requested:
+            detector = (
+                radar_detector(device=args.device)
+                if detector_id == "radar"
+                else xlmr_detector(args.xlmr_model, device=args.device)
+            )
+            summaries.append(
+                DetectionRunner(detector, max_workers=1).run(
+                    args.manifest,
+                    args.output / detector_id,
+                    resume=not args.no_resume,
+                )
+            )
+        payload = {"runs": summaries}
+    elif args.command == "calibrate":
+        from .detector_calibration import DetectorCalibrator
+
+        payload = DetectorCalibrator().run(
+            args.controls,
+            args.results,
+            args.output,
+            target_fpr=args.target_fpr,
+            minimum_calibration_rows=args.minimum_calibration_rows,
+            minimum_evaluation_rows=args.minimum_evaluation_rows,
+        )
     elif args.command == "report":
         payload = GenericDetectorReport().run(
             args.manifest,
             args.results,
             args.output,
             required_detectors=_csv(args.required_detectors),
+            calibration_path=args.calibration,
         )
     else:  # pragma: no cover - argparse guarantees this branch is unreachable
         raise ValueError(args.command)

@@ -21,10 +21,10 @@ gold artifacts remain untracked.
 
 The next independent-detector stage is documented in
 [`GENERIC_DETECTORS.md`](GENERIC_DETECTORS.md). It turns the 60 held-out
-originals and 240 selected rewrites into one hash-locked corpus, evaluates it
-with Copyleaks and GPTZero through resumable API adapters, runs the official
-Binoculars implementation on Modal, and reports native-label conditional
-evasion without claiming a locally calibrated false-positive rate.
+originals and 240 selected rewrites into one hash-locked corpus and evaluates
+them with an open Modal matrix: Binoculars, Fast-DetectGPT, LogRank, RADAR, and
+a bilingual XLM-R classifier. Independent human controls fit per-language 1%
+FPR thresholds and a disjoint control split audits the realized FPR.
 
 The remote run also produces two controls that are deliberately excluded from
 the candidate-algorithm ranking: an adaptive target-detector oracle paraphrase
@@ -127,6 +127,8 @@ src/unmarker_text_bench/
   unicode_hygiene.py conservative invisible-carrier cleanup and audit
 modal_pipeline.py     resumable Modal GPU jobs and artifact transfer
 modal_binoculars.py   pinned official Binoculars detector on Modal
+modal_fast_detect_gpt.py pinned official Fast-DetectGPT and LogRank on Modal
+modal_open_detectors.py RADAR inference and bilingual XLM-R training/inference
 tests/
   test_benchmark.py
   test_generic_detectors.py

@@ -402,6 +402,7 @@ class CopyleaksDetector:
         return {
             "score": ai,
             "score_name": "summary.ai",
+            "score_direction": "higher_is_ai",
             "native_ai_detected": ai >= human,
             "native_label": "AI" if ai >= human else "HUMAN",
             "model_version": payload.get("modelVersion"),
@@ -491,6 +492,7 @@ class GptZeroDetector:
         return {
             "score": score,
             "score_name": score_name,
+            "score_direction": "higher_is_ai",
             "native_ai_detected": native_ai,
             "native_label": classification,
             "model_version": document_payload.get("version")
@@ -526,11 +528,22 @@ class DetectionRunSummary:
 
 
 class DetectionRunner:
-    def __init__(self, detector: DetectorClient, *, max_workers: int = 2) -> None:
+    def __init__(
+        self,
+        detector: DetectorClient,
+        *,
+        max_workers: int = 2,
+        checkpoint_callback: Callable[[], None] | None = None,
+        checkpoint_interval: int = 25,
+    ) -> None:
         if max_workers < 1:
             raise ValueError("max_workers must be positive")
+        if checkpoint_interval < 1:
+            raise ValueError("checkpoint_interval must be positive")
         self.detector = detector
         self.max_workers = max_workers
+        self.checkpoint_callback = checkpoint_callback
+        self.checkpoint_interval = checkpoint_interval
 
     def run(
         self,
@@ -587,15 +600,24 @@ class DetectionRunner:
                 raise ValueError("Checkpoint does not match the detector corpus")
         pending = [row for row in documents if row["document_id"] not in completed]
         append_lock = threading.Lock()
+        persisted_since_callback = 0
 
         def persist(result: dict[str, Any]) -> None:
+            nonlocal persisted_since_callback
             encoded = json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n"
+            call_checkpoint = False
             with append_lock:
                 with checkpoint_path.open("a", encoding="utf-8") as handle:
                     handle.write(encoded)
                     handle.flush()
                     os.fsync(handle.fileno())
                 latest[str(result["document_id"])] = result
+                persisted_since_callback += 1
+                if persisted_since_callback >= self.checkpoint_interval:
+                    persisted_since_callback = 0
+                    call_checkpoint = self.checkpoint_callback is not None
+            if call_checkpoint and self.checkpoint_callback is not None:
+                self.checkpoint_callback()
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
             futures = {
@@ -681,6 +703,7 @@ def binoculars_result(
         "status": "success",
         "score": float(score),
         "score_name": "perplexity_over_cross_perplexity",
+        "score_direction": "lower_is_ai",
         "native_ai_detected": float(score) < float(threshold),
         "native_label": (
             "Most likely AI-generated"
@@ -704,6 +727,7 @@ class GenericDetectorReport:
         output_dir: Path,
         *,
         required_detectors: Sequence[str] = (),
+        calibration_path: Path | None = None,
     ) -> dict[str, Any]:
         documents = read_jsonl(documents_path)
         document_by_id = {str(row["document_id"]): row for row in documents}
@@ -728,6 +752,8 @@ class GenericDetectorReport:
                 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
                 detector_manifests[str(payload.get("detector_id"))] = payload
 
+        calibration = self._load_calibration(calibration_path)
+        self._attach_decisions(results, calibration)
         detectors = sorted({key[0] for key in results})
         missing_required = sorted(set(required_detectors) - set(detectors))
         if missing_required:
@@ -761,8 +787,25 @@ class GenericDetectorReport:
             "expected_result_count": len(documents) * len(detectors),
             "complete_matrix": successful == len(documents) * len(detectors),
             "calibration_status": (
-                "provider-native-labels-and-official-binoculars-global-threshold;"
-                "no-human-control-corpus-no-fpr-claim"
+                "local-per-detector-language-human-controls"
+                if calibration is not None
+                else "native-labels;no-local-human-control-fpr-claim"
+            ),
+            "calibration": (
+                {
+                    "path": str(calibration_path),
+                    "sha256": hashlib.sha256(calibration_path.read_bytes()).hexdigest(),
+                    "target_fpr": calibration.get("target_fpr"),
+                    "decision_contract": calibration.get("decision_contract"),
+                    "detectors": {
+                        detector_id: payload.get("languages", {})
+                        for detector_id, payload in calibration.get(
+                            "detectors", {}
+                        ).items()
+                    },
+                }
+                if calibration is not None and calibration_path is not None
+                else None
             ),
             "metrics": metrics,
             "all_detector_intersection": intersection,
@@ -784,8 +827,14 @@ class GenericDetectorReport:
                 "status",
                 "score",
                 "score_name",
+                "score_direction",
                 "native_ai_detected",
                 "native_label",
+                "calibrated_ai_detected",
+                "effective_ai_detected",
+                "decision_basis",
+                "calibration_threshold",
+                "calibration_operator",
                 "model_version",
                 "latency_ms",
             )
@@ -828,11 +877,11 @@ class GenericDetectorReport:
                 conditional = [
                     pair
                     for pair in pairs
-                    if pair[2] is not None and pair[2]["native_ai_detected"]
+                    if pair[2] is not None and self._decision(pair[2]) is True
                 ]
                 deltas = [
-                    self._ai_orientation(detector, pair[1]["score"])
-                    - self._ai_orientation(detector, pair[2]["score"])
+                    self._ai_orientation(detector, pair[1])
+                    - self._ai_orientation(detector, pair[2])
                     for pair in pairs
                     if pair[2] is not None
                     and pair[1].get("score") is not None
@@ -864,38 +913,67 @@ class GenericDetectorReport:
                 output.append((document, result))
         return output
 
-    @staticmethod
-    def _rate(rows: Sequence[tuple[dict[str, Any], dict[str, Any]]]) -> dict[str, Any]:
-        detected = sum(bool(result["native_ai_detected"]) for _, result in rows)
+    @classmethod
+    def _rate(
+        cls, rows: Sequence[tuple[dict[str, Any], dict[str, Any]]]
+    ) -> dict[str, Any]:
+        decided = [
+            (document, result)
+            for document, result in rows
+            if cls._decision(result) is not None
+        ]
+        detected = sum(cls._decision(result) is True for _, result in decided)
+        native_decided = [
+            result
+            for _, result in rows
+            if isinstance(result.get("native_ai_detected"), bool)
+        ]
+        native_detected = sum(
+            result["native_ai_detected"] is True for result in native_decided
+        )
         return {
-            "rows": len(rows),
+            "rows": len(decided),
+            "successful_rows": len(rows),
+            "undecided_rows": len(rows) - len(decided),
             "ai_detected": detected,
-            "native_detection_rate": detected / len(rows) if rows else None,
-            "native_detection_rate_wilson_95pct": _wilson_interval(detected, len(rows)),
+            "detection_rate": detected / len(decided) if decided else None,
+            "detection_rate_wilson_95pct": _wilson_interval(detected, len(decided)),
+            "native_rows": len(native_decided),
+            "native_ai_detected": native_detected,
+            "native_detection_rate": (
+                native_detected / len(native_decided) if native_decided else None
+            ),
+            "native_detection_rate_wilson_95pct": _wilson_interval(
+                native_detected, len(native_decided)
+            ),
         }
 
-    @staticmethod
+    @classmethod
     def _evasion(
+        cls,
         rows: Sequence[tuple[dict[str, Any], dict[str, Any], dict[str, Any] | None]],
     ) -> dict[str, Any]:
-        evaded = sum(not bool(result["native_ai_detected"]) for _, result, _ in rows)
+        decided = [row for row in rows if cls._decision(row[1]) is not None]
+        evaded = sum(cls._decision(result) is False for _, result, _ in decided)
         return {
-            "eligible_rows": len(rows),
+            "eligible_rows": len(decided),
+            "undecided_rows": len(rows) - len(decided),
             "evaded": evaded,
-            "rate": evaded / len(rows) if rows else None,
-            "rate_wilson_95pct": _wilson_interval(evaded, len(rows)),
+            "rate": evaded / len(decided) if decided else None,
+            "rate_wilson_95pct": _wilson_interval(evaded, len(decided)),
         }
 
-    @staticmethod
+    @classmethod
     def _quality_preserving_evasion(
+        cls,
         rows: Sequence[tuple[dict[str, Any], dict[str, Any], dict[str, Any] | None]],
     ) -> dict[str, Any]:
+        rows = [row for row in rows if cls._decision(row[1]) is not None]
         quality_passed = sum(
             bool(document.get("quality_pass")) for document, _, _ in rows
         )
         joint_success = sum(
-            bool(document.get("quality_pass"))
-            and not bool(result["native_ai_detected"])
+            bool(document.get("quality_pass")) and cls._decision(result) is False
             for document, result, _ in rows
         )
         return {
@@ -907,9 +985,11 @@ class GenericDetectorReport:
         }
 
     @staticmethod
-    def _ai_orientation(detector: str, score: Any) -> float:
-        value = float(score)
-        return -value if detector == "binoculars" else value
+    def _ai_orientation(detector: str, result: dict[str, Any]) -> float:
+        from .detector_calibration import score_direction
+
+        value = float(result["score"])
+        return -value if score_direction(result, detector) == "lower_is_ai" else value
 
     def _intersection_metrics(
         self,
@@ -932,14 +1012,16 @@ class GenericDetectorReport:
                     and all(
                         results.get((detector, row["document_id"]), {}).get("status")
                         == "success"
+                        and self._decision(
+                            results.get((detector, row["document_id"]), {})
+                        )
+                        is not None
                         for detector in detectors
                     )
                 ]
                 passed = sum(
                     all(
-                        not results[(detector, row["document_id"])][
-                            "native_ai_detected"
-                        ]
+                        self._decision(results[(detector, row["document_id"])]) is False
                         for detector in detectors
                     )
                     for row in eligible
@@ -962,12 +1044,41 @@ class GenericDetectorReport:
             + ".",
             "",
             (
-                "> These are provider-native labels (plus Binoculars' published "
-                "global threshold), not TPR at a locally calibrated FPR. This corpus "
-                "has no independent human controls, so this report makes no FPR claim."
+                "> Decisions use detector/language thresholds fitted on independent "
+                "human controls; evaluation-control FPR is reported in the calibration "
+                "artifact."
+                if summary.get("calibration")
+                else "> These are native detector labels, not TPR at a locally calibrated "
+                "FPR. Without a human-control calibration artifact this report makes no "
+                "FPR claim."
             ),
             "",
         ]
+        calibration = summary.get("calibration")
+        if calibration:
+            lines.extend(
+                [
+                    "## Human-control calibration audit",
+                    "",
+                    "| Detector | Language | Rule | Calibration FPR | Evaluation FPR |",
+                    "| --- | --- | ---: | ---: | ---: |",
+                ]
+            )
+            for detector_id, languages in calibration.get("detectors", {}).items():
+                for language, cell in languages.items():
+                    rule = f"score {cell['operator']} {cell['threshold']:.6g}"
+                    calibration_fpr = _format_fraction(
+                        cell["calibration_false_positives"],
+                        cell["calibration_rows"],
+                    )
+                    evaluation_fpr = _format_fraction(
+                        cell["evaluation_false_positives"], cell["evaluation_rows"]
+                    )
+                    lines.append(
+                        f"| {detector_id} | {language} | {rule} | "
+                        f"{calibration_fpr} | {evaluation_fpr} |"
+                    )
+            lines.append("")
         for detector, by_language in summary["metrics"].items():
             lines.extend([f"## {detector}", ""])
             for language, payload in by_language.items():
@@ -995,6 +1106,75 @@ class GenericDetectorReport:
                     )
                 lines.append("")
         return "\n".join(lines).rstrip() + "\n"
+
+    @staticmethod
+    def _load_calibration(path: Path | None) -> dict[str, Any] | None:
+        if path is None:
+            return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("artifact_kind") != "unmarker-generic-detector-calibration":
+            raise ValueError("Invalid generic-detector calibration artifact")
+        return payload
+
+    @staticmethod
+    def _attach_decisions(
+        results: dict[tuple[str, str], dict[str, Any]],
+        calibration: dict[str, Any] | None,
+    ) -> None:
+        from .detector_calibration import apply_threshold, score_direction
+
+        for (detector_id, _), result in results.items():
+            result["effective_ai_detected"] = None
+            result["decision_basis"] = "unavailable"
+            if result.get("status") != "success":
+                continue
+            language = str(result.get("language"))
+            detector_calibration = ((calibration or {}).get("detectors") or {}).get(
+                detector_id
+            )
+            threshold = (detector_calibration or {}).get("languages", {}).get(language)
+            if calibration is not None and threshold is None:
+                raise ValueError(
+                    f"Calibration has no {detector_id}/{language} threshold"
+                )
+            if threshold is not None and result.get("score") is not None:
+                expected_direction = detector_calibration.get("score_direction")
+                actual_direction = score_direction(result, detector_id)
+                if actual_direction != expected_direction:
+                    raise ValueError(
+                        f"Calibration score direction mismatch for {detector_id}"
+                    )
+                score_names = detector_calibration.get("score_names") or []
+                if score_names and result.get("score_name") not in score_names:
+                    raise ValueError(
+                        f"Calibration score name mismatch for {detector_id}"
+                    )
+                model_versions = detector_calibration.get("model_versions") or []
+                if model_versions and result.get("model_version") not in model_versions:
+                    raise ValueError(
+                        f"Calibration model version mismatch for {detector_id}"
+                    )
+                decision = apply_threshold(
+                    float(result["score"]),
+                    str(threshold["operator"]),
+                    float(threshold["threshold"]),
+                )
+                result["calibrated_ai_detected"] = decision
+                result["effective_ai_detected"] = decision
+                result["decision_basis"] = "calibrated_human_controls"
+                result["calibration_threshold"] = threshold["threshold"]
+                result["calibration_operator"] = threshold["operator"]
+            elif isinstance(result.get("native_ai_detected"), bool):
+                result["effective_ai_detected"] = result["native_ai_detected"]
+                result["decision_basis"] = "native"
+
+    @staticmethod
+    def _decision(result: dict[str, Any]) -> bool | None:
+        decision = result.get("effective_ai_detected")
+        if isinstance(decision, bool):
+            return decision
+        native = result.get("native_ai_detected")
+        return native if isinstance(native, bool) else None
 
 
 def _format_fraction(numerator: int, denominator: int) -> str:

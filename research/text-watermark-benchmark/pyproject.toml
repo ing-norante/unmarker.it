@@ -28,6 +28,11 @@ ner = [
   "gliner==0.2.24",
   "transformers>=5.15,<5.16",
 ]
+detectors = [
+  "sentencepiece>=0.2",
+  "torch>=2.5",
+  "transformers>=5.15,<5.16",
+]
 modal = [
   "modal==1.5.4",
 ]
