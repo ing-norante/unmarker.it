@@ -1079,6 +1079,35 @@ class GenericDetectorReport:
                         f"{calibration_fpr} | {evaluation_fpr} |"
                     )
             lines.append("")
+            stress_rows = [
+                (detector_id, language, control_group, stress)
+                for detector_id, languages in calibration.get("detectors", {}).items()
+                for language, cell in languages.items()
+                for control_group, stress in cell.get("stress_evaluations", {}).items()
+            ]
+            if stress_rows:
+                lines.extend(
+                    [
+                        "### Grouped human stress evaluations",
+                        "",
+                        "| Detector | Language | Control group | Passage FPR | Groups with any false positive | Complete |",
+                        "| --- | --- | --- | ---: | ---: | ---: |",
+                    ]
+                )
+                for detector_id, language, control_group, stress in stress_rows:
+                    passage_fpr = _format_fraction(
+                        stress["false_positives"], stress["scored_rows"]
+                    )
+                    grouped_fpr = _format_fraction(
+                        stress["groups_with_any_false_positive"],
+                        stress["fully_scored_groups"],
+                    )
+                    lines.append(
+                        f"| {detector_id} | {language} | {control_group} | "
+                        f"{passage_fpr} | {grouped_fpr} | "
+                        f"{'yes' if stress['complete'] else 'no'} |"
+                    )
+                lines.append("")
         for detector, by_language in summary["metrics"].items():
             lines.extend([f"## {detector}", ""])
             for language, payload in by_language.items():

@@ -4,6 +4,7 @@ import hashlib
 import re
 import statistics
 from collections import Counter, defaultdict
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -30,25 +31,33 @@ class HumanControlCorpusBuilder:
         evaluation_per_language: int = 500,
         seed: int = 20260827,
         shuffle_buffer: int = 20_000,
+        italian_book_dir: Path | None = None,
+        book_excerpts_per_chapter: int = 3,
     ) -> dict[str, Any]:
         if calibration_per_language < 1 or evaluation_per_language < 1:
             raise ValueError("Both control splits must contain at least one document")
+        if book_excerpts_per_chapter < 1:
+            raise ValueError("book_excerpts_per_chapter must be positive")
         benchmark = read_jsonl(benchmark_path)
         target_lengths: dict[str, list[int]] = defaultdict(list)
+        fallback_lengths: dict[str, list[int]] = defaultdict(list)
         excluded_ids: dict[str, set[str]] = defaultdict(set)
         for row in benchmark:
             language = str(row.get("language"))
             if language not in CONFIGS:
                 continue
-            target_lengths[language].append(
-                int(row.get("word_count") or len(str(row["text"]).split()))
-            )
+            word_count = int(row.get("word_count") or len(str(row["text"]).split()))
+            fallback_lengths[language].append(word_count)
+            if row.get("role") == "ai_original":
+                target_lengths[language].append(word_count)
             match = re.fullmatch(
                 rf"wikipedia-{language}-(.+)", str(row.get("sample_id"))
             )
             if match:
                 excluded_ids[language].add(match.group(1))
         for language in CONFIGS:
+            if not target_lengths[language]:
+                target_lengths[language] = fallback_lengths[language]
             if not target_lengths[language]:
                 raise ValueError(f"Benchmark has no {language} documents")
 
@@ -104,6 +113,15 @@ class HumanControlCorpusBuilder:
                     f"Only found {selected}/{requested} independent {language} controls"
                 )
 
+        book_manifest = None
+        if italian_book_dir is not None:
+            book_documents, book_manifest = self._book_documents(
+                italian_book_dir,
+                target_lengths["it"],
+                excerpts_per_chapter=book_excerpts_per_chapter,
+            )
+            documents.extend(book_documents)
+
         write_jsonl(output_path, documents)
         counts = Counter(
             (str(row["language"]), str(row["control_split"])) for row in documents
@@ -122,9 +140,19 @@ class HumanControlCorpusBuilder:
             "excluded_benchmark_article_ids": {
                 language: sorted(ids) for language, ids in excluded_ids.items()
             },
+            "length_matching_source": "ai_original_documents",
+            "target_word_length": {
+                language: {
+                    "minimum": min(lengths),
+                    "median": statistics.median(lengths),
+                    "maximum": max(lengths),
+                }
+                for language, lengths in target_lengths.items()
+            },
             "documents_path": str(output_path),
             "documents_sha256": hashlib.sha256(output_path.read_bytes()).hexdigest(),
             "document_count": len(documents),
+            "italian_unpublished_book": book_manifest,
             "counts": {
                 f"{language}:{split}": count
                 for (language, split), count in sorted(counts.items())
@@ -150,15 +178,137 @@ class HumanControlCorpusBuilder:
                 for language in CONFIGS
             },
             "control_contract": (
-                "pinned-wikipedia-independent-article-length-matched-split-v1"
+                "pinned-wikipedia-calibration-plus-grouped-private-stress-v2"
             ),
             "limitations": [
                 "The pinned 2023 Wikipedia snapshot is not guaranteed free of AI-assisted edits.",
                 "Controls are encyclopedic and do not estimate FPR on every product domain.",
+                "Book excerpts share one author and are reported as a grouped stress evaluation, not threshold-fitting controls.",
             ],
         }
         write_json(output_path.parent / "controls-manifest.json", manifest)
         return manifest
+
+    @classmethod
+    def _book_documents(
+        cls,
+        chapter_dir: Path,
+        target_lengths: list[int],
+        *,
+        excerpts_per_chapter: int,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        if not chapter_dir.is_dir():
+            raise FileNotFoundError(chapter_dir)
+        chapter_paths = sorted(
+            path
+            for path in chapter_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in {".md", ".markdown"}
+        )
+        if not chapter_paths:
+            raise ValueError(f"No Markdown chapters found in {chapter_dir}")
+        documents: list[dict[str, Any]] = []
+        chapter_hashes: list[str] = []
+        seen_chapter_hashes: set[str] = set()
+        seen_group_ids: set[str] = set()
+        seen_excerpt_hashes: set[str] = set()
+        for chapter_index, path in enumerate(chapter_paths):
+            raw = path.read_text(encoding="utf-8")
+            normalized = re.sub(r"\s+", " ", raw).strip()
+            words = normalized.split()
+            longest_target = max(target_lengths)
+            if len(words) < longest_target * excerpts_per_chapter:
+                raise ValueError(
+                    f"Chapter {path.name!r} is too short for "
+                    f"{excerpts_per_chapter} non-overlapping matched excerpts"
+                )
+            chapter_sha = sha256_text(raw)
+            if chapter_sha in seen_chapter_hashes:
+                raise ValueError("Private book contains duplicate chapters")
+            seen_chapter_hashes.add(chapter_sha)
+            chapter_hashes.append(chapter_sha)
+            group_id = chapter_sha[:20]
+            if group_id in seen_group_ids:
+                raise ValueError("Private book chapter group ID collision")
+            seen_group_ids.add(group_id)
+            starts = cls._evenly_spaced_starts(
+                len(words), longest_target, excerpts_per_chapter
+            )
+            for excerpt_index, start in enumerate(starts):
+                target = target_lengths[
+                    (chapter_index * excerpts_per_chapter + excerpt_index)
+                    % len(target_lengths)
+                ]
+                text = " ".join(words[start : start + target])
+                excerpt_sha = sha256_text(text)
+                if excerpt_sha in seen_excerpt_hashes:
+                    raise ValueError("Private book produced duplicate control excerpts")
+                seen_excerpt_hashes.add(excerpt_sha)
+                documents.append(
+                    {
+                        "artifact_schema_version": 1,
+                        "artifact_kind": "generic-detector-document",
+                        "document_id": (
+                            f"human:stress_evaluation:it:book-{group_id}-{excerpt_index + 1}"
+                        ),
+                        "text_sha256": excerpt_sha,
+                        "text": text,
+                        "character_count": len(text),
+                        "word_count": len(text.split()),
+                        "role": "human_control",
+                        "control_split": "stress_evaluation",
+                        "control_group": "italian_unpublished_book",
+                        "source_group_id": group_id,
+                        "language": "it",
+                        "sample_id": f"italian-unpublished-book-{group_id}",
+                        "pipeline": "human_control",
+                        "candidate_key": None,
+                        "algorithm": None,
+                        "domain": "literary_fiction",
+                        "quality_pass": None,
+                        "changed_token_ratio": None,
+                        "gate2b_target_detected": None,
+                        "source": {
+                            "dataset": "private:italian_unpublished_book",
+                            "chapter_sha256": chapter_sha,
+                            "chapter_group_id": group_id,
+                            "excerpt_index": excerpt_index + 1,
+                            "start_word": start,
+                            "end_word": start + target,
+                            "chapter_word_count": len(words),
+                        },
+                    }
+                )
+        set_sha = hashlib.sha256("\n".join(sorted(chapter_hashes)).encode()).hexdigest()
+        manifest = {
+            "source_directory": str(chapter_dir),
+            "chapter_count": len(chapter_paths),
+            "unique_chapter_sha256_count": len(set(chapter_hashes)),
+            "chapter_set_sha256": set_sha,
+            "excerpts_per_chapter": excerpts_per_chapter,
+            "excerpt_count": len(documents),
+            "split": "stress_evaluation",
+            "control_group": "italian_unpublished_book",
+            "grouping_unit": "chapter_sha256",
+            "threshold_fitting": False,
+        }
+        return documents, manifest
+
+    @staticmethod
+    def _evenly_spaced_starts(
+        word_count: int, maximum_excerpt_words: int, excerpt_count: int
+    ) -> list[int]:
+        maximum_start = word_count - maximum_excerpt_words
+        if excerpt_count == 1:
+            return [maximum_start // 2]
+        starts = [
+            round(index * maximum_start / (excerpt_count - 1))
+            for index in range(excerpt_count)
+        ]
+        if any(
+            second - first < maximum_excerpt_words for first, second in pairwise(starts)
+        ):
+            raise ValueError("Cannot produce non-overlapping private book excerpts")
+        return starts
 
     @staticmethod
     def _usable(example: dict[str, Any], language: str) -> bool:

@@ -14,6 +14,9 @@ calibrated separately for English and Italian on 1,000 independent human
 controls at a target 1% FPR. A disjoint 500-control split per language estimates
 the realized out-of-sample FPR. Detector scores, native decisions, calibrated
 decisions, model revisions, latency, and raw diagnostic fields are retained.
+The Italian controls also contain three excerpts from each of 164 chapters of
+an unpublished human-written book. These 492 literary passages never fit the
+threshold: they form a separate, chapter-grouped false-positive stress test.
 
 This is evidence about detector behavior, not proof of human authorship. RADAR
 is English-oriented, and published COLING shared-task results show that Italian
@@ -68,12 +71,17 @@ uv run --extra markllm unmarker-generic-detectors build-controls \
   --benchmark results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
   --output results/gate2b-exp-pilot-20260822-01/generic-detectors/controls/documents.jsonl \
   --calibration-per-language 1000 \
-  --evaluation-per-language 500
+  --evaluation-per-language 500 \
+  --italian-book-dir datasets/private/italian-unpublished-book/chapters \
+  --book-excerpts-per-chapter 3
 ```
 
-This writes 3,000 length-matched human documents plus
-`controls-manifest.json`. Article IDs already used to prompt the 60 AI
-originals are excluded.
+This writes 3,492 length-matched human documents plus
+`controls-manifest.json`: 3,000 Wikipedia calibration/evaluation controls and
+492 private Italian literary stress controls. Article IDs already used to
+prompt the 60 AI originals are excluded. The local `datasets/private/`
+directory is ignored by Git, while the complete control JSONL is uploaded to
+the existing Modal run volume by the normal scan commands.
 
 ## 3. Train the bilingual XLM-R detector once
 
@@ -140,7 +148,10 @@ uv run unmarker-generic-detectors calibrate \
 The threshold uses a strict empirical operator (`score > threshold` or
 `score < threshold`) so ties cannot silently exceed the allowed calibration
 false positives. Inspect `evaluation_fpr` and its Wilson interval for every
-detector/language cell before using that cell in conclusions.
+detector/language cell before using that cell in conclusions. For the private
+Italian book, inspect both passage FPR and the stricter fraction of chapters
+having at least one false positive. Multiple excerpts from one chapter are not
+counted as independent chapters.
 
 ## 6. Score the 300 benchmark texts
 

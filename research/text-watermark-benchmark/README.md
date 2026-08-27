@@ -24,7 +24,9 @@ The next independent-detector stage is documented in
 originals and 240 selected rewrites into one hash-locked corpus and evaluates
 them with an open Modal matrix: Binoculars, Fast-DetectGPT, LogRank, RADAR, and
 a bilingual XLM-R classifier. Independent human controls fit per-language 1%
-FPR thresholds and a disjoint control split audits the realized FPR.
+FPR thresholds and a disjoint control split audits the realized FPR. A private,
+unpublished Italian book adds a chapter-grouped human false-positive stress
+test without participating in threshold fitting.
 
 The remote run also produces two controls that are deliberately excluded from
 the candidate-algorithm ranking: an adaptive target-detector oracle paraphrase

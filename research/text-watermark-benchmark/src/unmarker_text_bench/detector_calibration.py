@@ -67,6 +67,7 @@ class DetectorCalibrator:
         model_versions: dict[str, set[str]] = defaultdict(set)
         score_names: dict[str, set[str]] = defaultdict(set)
         directions: dict[str, set[str]] = defaultdict(set)
+        successful_results: dict[tuple[str, str], dict[str, Any]] = {}
         seen: set[tuple[str, str]] = set()
         result_hashes: dict[str, str] = {}
         for path in result_paths:
@@ -88,6 +89,7 @@ class DetectorCalibrator:
                 language = str(control["language"])
                 split = str(control["control_split"])
                 grouped[(detector_id, language, split)].append(result)
+                successful_results[(detector_id, document_id)] = result
                 directions[detector_id].add(score_direction(result, detector_id))
                 if result.get("model_version"):
                     model_versions[detector_id].add(str(result["model_version"]))
@@ -159,6 +161,14 @@ class DetectorCalibrator:
                     "evaluation_fpr_wilson_95pct": _wilson_interval(
                         evaluation_fp, len(evaluation_rows)
                     ),
+                    "stress_evaluations": self._stress_evaluations(
+                        detector_id,
+                        str(language),
+                        controls,
+                        successful_results,
+                        operator,
+                        threshold,
+                    ),
                 }
             detectors[detector_id] = detector_payload
         if not detectors:
@@ -171,7 +181,9 @@ class DetectorCalibrator:
             "target_fpr": target_fpr,
             "minimum_calibration_rows": minimum_calibration_rows,
             "minimum_evaluation_rows": minimum_evaluation_rows,
-            "decision_contract": "strict-empirical-quantile-per-detector-language-v1",
+            "decision_contract": (
+                "strict-empirical-quantile-plus-grouped-human-stress-per-language-v2"
+            ),
             "controls_path": str(controls_path),
             "controls_sha256": hashlib.sha256(controls_path.read_bytes()).hexdigest(),
             "control_count": len(controls),
@@ -203,10 +215,85 @@ class DetectorCalibrator:
         for row in controls:
             if row.get("role") != "human_control":
                 raise ValueError("Every calibration document must be a human_control")
-            if row.get("control_split") not in {"calibration", "evaluation"}:
-                raise ValueError("control_split must be calibration or evaluation")
+            if row.get("control_split") not in {
+                "calibration",
+                "evaluation",
+                "stress_evaluation",
+            }:
+                raise ValueError(
+                    "control_split must be calibration, evaluation, or stress_evaluation"
+                )
             if row.get("language") not in {"en", "it"}:
                 raise ValueError("Only English and Italian controls are supported")
+            if row.get("control_split") == "stress_evaluation" and (
+                not row.get("control_group") or not row.get("source_group_id")
+            ):
+                raise ValueError(
+                    "Stress controls require control_group and source_group_id"
+                )
+
+    @staticmethod
+    def _stress_evaluations(
+        detector_id: str,
+        language: str,
+        controls: Sequence[dict[str, Any]],
+        results: dict[tuple[str, str], dict[str, Any]],
+        operator: str,
+        threshold: float,
+    ) -> dict[str, Any]:
+        grouped_controls: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for control in controls:
+            if (
+                str(control.get("language")) == language
+                and control.get("control_split") == "stress_evaluation"
+            ):
+                grouped_controls[str(control["control_group"])].append(control)
+        output: dict[str, Any] = {}
+        for control_group, group_controls in sorted(grouped_controls.items()):
+            expected_by_source: dict[str, list[dict[str, Any]]] = defaultdict(list)
+            scored_by_source: dict[str, list[bool]] = defaultdict(list)
+            false_positives = 0
+            scored_rows = 0
+            for control in group_controls:
+                source_group = str(control["source_group_id"])
+                expected_by_source[source_group].append(control)
+                result = results.get((detector_id, str(control["document_id"])))
+                if result is None:
+                    continue
+                detected = apply_threshold(float(result["score"]), operator, threshold)
+                scored_by_source[source_group].append(detected)
+                scored_rows += 1
+                false_positives += int(detected)
+            complete_source_groups = [
+                source_group
+                for source_group, expected in expected_by_source.items()
+                if len(scored_by_source[source_group]) == len(expected)
+            ]
+            groups_with_any_false_positive = sum(
+                any(scored_by_source[source_group])
+                for source_group in complete_source_groups
+            )
+            output[control_group] = {
+                "expected_rows": len(group_controls),
+                "scored_rows": scored_rows,
+                "complete": scored_rows == len(group_controls),
+                "false_positives": false_positives,
+                "fpr": false_positives / scored_rows if scored_rows else None,
+                "fpr_wilson_95pct": _wilson_interval(false_positives, scored_rows),
+                "grouping_unit": "source_group_id",
+                "expected_groups": len(expected_by_source),
+                "fully_scored_groups": len(complete_source_groups),
+                "groups_with_any_false_positive": groups_with_any_false_positive,
+                "groups_with_any_false_positive_rate": (
+                    groups_with_any_false_positive / len(complete_source_groups)
+                    if complete_source_groups
+                    else None
+                ),
+                "groups_with_any_false_positive_rate_wilson_95pct": _wilson_interval(
+                    groups_with_any_false_positive, len(complete_source_groups)
+                ),
+            }
+        return output
 
 
 def _wilson_interval(

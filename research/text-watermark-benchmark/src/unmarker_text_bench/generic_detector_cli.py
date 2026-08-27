@@ -36,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     controls.add_argument("--evaluation-per-language", type=int, default=500)
     controls.add_argument("--seed", type=int, default=20260827)
     controls.add_argument("--shuffle-buffer", type=int, default=20_000)
+    controls.add_argument(
+        "--italian-book-dir",
+        type=Path,
+        help="Optional private Italian Markdown chapters for grouped stress controls",
+    )
+    controls.add_argument("--book-excerpts-per-chapter", type=int, default=3)
 
     scan = commands.add_parser(
         "scan-api", help="Run resumable Copyleaks and/or GPTZero API scans"
@@ -103,6 +109,8 @@ def main() -> None:
             evaluation_per_language=args.evaluation_per_language,
             seed=args.seed,
             shuffle_buffer=args.shuffle_buffer,
+            italian_book_dir=args.italian_book_dir,
+            book_excerpts_per_chapter=args.book_excerpts_per_chapter,
         )
     elif args.command == "scan-api":
         if args.env_file:

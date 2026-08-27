@@ -95,6 +95,13 @@ class GenericDetectorTests(unittest.TestCase):
                 )
                 benchmark.append(row)
             write_jsonl(benchmark_path, benchmark)
+            book_dir = root / "private-book"
+            book_dir.mkdir()
+            for index in range(2):
+                (book_dir / f"chapter-{index}.md").write_text(
+                    " ".join(f"chapter{index}-word{word}" for word in range(700)),
+                    encoding="utf-8",
+                )
             fake_datasets = types.SimpleNamespace(load_dataset=load_dataset)
             with mock.patch.dict("sys.modules", {"datasets": fake_datasets}):
                 manifest = HumanControlCorpusBuilder().run(
@@ -102,12 +109,18 @@ class GenericDetectorTests(unittest.TestCase):
                     root / "controls" / "documents.jsonl",
                     calibration_per_language=1,
                     evaluation_per_language=1,
+                    italian_book_dir=book_dir,
+                    book_excerpts_per_chapter=3,
                 )
             controls = read_jsonl(root / "controls" / "documents.jsonl")
 
-            self.assertEqual(manifest["document_count"], 4)
+            self.assertEqual(manifest["document_count"], 10)
             self.assertEqual(
-                {(row["language"], row["control_split"]) for row in controls},
+                {
+                    (row["language"], row["control_split"])
+                    for row in controls
+                    if row["control_split"] != "stress_evaluation"
+                },
                 {
                     ("en", "calibration"),
                     ("en", "evaluation"),
@@ -115,6 +128,17 @@ class GenericDetectorTests(unittest.TestCase):
                     ("it", "evaluation"),
                 },
             )
+            stress = [
+                row for row in controls if row["control_split"] == "stress_evaluation"
+            ]
+            self.assertEqual(len(stress), 6)
+            self.assertEqual(len({row["source_group_id"] for row in stress}), 2)
+            self.assertTrue(
+                all(
+                    row["control_group"] == "italian_unpublished_book" for row in stress
+                )
+            )
+            self.assertEqual(manifest["italian_unpublished_book"]["chapter_count"], 2)
             self.assertFalse(any("used-" in row["document_id"] for row in controls))
             self.assertTrue((root / "controls" / "controls-manifest.json").exists())
 
@@ -305,6 +329,37 @@ class GenericDetectorTests(unittest.TestCase):
                                 "model_version": "test-v1",
                             }
                         )
+            for group_index in range(2):
+                for excerpt_index in range(2):
+                    document = self._document(
+                        f"it-stress-{group_index}-{excerpt_index}"
+                    )
+                    document.update(
+                        {
+                            "language": "it",
+                            "role": "human_control",
+                            "pipeline": "human_control",
+                            "control_split": "stress_evaluation",
+                            "control_group": "italian_unpublished_book",
+                            "source_group_id": f"chapter-{group_index}",
+                        }
+                    )
+                    controls.append(document)
+                    score = 99.0 if (group_index, excerpt_index) == (0, 0) else 0.0
+                    control_results.append(
+                        {
+                            "detector_id": "alpha",
+                            "document_id": document["document_id"],
+                            "text_sha256": document["text_sha256"],
+                            "language": "it",
+                            "status": "success",
+                            "score": score,
+                            "score_name": "test",
+                            "score_direction": "higher_is_ai",
+                            "native_ai_detected": False,
+                            "model_version": "test-v1",
+                        }
+                    )
             controls_path = root / "controls.jsonl"
             control_results_path = root / "alpha-controls" / "results.jsonl"
             write_jsonl(controls_path, controls)
@@ -324,6 +379,13 @@ class GenericDetectorTests(unittest.TestCase):
                 self.assertEqual(cell["threshold"], 98.0)
                 self.assertEqual(cell["calibration_false_positives"], 1)
                 self.assertEqual(cell["evaluation_false_positives"], 0)
+            stress = calibration["detectors"]["alpha"]["languages"]["it"][
+                "stress_evaluations"
+            ]["italian_unpublished_book"]
+            self.assertEqual(stress["expected_rows"], 4)
+            self.assertEqual(stress["false_positives"], 1)
+            self.assertEqual(stress["expected_groups"], 2)
+            self.assertEqual(stress["groups_with_any_false_positive"], 1)
 
             selections = root / "selections.jsonl"
             write_jsonl(selections, self._selections())
@@ -366,6 +428,10 @@ class GenericDetectorTests(unittest.TestCase):
             self.assertEqual(
                 summary["calibration_status"],
                 "local-per-detector-language-human-controls",
+            )
+            self.assertIn(
+                "Grouped human stress evaluations",
+                (root / "report" / "REPORT.md").read_text(encoding="utf-8"),
             )
 
     def test_detector_without_native_threshold_is_not_counted_as_human(self) -> None:
