@@ -5,10 +5,12 @@ rewrites without Copyleaks or GPTZero. The primary open matrix is:
 
 - official Binoculars on Modal;
 - official Fast-DetectGPT plus the official LogRank baseline in one Modal pass;
-- IBM's released RADAR classifier;
-- an exploratory XLM-R large classifier fine-tuned on pinned English COLING
-  human/machine rows, Italian COLING machine rows, and disjoint Italian
-  Wikipedia human rows.
+- IBM's released RADAR classifier.
+
+An exploratory XLM-R large classifier is run separately as a negative research
+control. It was fine-tuned on pinned English COLING human/machine rows, Italian
+COLING machine rows, and disjoint Italian Wikipedia human rows. It is excluded
+from the primary detector intersection and every product-facing conclusion.
 
 The benchmark does not treat native 0.5 cutoffs as comparable. Each detector is
 calibrated separately for English and Italian on 1,000 independent human
@@ -210,7 +212,25 @@ uv run modal run modal_open_detectors.py \
 The existing Binoculars result can be reused only if its corpus hash and model
 contract match. Never reuse a threshold fitted on benchmark AI scores.
 
-## 7. Produce the calibrated report
+## 7. Produce the calibrated reports
+
+The primary report contains only the four admitted open detectors:
+
+```bash
+uv run unmarker-generic-detectors report \
+  --manifest results/gate2b-exp-pilot-20260822-01/generic-detectors/corpus/documents.jsonl \
+  --results \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/binoculars/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/fast_detect_gpt/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/logrank/results.jsonl \
+    results/gate2b-exp-pilot-20260822-01/generic-detectors/radar/results.jsonl \
+  --calibration results/gate2b-exp-pilot-20260822-01/generic-detectors/calibration.json \
+  --required-detectors binoculars,fast_detect_gpt,logrank,radar \
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/report-open-primary
+```
+
+Generate a separate diagnostic report containing XLM-R when investigating its
+failure mode. Do not quote its detector intersection as a benchmark result:
 
 ```bash
 uv run unmarker-generic-detectors report \
@@ -223,14 +243,76 @@ uv run unmarker-generic-detectors report \
     results/gate2b-exp-pilot-20260822-01/generic-detectors/xlmr_mgt/results.jsonl \
   --calibration results/gate2b-exp-pilot-20260822-01/generic-detectors/calibration.json \
   --required-detectors binoculars,fast_detect_gpt,logrank,radar,xlmr_mgt \
-  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/report-open
+  --output results/gate2b-exp-pilot-20260822-01/generic-detectors/report-open-diagnostic
 ```
 
-The report contains original TPR, post-rewrite detection, conditional evasion,
-quality-preserving conditional evasion, score deltas, and the intersection of
-all detectors. All rates have Wilson 95% intervals. The intersection is useful
-only when the matrix is complete and every included detector/language cell has
-acceptable held-out control FPR and non-trivial original TPR.
+Both reports contain original TPR, post-rewrite detection, conditional evasion,
+quality-preserving conditional evasion, score deltas, and detector
+intersections. All rates have Wilson 95% intervals. A raw "passes all
+detectors" rate is an operational outcome, not automatically an evasion rate.
+An all-detector conditional evasion claim additionally requires every included
+detector to have non-trivial original TPR on the same language and documents.
+
+### Reference benchmark result (2026-08-28)
+
+The immutable `generic-benchmark-v1` run scored all 300 documents with zero
+failed rows and no document/hash mismatch. The corpus SHA-256 is
+`0becf7bd3422f10360516522da9c7ba7ffba7ae1314b831e47dc7df3a71a7605`.
+At the locally calibrated thresholds, original TPR is:
+
+| detector | EN original TPR | IT original TPR |
+| --- | ---: | ---: |
+| Binoculars | 100.0% | 80.0% |
+| Fast-DetectGPT | 90.0% | 46.7% |
+| LogRank | 0.0% | 20.0% |
+| RADAR | 100.0% | 0.0% |
+
+Consequently, no original is eligible for a four-detector conditional evasion
+claim: LogRank detects none of the 30 English originals and RADAR detects none
+of the 30 Italian originals. Per-detector conditional evasion remains valid
+where that detector recognized the paired original:
+
+| language | pipeline | Binoculars | Fast-DetectGPT | LogRank | RADAR |
+| --- | --- | ---: | ---: | ---: | ---: |
+| EN | simple paraphrase | 46.7% | 63.0% | - | 3.3% |
+| EN | SIRA | 23.3% | 37.0% | - | 6.7% |
+| EN | BIRA | 80.0% | 88.9% | - | 10.0% |
+| EN | BIRA position-aware | 73.3% | 81.5% | - | 16.7% |
+| IT | simple paraphrase | 66.7% | 78.6% | 33.3% | - |
+| IT | SIRA | 54.2% | 64.3% | 33.3% | - |
+| IT | BIRA | 66.7% | 85.7% | 50.0% | - |
+| IT | BIRA position-aware | 54.2% | 78.6% | 83.3% | - |
+
+`-` means that the detector recognized zero paired originals in that language,
+so conditional evasion is undefined. The Italian LogRank percentages have only
+six eligible originals and therefore wide uncertainty.
+
+As an operational outcome, the counts below show rewrites that pass all four
+primary detectors, followed by the subset that also passed the adjudicated
+human quality gate:
+
+| language | pipeline | passes all | passes all + quality |
+| --- | --- | ---: | ---: |
+| EN | simple paraphrase | 1/30 | 0/30 |
+| EN | SIRA | 1/30 | 0/30 |
+| EN | BIRA | 3/30 | 0/30 |
+| EN | BIRA position-aware | 4/30 | 1/30 |
+| IT | simple paraphrase | 19/30 | 18/30 |
+| IT | SIRA | 16/30 | 9/30 |
+| IT | BIRA | 18/30 | 13/30 |
+| IT | BIRA position-aware | 17/30 | 13/30 |
+
+For context, 0/30 English originals and 3/30 Italian originals already pass all
+four detectors before rewriting. This is another reason to retain paired,
+per-detector conditional metrics beside the operational pass counts.
+
+The primary evidence therefore supports strong evasion against Binoculars and
+Fast-DetectGPT, but not a detector-agnostic success claim: English RADAR remains
+hard to evade, while Italian RADAR and English LogRank lack baseline power.
+XLM-R classified 60/60 originals and almost every rewrite as AI, but it also
+misclassified 482/492 unpublished human book excerpts. This confirms its role
+as a source-shortcut negative control rather than evidence against the
+rewrites.
 
 ## Local fallback
 
