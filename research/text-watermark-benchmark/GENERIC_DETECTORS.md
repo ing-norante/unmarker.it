@@ -288,8 +288,9 @@ so conditional evasion is undefined. The Italian LogRank percentages have only
 six eligible originals and therefore wide uncertainty.
 
 As an operational outcome, the counts below show rewrites that pass all four
-primary detectors, followed by the subset that also passed the adjudicated
-human quality gate:
+primary detectors, followed by the subset that also passed the prospective
+automatic quality gate (protected-content, semantic, NLI, and API-completion
+checks):
 
 | language | pipeline | passes all | passes all + quality |
 | --- | --- | ---: | ---: |
@@ -306,6 +307,11 @@ For context, 0/30 English originals and 3/30 Italian originals already pass all
 four detectors before rewriting. This is another reason to retain paired,
 per-detector conditional metrics beside the operational pass counts.
 
+The automatic-quality column is not a population-wide human verdict. The
+completed two-reviewer adjudication covers the separately sampled 48-row human
+audit; it is reported in `GATE2B_RESULTS.md` and must not be projected onto all
+240 rewrites.
+
 The primary evidence therefore supports strong evasion against Binoculars and
 Fast-DetectGPT, but not a detector-agnostic success claim: English RADAR remains
 hard to evade, while Italian RADAR and English LogRank lack baseline power.
@@ -313,6 +319,69 @@ XLM-R classified 60/60 originals and almost every rewrite as AI, but it also
 misclassified 482/492 unpublished human book excerpts. This confirms its role
 as a source-shortcut negative control rather than evidence against the
 rewrites.
+
+## 8. Run the paired algorithm-selection gate
+
+The selection gate admits a detector/language cell only when held-out human FPR
+is at most 3%, original TPR is at least 70%, and the original-TPR Wilson lower
+bound is at least 50%. The Italian book passage FPR must also be at most 3%.
+It then restricts the paired population to sources recognized before rewriting
+by EXP and every admitted detector for that language.
+
+```bash
+uv run unmarker-generic-detectors select-algorithm \
+  --joined-results results/gate2b-exp-pilot-20260822-01/generic-detectors/report-open-primary/joined-results.jsonl \
+  --calibration results/gate2b-exp-pilot-20260822-01/generic-detectors/calibration.json \
+  --judge-evaluations results/gate2b-exp-pilot-20260822-01/judge/llm-judge.jsonl \
+  --output results/gate2b-exp-pilot-20260822-01/algorithm-selection
+```
+
+The primary paired outcome requires the EXP watermark and every admitted
+generic detector to be evaded while the prospective automatic quality gate
+passes. The blinded LLM screen is retained as a sensitivity analysis, not
+human ground truth. Comparisons use exact McNemar tests, Holm correction, and a
+language-stratified paired bootstrap. XLM-R input is rejected by construction.
+
+On the reference run, the admitted cells are Binoculars EN/IT,
+Fast-DetectGPT EN, and RADAR EN. Simple paraphrasing is the stable provisional
+winner under both automatic and LLM quality mappings, with fewer edits, but it
+does not pass multiplicity-adjusted statistical confirmation. A fresh corpus
+is therefore required before promotion.
+
+### Independent confirmation corpus
+
+Build the confirmation prompt set from the locked calibration prompts and
+evaluation prompts not used by the selection run:
+
+```bash
+uv run unmarker-generic-detectors prepare-confirmation-prompts \
+  --prompt-pool datasets/markllm-wikipedia-v1.jsonl \
+  --previous-generations results/gate2b-exp-pilot-20260822-01/modal-prepare/generations.jsonl \
+  --output results/gate2c-exp-confirmation-20260828-01/prompts
+```
+
+The Modal prepare stage can seed calibration records from the prior immutable
+run. Seeding is accepted only when the gate, backend, prompt text, algorithm,
+language, split, and deterministic sample seed match. Evaluation records are
+never seeded.
+
+```bash
+uv run --extra modal modal run modal_pipeline.py \
+  --stage prepare \
+  --run-id gate2c-exp-confirmation-v1 \
+  --prompts results/gate2c-exp-confirmation-20260828-01/prompts/prompts.jsonl \
+  --algorithms EXP \
+  --calibration-prompts-per-language 100 \
+  --evaluation-prompts-per-language 50 \
+  --evidence-profile gate2b_exp_pilot \
+  --seed-calibration-run-id gate2b-exp-pilot-20260822-01 \
+  --output results/gate2c-exp-confirmation-20260828-01/modal-prepare
+```
+
+Use `gate2c-exp-confirmation` for the attack. It freezes the same four
+pipelines, 20/30 development/held-out split, approved GLiNER quality profile,
+and OpenRouter route as Gate 2b while disabling the already-measured adaptive
+oracle and re-stamp controls.
 
 ## Local fallback
 

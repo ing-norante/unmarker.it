@@ -9,6 +9,10 @@ from typing import Any
 from unittest import mock
 from urllib.request import Request
 
+from unmarker_text_bench.algorithm_selection import (
+    AlgorithmSelectionGate,
+    ConfirmationPromptBuilder,
+)
 from unmarker_text_bench.detector_calibration import DetectorCalibrator
 from unmarker_text_bench.detector_controls import HumanControlCorpusBuilder
 from unmarker_text_bench.generic_detectors import (
@@ -27,6 +31,54 @@ PIPELINES = ("simple_paraphrase", "sira", "bira", "bira_position_aware")
 
 
 class GenericDetectorTests(unittest.TestCase):
+    def test_confirmation_prompts_reuse_calibration_and_exclude_used_evaluation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            prompts = []
+            generations = []
+            for language in ("en", "it"):
+                for split in ("calibration", "evaluation"):
+                    for index in range(3):
+                        prompt_id = f"{language}-{split}-{index}"
+                        prompts.append(
+                            {
+                                "id": prompt_id,
+                                "language": language,
+                                "split": split,
+                                "prompt": f"Prompt {prompt_id}",
+                            }
+                        )
+                        if split == "calibration" or index == 0:
+                            generations.append(
+                                {
+                                    "sample_id": prompt_id,
+                                    "language": language,
+                                    "split": split,
+                                }
+                            )
+            prompts_path = root / "prompts.jsonl"
+            generations_path = root / "generations.jsonl"
+            write_jsonl(prompts_path, prompts)
+            write_jsonl(generations_path, generations)
+
+            manifest = ConfirmationPromptBuilder().run(
+                prompts_path,
+                generations_path,
+                root / "confirmation",
+                calibration_per_language=3,
+                evaluation_per_language=2,
+            )
+            selected = read_jsonl(root / "confirmation" / "prompts.jsonl")
+
+            self.assertEqual(manifest["prompt_count"], 10)
+            selected_evaluation = {
+                row["id"] for row in selected if row["split"] == "evaluation"
+            }
+            self.assertNotIn("en-evaluation-0", selected_evaluation)
+            self.assertNotIn("it-evaluation-0", selected_evaluation)
+
     def test_corpus_builder_deduplicates_originals_and_preserves_four_rewrites(
         self,
     ) -> None:
@@ -294,6 +346,96 @@ class GenericDetectorTests(unittest.TestCase):
             self.assertEqual(intersection["rate"], 1.0)
             self.assertTrue(summary["complete_matrix"])
             self.assertTrue((root / "report" / "REPORT.md").exists())
+
+    def test_algorithm_selection_excludes_weak_cells_and_ranks_paired_success(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            joined = []
+            judge = []
+            for language in ("en", "it"):
+                for index in range(4):
+                    sample_id = f"{language}-{index}"
+                    original_detectors = {
+                        "alpha": {"effective_ai_detected": True},
+                        "beta": {
+                            "effective_ai_detected": language == "en",
+                        },
+                    }
+                    joined.append(
+                        {
+                            "language": language,
+                            "sample_id": sample_id,
+                            "pipeline": "original",
+                            "detectors": original_detectors,
+                            "gate2b_target_detected": True,
+                        }
+                    )
+                    for pipeline in PIPELINES:
+                        candidate_key = f"{sample_id}|{pipeline}"
+                        success = pipeline == "simple_paraphrase"
+                        joined.append(
+                            {
+                                "language": language,
+                                "sample_id": sample_id,
+                                "pipeline": pipeline,
+                                "candidate_key": candidate_key,
+                                "detectors": {
+                                    "alpha": {"effective_ai_detected": not success},
+                                    "beta": {"effective_ai_detected": not success},
+                                },
+                                "gate2b_target_detected": not success,
+                                "quality_pass": True,
+                                "changed_token_ratio": 0.2,
+                            }
+                        )
+                        judge.append(
+                            {"candidate_key": candidate_key, "llm_screen_pass": True}
+                        )
+            joined_path = root / "joined.jsonl"
+            judge_path = root / "judge.jsonl"
+            write_jsonl(joined_path, joined)
+            write_jsonl(judge_path, judge)
+            calibration = {
+                "artifact_kind": "unmarker-generic-detector-calibration",
+                "detectors": {
+                    detector: {
+                        "languages": {
+                            language: {
+                                "evaluation_fpr": 0.01,
+                                "stress_evaluations": {},
+                            }
+                            for language in ("en", "it")
+                        }
+                    }
+                    for detector in ("alpha", "beta")
+                },
+            }
+            calibration_path = root / "calibration.json"
+            calibration_path.write_text(json.dumps(calibration), encoding="utf-8")
+
+            summary = AlgorithmSelectionGate().run(
+                joined_path,
+                calibration_path,
+                root / "selection",
+                judge_path=judge_path,
+                minimum_original_tpr_wilson_lower=0.0,
+                bootstrap_samples=100,
+            )
+
+            self.assertEqual(summary["admitted_detectors"]["en"], ["alpha", "beta"])
+            self.assertEqual(summary["admitted_detectors"]["it"], ["alpha"])
+            self.assertEqual(
+                summary["selection"]["provisional_winner"], "simple_paraphrase"
+            )
+            self.assertEqual(
+                summary["metrics"]["overall"]["simple_paraphrase"][
+                    "automatic_quality"
+                ]["successes"],
+                8,
+            )
+            self.assertTrue((root / "selection" / "REPORT.md").exists())
 
     def test_calibration_fits_strict_language_thresholds_and_report_uses_them(
         self,

@@ -75,6 +75,7 @@ def generate_corpus(
     allow_small_smoke: bool = False,
     algorithms: tuple[str, ...] = ("KGW", "Unigram", "SynthID", "EXP"),
     evidence_profile: str = "formal",
+    seed_calibration_run_id: str = "",
 ) -> dict:
     from unmarker_text_bench.markllm_backend import OfficialMarkLLMBackend
     from unmarker_text_bench.markllm_gate import (
@@ -133,6 +134,13 @@ def generate_corpus(
         run_dir / "corpus",
         resume=True,
         checkpoint=run_volume.commit,
+        seed_calibration_records=(
+            _remote_run_dir(seed_calibration_run_id)
+            / "corpus"
+            / "raw-generations.jsonl"
+            if seed_calibration_run_id
+            else None
+        ),
     )
     run_volume.commit()
     hf_cache.commit()
@@ -387,6 +395,7 @@ def main(
     evaluation_label: str = "",
     evidence_profile: str = "formal",
     gold_source: str = "",
+    seed_calibration_run_id: str = "",
 ) -> None:
     """Run a benchmark stage from a Modal-authenticated machine."""
 
@@ -445,6 +454,10 @@ def main(
                 )
             if allow_small_smoke:
                 raise ValueError("gate2b_exp_pilot is not an integration smoke")
+        if seed_calibration_run_id:
+            _validate_run_id(seed_calibration_run_id)
+            if seed_calibration_run_id == run_id:
+                raise ValueError("Calibration seed run must differ from the target run")
         print(
             json.dumps(
                 generate_corpus.remote(
@@ -453,6 +466,7 @@ def main(
                     allow_small_smoke,
                     selected_algorithms,
                     evidence_profile,
+                    seed_calibration_run_id,
                 ),
                 indent=2,
             )
@@ -585,6 +599,13 @@ def _download_prepare_artifacts(run_id: str, output_dir: Path) -> None:
         ("scores/token-scores.manifest.json", "token-scores.manifest.json"),
     ):
         _download_file(f"/{run_id}/{remote_name}", output_dir / local_name)
+    try:
+        _download_file(
+            f"/{run_id}/corpus/calibration-seed-manifest.json",
+            output_dir / "calibration-seed-manifest.json",
+        )
+    except FileNotFoundError:
+        pass
 
 
 def _download_protection_artifacts(run_id: str, output_dir: Path) -> None:

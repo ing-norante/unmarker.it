@@ -301,6 +301,49 @@ class MarkLLMGateTests(unittest.TestCase):
             self.assertEqual(resumed.watermarked_calls, 0)
             self.assertTrue((Path(directory) / "input-manifest.json").exists())
 
+    def test_confirmation_run_seeds_only_matching_calibration_records(self) -> None:
+        config = Gate2Config(min_generated_tokens=1, allow_small_smoke=True)
+        replacement_evaluations = [
+            PromptSample(
+                "en-3",
+                "en",
+                "test",
+                "evaluation",
+                "Describe a third independent English topic in detail.",
+            ),
+            PromptSample(
+                "it-3",
+                "it",
+                "test",
+                "evaluation",
+                "Descrivi un terzo argomento italiano indipendente in dettaglio.",
+            ),
+        ]
+        confirmation_prompts = [
+            self.prompts[0],
+            replacement_evaluations[0],
+            self.prompts[2],
+            replacement_evaluations[1],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            MarkLLMGateRunner(self.prompts, FakeMarkLLMBackend(), config).run(source)
+
+            backend = FakeMarkLLMBackend()
+            destination = root / "confirmation"
+            MarkLLMGateRunner(confirmation_prompts, backend, config).run(
+                destination,
+                seed_calibration_records=source / "raw-generations.jsonl",
+            )
+
+            self.assertEqual(backend.unwatermarked_calls, 2)
+            self.assertEqual(backend.watermarked_calls, 8)
+            provenance = json.loads(
+                (destination / "calibration-seed-manifest.json").read_text()
+            )
+            self.assertEqual(provenance["available_calibration_records"], 8)
+
     def test_no_resume_replaces_raw_checkpoint(self) -> None:
         config = Gate2Config(min_generated_tokens=1, allow_small_smoke=True)
         with tempfile.TemporaryDirectory() as directory:

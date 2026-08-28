@@ -69,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     attack.add_argument("--no-resume", action="store_true")
     attack.add_argument(
         "--profile",
-        choices=("custom", "gate2b-exp-pilot"),
+        choices=("custom", "gate2b-exp-pilot", "gate2c-exp-confirmation"),
         default="custom",
     )
     attack.add_argument(
@@ -140,10 +140,10 @@ def main() -> None:
     if args.command == "attack":
         if args.env_file:
             _load_env_key(args.env_file, "OPENROUTER_API_KEY")
-        if args.profile == "gate2b-exp-pilot":
+        if args.profile in {"gate2b-exp-pilot", "gate2c-exp-confirmation"}:
             if not args.protected_spans:
                 raise ValueError(
-                    "gate2b-exp-pilot requires --protected-spans from Modal"
+                    f"{args.profile} requires --protected-spans from Modal"
                 )
             args.quality_profile = "gliner-v1"
             args.pipelines = "simple_paraphrase,sira,bira,bira_position_aware"
@@ -153,8 +153,9 @@ def main() -> None:
             args.development_prompts_per_language = 20
             args.max_workers = 4
             args.oracle_max_attempts = 3
-            args.no_oracle_baseline = False
-            args.no_restamp_control = False
+            is_confirmation = args.profile == "gate2c-exp-confirmation"
+            args.no_oracle_baseline = is_confirmation
+            args.no_restamp_control = is_confirmation
         pipelines = tuple(
             value.strip() for value in args.pipelines.split(",") if value.strip()
         )
@@ -186,11 +187,14 @@ def main() -> None:
             if args.protected_spans
             else None
         )
-        if args.profile == "gate2b-exp-pilot" and not protected_spans.metadata.get(
-            "threshold_provenance", {}
-        ).get("human_approved"):
+        if args.profile in {
+            "gate2b-exp-pilot",
+            "gate2c-exp-confirmation",
+        } and not protected_spans.metadata.get("threshold_provenance", {}).get(
+            "human_approved"
+        ):
             raise ValueError(
-                "gate2b-exp-pilot requires a manifest built from human-approved "
+                f"{args.profile} requires a manifest built from human-approved "
                 "GLiNER thresholds"
             )
         config = AttackConfig(

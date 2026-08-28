@@ -176,6 +176,7 @@ class MarkLLMGateRunner:
         resume: bool = True,
         checkpoint: Callable[[], None] | None = None,
         checkpoint_every: int = 10,
+        seed_calibration_records: Path | None = None,
     ) -> dict[str, Any]:
         output_dir.mkdir(parents=True, exist_ok=True)
         raw_path = output_dir / "raw-generations.jsonl"
@@ -195,7 +196,20 @@ class MarkLLMGateRunner:
         else:
             raw_path.write_text("", encoding="utf-8")
         self._write_json(manifest_path, manifest)
-        existing = self._load_raw_records(raw_path) if resume else {}
+        if seed_calibration_records is not None:
+            self._seed_calibration_records(
+                raw_path,
+                seed_calibration_records,
+                manifest,
+                output_dir / "calibration-seed-manifest.json",
+            )
+            if checkpoint:
+                checkpoint()
+        existing = (
+            self._load_raw_records(raw_path)
+            if resume or seed_calibration_records is not None
+            else {}
+        )
         records_by_key = dict(existing)
 
         for prompt in self.prompts:
@@ -350,6 +364,93 @@ class MarkLLMGateRunner:
         # Normalize tuples and other JSON-compatible containers so an in-memory
         # manifest compares equal to the same manifest loaded from disk.
         return json.loads(json.dumps(manifest, ensure_ascii=False))
+
+    def _seed_calibration_records(
+        self,
+        destination: Path,
+        source: Path,
+        current_manifest: dict[str, Any],
+        provenance_path: Path,
+    ) -> None:
+        source_manifest_path = source.parent / "input-manifest.json"
+        if not source.exists() or not source_manifest_path.exists():
+            raise FileNotFoundError(
+                "Calibration seed requires raw-generations.jsonl and its "
+                "input-manifest.json"
+            )
+        source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
+        for key in ("gate", "backend"):
+            if source_manifest.get(key) != current_manifest.get(key):
+                raise ValueError(
+                    f"Calibration seed {key} does not match the current generation contract"
+                )
+
+        prompts = {prompt.id: prompt for prompt in self.prompts}
+        existing = self._load_raw_records(destination)
+        seeded = 0
+        source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+        with source.open(encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, start=1):
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                    sample_id = str(record["sample_id"])
+                    algorithm = str(record["algorithm"])
+                except (json.JSONDecodeError, KeyError) as error:
+                    raise ValueError(
+                        f"Invalid calibration seed at {source}:{line_number}"
+                    ) from error
+                prompt = prompts.get(sample_id)
+                if prompt is None or prompt.split != "calibration":
+                    continue
+                key = (sample_id, algorithm)
+                if algorithm not in self.config.algorithms or key in existing:
+                    continue
+                expected = {
+                    "language": prompt.language,
+                    "split": "calibration",
+                    "prompt": prompt.prompt,
+                    "seed": self._sample_seed(sample_id),
+                }
+                mismatch = {
+                    field: {"expected": value, "actual": record.get(field)}
+                    for field, value in expected.items()
+                    if record.get(field) != value
+                }
+                if mismatch:
+                    raise ValueError(
+                        f"Calibration seed record does not match {sample_id}: {mismatch}"
+                    )
+                self._append_jsonl(destination, record)
+                existing[key] = record
+                seeded += 1
+
+        expected_seeded = sum(
+            prompt.split == "calibration" for prompt in self.prompts
+        ) * len(self.config.algorithms)
+        available = sum(
+            prompt.split == "calibration"
+            and (prompt.id, algorithm) in existing
+            for prompt in self.prompts
+            for algorithm in self.config.algorithms
+        )
+        if available != expected_seeded:
+            raise ValueError(
+                f"Calibration seed is incomplete: {available}/{expected_seeded}"
+            )
+        self._write_json(
+            provenance_path,
+            {
+                "artifact_schema_version": 1,
+                "artifact_kind": "markllm-calibration-seed",
+                "source_path": str(source),
+                "source_sha256": source_hash,
+                "seeded_records": seeded,
+                "available_calibration_records": available,
+                "contract": "same-gate-backend-prompt-seed-calibration-only-v1",
+            },
+        )
 
     def _load_raw_records(self, path: Path) -> dict[tuple[str, str], dict[str, Any]]:
         if not path.exists():

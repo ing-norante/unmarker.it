@@ -92,6 +92,33 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional per-language human-control calibration artifact",
     )
+
+    select = commands.add_parser(
+        "select-algorithm",
+        help="Rank pipelines using qualified detector/language cells",
+    )
+    select.add_argument("--joined-results", type=Path, required=True)
+    select.add_argument("--calibration", type=Path, required=True)
+    select.add_argument("--output", type=Path, required=True)
+    select.add_argument("--judge-evaluations", type=Path)
+    select.add_argument("--minimum-original-tpr", type=float, default=0.70)
+    select.add_argument(
+        "--minimum-original-tpr-wilson-lower", type=float, default=0.50
+    )
+    select.add_argument("--maximum-evaluation-fpr", type=float, default=0.03)
+    select.add_argument("--maximum-book-fpr", type=float, default=0.03)
+    select.add_argument("--bootstrap-samples", type=int, default=10_000)
+    select.add_argument("--seed", type=int, default=20260828)
+
+    confirmation = commands.add_parser(
+        "prepare-confirmation-prompts",
+        help="Reuse calibration prompts and select untouched evaluation prompts",
+    )
+    confirmation.add_argument("--prompt-pool", type=Path, required=True)
+    confirmation.add_argument("--previous-generations", type=Path, required=True)
+    confirmation.add_argument("--output", type=Path, required=True)
+    confirmation.add_argument("--calibration-per-language", type=int, default=100)
+    confirmation.add_argument("--evaluation-per-language", type=int, default=50)
     return parser
 
 
@@ -186,6 +213,33 @@ def main() -> None:
             args.output,
             required_detectors=_csv(args.required_detectors),
             calibration_path=args.calibration,
+        )
+    elif args.command == "select-algorithm":
+        from .algorithm_selection import AlgorithmSelectionGate
+
+        payload = AlgorithmSelectionGate().run(
+            args.joined_results,
+            args.calibration,
+            args.output,
+            judge_path=args.judge_evaluations,
+            minimum_original_tpr=args.minimum_original_tpr,
+            minimum_original_tpr_wilson_lower=(
+                args.minimum_original_tpr_wilson_lower
+            ),
+            maximum_evaluation_fpr=args.maximum_evaluation_fpr,
+            maximum_book_fpr=args.maximum_book_fpr,
+            bootstrap_samples=args.bootstrap_samples,
+            seed=args.seed,
+        )
+    elif args.command == "prepare-confirmation-prompts":
+        from .algorithm_selection import ConfirmationPromptBuilder
+
+        payload = ConfirmationPromptBuilder().run(
+            args.prompt_pool,
+            args.previous_generations,
+            args.output,
+            calibration_per_language=args.calibration_per_language,
+            evaluation_per_language=args.evaluation_per_language,
         )
     else:  # pragma: no cover - argparse guarantees this branch is unreachable
         raise ValueError(args.command)
