@@ -19,6 +19,12 @@ The completed official-EXP pilot and its non-promotion decision are documented
 in [`GATE2B_RESULTS.md`](GATE2B_RESULTS.md). Raw generations and licensed NER
 gold artifacts remain untracked.
 
+The independent Gate 2c replication and final non-promotion decision are
+documented in
+[`GATE2C_CONFIRMATION_RESULTS.md`](GATE2C_CONFIRMATION_RESULTS.md). The
+discovery winner did not replicate, and no pipeline achieved an automatic
+quality-preserving robust success on the eligible English population.
+
 The next independent-detector stage is documented in
 [`GENERIC_DETECTORS.md`](GENERIC_DETECTORS.md). It turns the 60 held-out
 originals and 240 selected rewrites into one hash-locked corpus and evaluates

@@ -383,6 +383,20 @@ pipelines, 20/30 development/held-out split, approved GLiNER quality profile,
 and OpenRouter route as Gate 2b while disabling the already-measured adaptive
 oracle and re-stamp controls.
 
+### Independent confirmation result (2026-08-30)
+
+The full confirmation run is documented in
+[`GATE2C_CONFIRMATION_RESULTS.md`](GATE2C_CONFIRMATION_RESULTS.md). All five
+detectors completed the new 300-document corpus without errors. The admitted
+cells remained Binoculars EN/IT, Fast-DetectGPT EN, and RADAR EN.
+
+The discovery winner did not replicate: simple paraphrasing fell from 10/49 to
+2/45 automatic-quality robust successes, while position-aware BIRA obtained
+6/45 and became the new provisional winner. The difference was not
+multiplicity-adjusted significant, position-aware BIRA required 41.8% mean
+token edits versus 22.5% for simple paraphrasing, and every pipeline scored
+0/23 automatic-quality robust successes in English. No algorithm is promoted.
+
 ## Local fallback
 
 RADAR or the trained XLM-R model can also be scanned with
