@@ -25,6 +25,15 @@ documented in
 discovery winner did not replicate, and no pipeline achieved an automatic
 quality-preserving robust success on the eligible English population.
 
+The product-oriented follow-up is documented in
+[`ADAPTIVE_CASCADE.md`](ADAPTIVE_CASCADE.md). It adds a resumable multi-model
+cascade without changing the fixed Gate 2 evidence pipeline: GLiNER and exact
+structured protection, full-round evaluation, contextual chunks,
+backtranslation, structural regeneration, optional compatible-target
+position-aware BIRA, and multi-objective Pareto selection.
+The first controlled adaptive EXP holdout and its language-stratified result are
+recorded in [`ADAPTIVE_HOLDOUT_RESULTS.md`](ADAPTIVE_HOLDOUT_RESULTS.md).
+
 The next independent-detector stage is documented in
 [`GENERIC_DETECTORS.md`](GENERIC_DETECTORS.md). It turns the 60 held-out
 originals and 240 selected rewrites into one hash-locked corpus and evaluates
@@ -134,6 +143,11 @@ src/unmarker_text_bench/
   llm_judge.py        blinded frontier-model quality pre-screen and audit sample
   final_report.py     development-fitted surrogate and held-out reports
   unicode_hygiene.py conservative invisible-carrier cleanup and audit
+  adaptive_cascade.py progressive generation, stopping, and Pareto selection
+  adaptive_evaluation.py composable local quality and detector adapters
+  adaptive_modal.py deployed Modal GLiNER/quality/detector fan-out
+  adaptive_cli.py resumable multi-item command-line runner
+  adaptive_holdout.py deterministic compatible-target holdout builder
 modal_pipeline.py     resumable Modal GPU jobs and artifact transfer
 modal_binoculars.py   pinned official Binoculars detector on Modal
 modal_fast_detect_gpt.py pinned official Fast-DetectGPT and LogRank on Modal

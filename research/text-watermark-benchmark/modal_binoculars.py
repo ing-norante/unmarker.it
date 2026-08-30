@@ -24,6 +24,7 @@ MODEL_VERSION = (
     f"falcon-7b@{OBSERVER_REVISION[:12]}:"
     f"falcon-7b-instruct@{PERFORMER_REVISION[:12]}"
 )
+_adaptive_binoculars: dict[str, object] = {}
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -209,6 +210,65 @@ def scan_binoculars(
     )
     run_volume.commit()
     return summary
+
+
+@app.function(
+    image=image,
+    gpu="L40S",
+    timeout=3_600,
+    scaledown_window=300,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes=volumes,
+)
+def adaptive_binoculars_batch(candidates: list[dict], mode: str = "low-fpr") -> dict:
+    """In-memory scoring endpoint for one adaptive-cascade round."""
+
+    from binoculars import Binoculars
+    from huggingface_hub import snapshot_download
+
+    if mode not in {"low-fpr", "accuracy"}:
+        raise ValueError("mode must be low-fpr or accuracy")
+    detector = _adaptive_binoculars.get(mode)
+    if detector is None:
+        observer_path = snapshot_download(
+            OBSERVER_MODEL,
+            revision=OBSERVER_REVISION,
+            cache_dir=HF_CACHE_ROOT,
+        )
+        performer_path = snapshot_download(
+            PERFORMER_MODEL,
+            revision=PERFORMER_REVISION,
+            cache_dir=HF_CACHE_ROOT,
+        )
+        detector = Binoculars(
+            observer_name_or_path=observer_path,
+            performer_name_or_path=performer_path,
+            use_bfloat16=True,
+            max_token_observed=512,
+            mode=mode,
+        )
+        _adaptive_binoculars[mode] = detector
+    started = time.perf_counter()
+    scores = detector.compute_score([str(value["text"]) for value in candidates])
+    if isinstance(scores, float):
+        scores = [scores]
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    hf_cache.commit()
+    return {
+        "rows": [
+            {
+                "candidate_id": candidate["candidate_id"],
+                "score": float(score),
+                "latency_ms": elapsed_ms / max(len(candidates), 1),
+                "model_version": MODEL_VERSION,
+            }
+            for candidate, score in zip(candidates, scores, strict=True)
+        ],
+        "detector_id": "binoculars",
+        "score_direction": "lower_is_ai",
+        "native_threshold": float(detector.threshold),
+        "model_version": MODEL_VERSION,
+    }
 
 
 @app.local_entrypoint()

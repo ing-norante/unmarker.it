@@ -471,7 +471,10 @@ class OpenRouterTests(unittest.TestCase):
                             "endpoints": [
                                 {
                                     "provider_name": "Together",
-                                    "supported_parameters": ["logit_bias"],
+                                    "supported_parameters": [
+                                        "logit_bias",
+                                        "temperature",
+                                    ],
                                     "status": 0,
                                 }
                             ]
@@ -551,6 +554,66 @@ class OpenRouterTests(unittest.TestCase):
         )
         client.rewrite("system", "user")
         self.assertNotIn("reasoning", json.loads(requests[-1].data))
+
+    def test_rewrite_omits_temperature_when_disabled(self) -> None:
+        requests: list[urllib.request.Request] = []
+
+        def transport(
+            request: urllib.request.Request, timeout: float
+        ) -> tuple[int, bytes]:
+            requests.append(request)
+            return 200, json.dumps(
+                {
+                    "id": "request-1",
+                    "model": "test/model",
+                    "provider": "OpenAI",
+                    "choices": [{"message": {"content": "Rewritten text"}}],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 4},
+                }
+            ).encode()
+
+        client = OpenRouterRewriter(
+            api_key="not-a-real-key",
+            model="test/model",
+            provider="OpenAI",
+            temperature=None,
+            transport=transport,
+        )
+        client.rewrite("system", "user")
+        self.assertNotIn("temperature", json.loads(requests[-1].data))
+
+    def test_capability_preflight_rejects_inactive_endpoint(self) -> None:
+        def transport(
+            request: urllib.request.Request, timeout: float
+        ) -> tuple[int, bytes]:
+            if request.full_url.endswith("/endpoints"):
+                return 200, json.dumps(
+                    {
+                        "data": {
+                            "endpoints": [
+                                {
+                                    "provider_name": "DeepInfra",
+                                    "supported_parameters": [
+                                        "max_tokens",
+                                        "temperature",
+                                        "seed",
+                                    ],
+                                    "status": -2,
+                                }
+                            ]
+                        }
+                    }
+                ).encode()
+            raise AssertionError("Model discovery must not run for an inactive route")
+
+        client = OpenRouterRewriter(
+            api_key="not-a-real-key",
+            model="test/model",
+            provider="DeepInfra",
+            transport=transport,
+        )
+        with self.assertRaisesRegex(OpenRouterError, "no active endpoint"):
+            client.validate_capabilities(require_seed=True)
 
     def test_empty_length_response_retries_with_larger_budget(self) -> None:
         requests: list[urllib.request.Request] = []

@@ -36,6 +36,7 @@ HF_METADATA_FILES = [
 ]
 REFERENCE_RUNTIME_FILES = [*HF_METADATA_FILES, "pytorch_model.bin"]
 SCORING_RUNTIME_FILES = [*HF_METADATA_FILES, "model.safetensors"]
+_adaptive_fast_bundle: tuple[object, object, object, object] | None = None
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -329,6 +330,132 @@ def scan_fast_detect_gpt(
         summaries.append(summary)
     run_volume.commit()
     return {"runs": summaries}
+
+
+@app.function(
+    image=image,
+    gpu="L40S",
+    cpu=4,
+    memory=49_152,
+    timeout=3_600,
+    scaledown_window=300,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes=volumes,
+)
+def adaptive_fast_detect_batch(
+    candidates: list[dict],
+    max_length: int = 512,
+) -> dict:
+    """Return Fast-DetectGPT and LogRank scores for an in-memory cascade round."""
+
+    import torch
+    from baselines import get_logrank
+    from fast_detect_gpt import get_sampling_discrepancy_analytic
+    from huggingface_hub import snapshot_download
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    if max_length < 32:
+        raise ValueError("max_length must be at least 32")
+    global _adaptive_fast_bundle
+    if _adaptive_fast_bundle is None:
+        reference_path = snapshot_download(
+            REFERENCE_MODEL,
+            revision=REFERENCE_REVISION,
+            cache_dir=HF_CACHE_ROOT,
+            allow_patterns=REFERENCE_RUNTIME_FILES,
+        )
+        scoring_path = snapshot_download(
+            SCORING_MODEL,
+            revision=SCORING_REVISION,
+            cache_dir=HF_CACHE_ROOT,
+            allow_patterns=SCORING_RUNTIME_FILES,
+        )
+        reference_tokenizer = AutoTokenizer.from_pretrained(reference_path)
+        scoring_tokenizer = AutoTokenizer.from_pretrained(scoring_path)
+        reference_model = (
+            AutoModelForCausalLM.from_pretrained(
+                reference_path,
+                torch_dtype=torch.float16,
+                low_cpu_mem_usage=True,
+            )
+            .to("cuda")
+            .eval()
+        )
+        scoring_model = (
+            AutoModelForCausalLM.from_pretrained(
+                scoring_path,
+                torch_dtype=torch.float16,
+                low_cpu_mem_usage=True,
+            )
+            .to("cuda")
+            .eval()
+        )
+        _adaptive_fast_bundle = (
+            reference_tokenizer,
+            scoring_tokenizer,
+            reference_model,
+            scoring_model,
+        )
+    (
+        reference_tokenizer,
+        scoring_tokenizer,
+        reference_model,
+        scoring_model,
+    ) = _adaptive_fast_bundle
+    fast_rows = []
+    logrank_rows = []
+    for candidate in candidates:
+        started = time.perf_counter()
+        text = str(candidate["text"])
+        scoring_tokens = scoring_tokenizer(
+            text,
+            return_tensors="pt",
+            truncation=True,
+            max_length=max_length,
+        ).to("cuda")
+        reference_tokens = reference_tokenizer(
+            text,
+            return_tensors="pt",
+            truncation=True,
+            max_length=max_length,
+        ).to("cuda")
+        if not torch.equal(scoring_tokens.input_ids, reference_tokens.input_ids):
+            raise ValueError("Official GPT-J/GPT-Neo tokenizers produced different IDs")
+        labels = scoring_tokens.input_ids[:, 1:]
+        with torch.inference_mode():
+            scoring_logits = scoring_model(**scoring_tokens).logits[:, :-1]
+            reference_logits = reference_model(**reference_tokens).logits[:, :-1]
+            criterion = float(
+                get_sampling_discrepancy_analytic(
+                    reference_logits,
+                    scoring_logits,
+                    labels,
+                )
+            )
+            logrank = float(get_logrank(scoring_logits, labels))
+        latency_ms = (time.perf_counter() - started) * 1000
+        common = {
+            "candidate_id": candidate["candidate_id"],
+            "latency_ms": latency_ms,
+            "model_version": MODEL_VERSION,
+        }
+        fast_rows.append({**common, "score": criterion})
+        logrank_rows.append({**common, "score": logrank})
+    hf_cache.commit()
+    return {
+        "detectors": {
+            "fast_detect_gpt": {
+                "rows": fast_rows,
+                "score_direction": "higher_is_ai",
+                "model_version": MODEL_VERSION,
+            },
+            "logrank": {
+                "rows": logrank_rows,
+                "score_direction": "higher_is_ai",
+                "model_version": MODEL_VERSION,
+            },
+        }
+    }
 
 
 @app.local_entrypoint()

@@ -15,6 +15,7 @@ MODELS_ROOT = Path("/open-models")
 
 COLING_DATASET = "Jinyan1/COLING_2025_MGT_multingual"
 COLING_REVISION = "da603651a8929a3790937c2c2b01bde23662111f"
+_adaptive_radar: object | None = None
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -357,6 +358,49 @@ def scan_open_detectors(
         del detector
     hf_cache.commit()
     return {"runs": summaries}
+
+
+@app.function(
+    image=image,
+    gpu="L4",
+    cpu=4,
+    memory=32_768,
+    timeout=3_600,
+    scaledown_window=300,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes=volumes,
+)
+def adaptive_radar_batch(candidates: list[dict]) -> dict:
+    """In-memory calibrated-score input for one adaptive-cascade round."""
+
+    from unmarker_text_bench.open_detector_models import radar_detector
+
+    global _adaptive_radar
+    if _adaptive_radar is None:
+        _adaptive_radar = radar_detector(device="cuda")
+    detector = _adaptive_radar
+    rows = []
+    for candidate in candidates:
+        document = {
+            "document_id": candidate["candidate_id"],
+            "text": str(candidate["text"]),
+        }
+        result = detector.detect(document)
+        rows.append(
+            {
+                "candidate_id": candidate["candidate_id"],
+                "score": result["score"],
+                "latency_ms": result["latency_ms"],
+                "model_version": result["model_version"],
+            }
+        )
+    hf_cache.commit()
+    return {
+        "rows": rows,
+        "detector_id": "radar",
+        "score_direction": "higher_is_ai",
+        "model_version": detector.metadata["model_version"],
+    }
 
 
 @app.local_entrypoint()

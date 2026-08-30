@@ -28,6 +28,19 @@ GLINER_LABELS = (
 THRESHOLD_GRID = tuple(round(value / 100, 2) for value in range(30, 96, 5))
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 QUOTED_RE = re.compile(r'(?:(?:"([^"]+)")|(?:“([^”]+)”)|(?:‘([^’]+)’))')
+DATE_RE = re.compile(
+    r"(?<!\w)(?:"
+    r"\d{4}[-/.]\d{1,2}[-/.]\d{1,2}"
+    r"|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}"
+    r"|\d{1,2}\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|"
+    r"settembre|ottobre|novembre|dicembre|january|february|march|april|may|june|"
+    r"july|august|september|october|november|december)\s+\d{4}"
+    r"|(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|"
+    r"ottobre|novembre|dicembre|january|february|march|april|may|june|july|"
+    r"august|september|october|november|december)\s+\d{1,2},?\s+\d{4}"
+    r")(?!\w)",
+    re.IGNORECASE,
+)
 
 
 def text_sha256(text: str) -> str:
@@ -64,7 +77,11 @@ class EntityExtractor(Protocol):
     def extract(self, text: str, language: str) -> list[EntitySpan]: ...
 
 
-def extract_structured(text: str, language: str) -> dict[str, list[str]]:
+def extract_structured(
+    text: str,
+    language: str,
+    terminology: Iterable[str] = (),
+) -> dict[str, list[str]]:
     quotations = []
     for match in QUOTED_RE.finditer(text):
         quotations.append(next(value for value in match.groups() if value is not None))
@@ -73,7 +90,13 @@ def extract_structured(text: str, language: str) -> dict[str, list[str]]:
         "urls": list(extract_urls(text)),
         "emails": EMAIL_RE.findall(text),
         "quotations": quotations,
+        "dates": [match.group(0) for match in DATE_RE.finditer(text)],
         "negations": list(extract_negations(text, language)),
+        "terminology": [
+            term
+            for term in dict.fromkeys(value.strip() for value in terminology)
+            if term and _surface_count(text, term)
+        ],
     }
 
 
@@ -91,13 +114,14 @@ class ProtectedSpanRecord:
         text: str,
         language: str,
         entities: Iterable[EntitySpan],
+        terminology: Iterable[str] = (),
     ) -> ProtectedSpanRecord:
         return cls(
             text_sha256=text_sha256(text),
             language=language,
             text_length=len(text),
             entities=tuple(entities),
-            structured=extract_structured(text, language),
+            structured=extract_structured(text, language, terminology),
         )
 
     @classmethod
@@ -220,7 +244,11 @@ def validate_record(
     )
     entities_preserved = expected_entities == actual_entity_counts
 
-    actual_structured = extract_structured(candidate, record.language)
+    actual_structured = extract_structured(
+        candidate,
+        record.language,
+        record.structured.get("terminology", []),
+    )
     structured_checks = {
         f"{field}_preserved": Counter(values)
         == Counter(actual_structured.get(field, []))

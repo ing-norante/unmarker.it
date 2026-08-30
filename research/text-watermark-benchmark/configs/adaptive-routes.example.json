@@ -1,0 +1,23 @@
+{
+  "routes": [
+    {
+      "id": "qwen3-235b",
+      "family": "qwen",
+      "model": "qwen/qwen3-235b-a22b-2507",
+      "provider": "Parasail",
+      "temperature": 0.2,
+      "reasoning_effort": "none",
+      "bias_tokenizer": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "bias_tokenizer_revision": "ac9c66cc9b46af7306746a9250f23d47083d689e",
+      "bira_beta": -5.0
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "family": "openai",
+      "model": "openai/gpt-5.6-terra",
+      "provider": "OpenAI",
+      "temperature": null,
+      "reasoning_effort": "medium"
+    }
+  ]
+}

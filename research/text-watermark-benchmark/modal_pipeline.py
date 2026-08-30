@@ -23,6 +23,11 @@ REMOTE_MARKLLM_ROOT = "/opt/MarkLLM"
 RUNS_ROOT = Path("/runs")
 HF_CACHE_ROOT = "/hf-cache"
 
+_adaptive_entity_extractors: dict[str, object] = {}
+_adaptive_quality_bundles: dict[str, tuple[object, object]] = {}
+_adaptive_target_detectors: dict[str, object] = {}
+_adaptive_scorer: object | None = None
+
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -204,11 +209,18 @@ def protect_sources(
         raise FileNotFoundError(
             "Generate the MarkLLM corpus before extracting entities"
         )
-    extractor = GlinerEntityExtractor(
-        thresholds=thresholds,
-        labels=labels,
-        device="cuda",
+    cache_key = json.dumps(
+        {"thresholds": thresholds, "labels": labels},
+        sort_keys=True,
     )
+    extractor = _adaptive_entity_extractors.get(cache_key)
+    if extractor is None:
+        extractor = GlinerEntityExtractor(
+            thresholds=thresholds,
+            labels=labels,
+            device="cuda",
+        )
+        _adaptive_entity_extractors[cache_key] = extractor
     output = run_dir / "protection" / "gliner-v1" / "protected-spans.jsonl"
     manifest = ProtectedSpanManifestRunner(extractor).run(
         generations,
@@ -374,6 +386,198 @@ def evaluate_candidates(
     run_volume.commit()
     hf_cache.commit()
     return summary
+
+
+@app.function(
+    image=image,
+    gpu="L4",
+    cpu=4,
+    memory=16_384,
+    timeout=3_600,
+    scaledown_window=300,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes=volumes,
+)
+def adaptive_extract_entities(
+    text: str,
+    language: str,
+    thresholds: dict[str, float],
+    labels: tuple[str, ...],
+) -> dict:
+    """Extract source entities before any paid rewrite call."""
+
+    from dataclasses import asdict
+
+    from unmarker_text_bench.protected_spans import GlinerEntityExtractor
+
+    extractor = GlinerEntityExtractor(
+        thresholds=thresholds,
+        labels=labels,
+        device="cuda",
+    )
+    entities = extractor.extract(text, language)
+    hf_cache.commit()
+    return {
+        "entities": [asdict(value) for value in entities],
+        "extractor": extractor.metadata,
+    }
+
+
+@app.function(
+    image=image,
+    gpu="L4",
+    cpu=8,
+    memory=32_768,
+    timeout=3_600,
+    scaledown_window=300,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes=volumes,
+)
+def adaptive_quality_batch(
+    source_text: str,
+    language: str,
+    candidates: list[dict],
+    source_entities: list[dict],
+    terminology: tuple[str, ...],
+    thresholds: dict[str, float],
+    labels: tuple[str, ...],
+) -> dict:
+    """Batch GLiNER, deterministic, embedding, and NLI validation for one round."""
+
+    from unmarker_text_bench.protected_spans import (
+        EntitySpan,
+        GlinerEntityExtractor,
+        ProtectedSpanRecord,
+    )
+    from unmarker_text_bench.quality_checks import deterministic_quality
+    from unmarker_text_bench.remote_evaluation import NeuralQualityEvaluator
+
+    cache_key = json.dumps(
+        {"thresholds": thresholds, "labels": labels},
+        sort_keys=True,
+    )
+    bundle = _adaptive_quality_bundles.get(cache_key)
+    if bundle is None:
+        bundle = (
+            GlinerEntityExtractor(
+                thresholds=thresholds,
+                labels=labels,
+                device="cuda",
+            ),
+            NeuralQualityEvaluator(
+                embedding_model=EMBEDDING_MODEL,
+                embedding_revision=EMBEDDING_MODEL_REVISION,
+                nli_model=NLI_MODEL,
+                nli_revision=NLI_MODEL_REVISION,
+                device="cuda",
+                batch_size=32,
+            ),
+        )
+        _adaptive_quality_bundles[cache_key] = bundle
+    extractor, quality = bundle
+    record = ProtectedSpanRecord.build(
+        source_text,
+        language,
+        [EntitySpan.from_dict(value) for value in source_entities],
+        terminology=terminology,
+    )
+    neural = quality.evaluate_pairs(
+        [(source_text, str(value["text"])) for value in candidates]
+    )
+    rows = []
+    for candidate, neural_result in zip(candidates, neural, strict=True):
+        text = str(candidate["text"])
+        candidate_entities = extractor.extract(text, language)
+        deterministic = deterministic_quality(
+            source_text,
+            text,
+            language,
+            protected_record=record,
+            candidate_entities=candidate_entities,
+        ).to_dict()
+        rows.append(
+            {
+                "candidate_id": candidate["candidate_id"],
+                "semantic_similarity": neural_result.semantic_similarity,
+                "bidirectional_entailment": neural_result.bidirectional_entailment,
+                "deterministic_quality": deterministic,
+            }
+        )
+    hf_cache.commit()
+    return {
+        "rows": rows,
+        "quality": quality.metadata,
+        "extractor": extractor.metadata,
+    }
+
+
+@app.function(
+    image=image,
+    cpu=4,
+    memory=16_384,
+    timeout=3_600,
+    scaledown_window=300,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes=volumes,
+)
+def adaptive_target_batch(algorithm: str, candidates: list[dict]) -> dict:
+    """Score a round only when a compatible MarkLLM target is explicitly known."""
+
+    from unmarker_text_bench.markllm_backend import OfficialMarkLLMDetectorBackend
+
+    detector = _adaptive_target_detectors.get(algorithm)
+    if detector is None:
+        detector = OfficialMarkLLMDetectorBackend(
+            markllm_root=Path(REMOTE_MARKLLM_ROOT),
+            tokenizer_name=GENERATION_MODEL,
+            tokenizer_revision=GENERATION_MODEL_REVISION,
+            algorithms=(algorithm,),
+            device="cpu",
+            config_overrides={"EXP": {"sequence_length": 192}}
+            if algorithm == "EXP"
+            else None,
+        )
+        _adaptive_target_detectors[algorithm] = detector
+    rows = []
+    for candidate in candidates:
+        result = detector.detect(algorithm, str(candidate["text"]))
+        rows.append(
+            {
+                "candidate_id": candidate["candidate_id"],
+                "score": result.score,
+                "builtin_detected": result.detected,
+            }
+        )
+    hf_cache.commit()
+    return {"rows": rows, "detector": detector.metadata, "algorithm": algorithm}
+
+
+@app.function(
+    image=image,
+    gpu="L40S",
+    timeout=3_600,
+    scaledown_window=300,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes=volumes,
+)
+def adaptive_self_information(text: str) -> dict:
+    """Return the token-level proxy signal required by position-aware BIRA."""
+
+    from dataclasses import asdict
+
+    from unmarker_text_bench.self_information import CausalSelfInformationScorer
+
+    global _adaptive_scorer
+    if _adaptive_scorer is None:
+        _adaptive_scorer = CausalSelfInformationScorer(
+            SCORER_MODEL,
+            SCORER_MODEL_REVISION,
+            device="cuda",
+        )
+    scorer = _adaptive_scorer
+    scores = scorer.score(text)
+    hf_cache.commit()
+    return {"tokens": [asdict(value) for value in scores], "scorer": scorer.metadata}
 
 
 @app.local_entrypoint()

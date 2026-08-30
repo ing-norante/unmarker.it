@@ -1,0 +1,2 @@
+{"request_id":"example-en-001","language":"en","text":"Alice works at Acme in Rome on 2026-08-30. She does not modify 24 Atlas reports.","terminology":["Atlas"]}
+{"request_id":"example-it-001","language":"it","text":"Alice lavora per Acme a Roma il 30/08/2026. Non modifica i 24 rapporti Atlas.","generator_family":"qwen","terminology":["Atlas"]}

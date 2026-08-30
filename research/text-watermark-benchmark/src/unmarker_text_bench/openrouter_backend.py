@@ -71,7 +71,7 @@ class OpenRouterRewriter:
         model: str = DEFAULT_OPENROUTER_MODEL,
         provider: str | None = "DeepInfra",
         base_url: str = "https://openrouter.ai/api/v1",
-        temperature: float = 0.2,
+        temperature: float | None = 0.2,
         max_tokens: int = 4096,
         length_retry_max_tokens: int = 16384,
         reasoning_effort: str | None = None,
@@ -140,11 +140,12 @@ class OpenRouterRewriter:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "provider": provider,
             "usage": {"include": True},
         }
+        if self.temperature is not None:
+            body["temperature"] = self.temperature
         if self.reasoning_effort is not None:
             body["reasoning"] = {
                 "effort": self.reasoning_effort,
@@ -374,6 +375,23 @@ class OpenRouterRewriter:
         if not matches:
             raise OpenRouterError(
                 f"Provider {self.provider!r} does not currently serve {self.model!r}"
+            )
+        active_matches = [
+            endpoint for endpoint in matches if int(endpoint.get("status") or 0) == 0
+        ]
+        if not active_matches:
+            raise OpenRouterError(
+                f"Provider {self.provider!r} has no active endpoint for {self.model!r}; "
+                f"statuses={[endpoint.get('status') for endpoint in matches]}"
+            )
+        matches = active_matches
+        if self.temperature is not None and not any(
+            "temperature" in endpoint.get("supported_parameters", [])
+            for endpoint in matches
+        ):
+            raise OpenRouterError(
+                f"Provider {self.provider!r} does not expose temperature for {self.model!r}; "
+                "configure temperature as null"
             )
         if require_logit_bias and not any(
             "logit_bias" in endpoint.get("supported_parameters", [])
