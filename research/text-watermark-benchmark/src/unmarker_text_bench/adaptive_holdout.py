@@ -17,11 +17,18 @@ def build_controlled_holdout(
     per_language: int = 5,
     seed: int = 20260830,
     generator_family: str = "qwen",
+    attack_split: str = "held_out_test",
+    languages: tuple[str, ...] = ("en", "it"),
 ) -> dict[str, Any]:
-    """Select a deterministic, pre-attack-detected slice of the held-out split."""
+    """Select a deterministic, pre-attack-detected adaptive experiment slice."""
 
     if per_language < 1:
         raise ValueError("per_language must be positive")
+    if attack_split not in {"development", "held_out_test"}:
+        raise ValueError("attack_split must be development or held_out_test")
+    languages = tuple(dict.fromkeys(languages))
+    if not languages or any(value not in {"en", "it"} for value in languages):
+        raise ValueError("languages must contain en and/or it")
     generations = _read_jsonl(generations_path)
     candidates = _read_jsonl(candidates_path)
     attack_splits: dict[tuple[str, str], str] = {}
@@ -40,8 +47,8 @@ def build_controlled_holdout(
         if (
             key[1] != algorithm
             or row.get("split") != "evaluation"
-            or language not in {"en", "it"}
-            or attack_splits.get(key) != "held_out_test"
+            or language not in languages
+            or attack_splits.get(key) != attack_split
             or not row.get("watermarked_text")
             or row.get("calibrated_watermarked_detected") is not True
         ):
@@ -50,7 +57,7 @@ def build_controlled_holdout(
         thresholds[language].add(float(row["calibrated_threshold_1pct"]))
 
     selected: list[dict[str, Any]] = []
-    for language in ("en", "it"):
+    for language in languages:
         rows = sorted(
             eligible[language],
             key=lambda row: (
@@ -73,7 +80,11 @@ def build_controlled_holdout(
 
     requests = [
         {
-            "request_id": f"adaptive-holdout-{row['sample_id']}",
+            "request_id": (
+                f"adaptive-holdout-{row['sample_id']}"
+                if attack_split == "held_out_test"
+                else f"adaptive-development-{row['sample_id']}"
+            ),
             "language": row["language"],
             "text": row["watermarked_text"],
             "generator_family": generator_family,
@@ -86,7 +97,7 @@ def build_controlled_holdout(
         "thresholds": {
             algorithm: {
                 language: next(iter(thresholds[language]))
-                for language in ("en", "it")
+                for language in languages
             }
         },
         "operators": {algorithm: "gt"},
@@ -97,13 +108,19 @@ def build_controlled_holdout(
     }
     manifest = {
         "artifact_schema_version": 1,
-        "artifact_kind": "adaptive-cascade-controlled-holdout",
+        "artifact_kind": (
+            "adaptive-cascade-controlled-holdout"
+            if attack_split == "held_out_test"
+            else "adaptive-cascade-controlled-slice"
+        ),
         "algorithm": algorithm,
+        "attack_split": attack_split,
+        "languages": list(languages),
         "generator_family": generator_family,
         "seed": seed,
         "per_language": per_language,
         "selection": (
-            "evaluation + held_out_test + calibrated target detected before attack; "
+            f"evaluation + {attack_split} + calibrated target detected before attack; "
             "SHA-256 seeded ordering within language"
         ),
         "source_hashes": {
@@ -111,12 +128,12 @@ def build_controlled_holdout(
             "candidates_sha256": _sha256(candidates_path),
         },
         "eligible_counts": {
-            language: len(eligible[language]) for language in ("en", "it")
+            language: len(eligible[language]) for language in languages
         },
         "selected_sample_ids": [str(row["sample_id"]) for row in selected],
         "request_count": len(requests),
         "limitations": [
-            "This split is untouched by the adaptive cascade, but it was part of the earlier fixed-grid confirmation corpus.",
+            "This slice was part of the earlier fixed-grid confirmation corpus.",
             "Selection is conditional on compatible target detection before rewriting.",
         ],
     }
@@ -138,6 +155,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--per-language", type=int, default=5)
     parser.add_argument("--seed", type=int, default=20260830)
     parser.add_argument("--generator-family", default="qwen")
+    parser.add_argument(
+        "--attack-split",
+        choices=("development", "held_out_test"),
+        default="held_out_test",
+    )
+    parser.add_argument("--languages", default="en,it")
     return parser
 
 
@@ -151,6 +174,10 @@ def main() -> None:
         per_language=args.per_language,
         seed=args.seed,
         generator_family=args.generator_family,
+        attack_split=args.attack_split,
+        languages=tuple(
+            value.strip() for value in args.languages.split(",") if value.strip()
+        ),
     )
     print(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True))
 

@@ -13,6 +13,7 @@ from typing import Any
 DEFAULT_OPENROUTER_MODEL = "qwen/qwen3-235b-a22b-2507"
 DEFAULT_OPENROUTER_TOKENIZER = "Qwen/Qwen3-235B-A22B-Instruct-2507"
 DEFAULT_OPENROUTER_TOKENIZER_REVISION = "ac9c66cc9b46af7306746a9250f23d47083d689e"
+MAX_PORTABLE_SEED = 2**31 - 1
 
 
 @dataclass(frozen=True)
@@ -118,6 +119,7 @@ class OpenRouterRewriter:
             "allow_fallbacks": self.allow_fallbacks,
             "require_parameters": True,
             "data_collection": "deny",
+            "seed_range": [0, MAX_PORTABLE_SEED],
         }
 
     def rewrite(
@@ -156,7 +158,7 @@ class OpenRouterRewriter:
                 str(key): float(value) for key, value in logit_bias.items()
             }
         if seed is not None:
-            body["seed"] = int(seed)
+            body["seed"] = _portable_seed(seed)
 
         current_max_tokens = self.max_tokens
         payloads: list[dict[str, Any]] = []
@@ -268,7 +270,7 @@ class OpenRouterRewriter:
                 "exclude": True,
             }
         if seed is not None:
-            body["seed"] = int(seed)
+            body["seed"] = _portable_seed(seed)
         current_max_tokens = self.max_tokens
         payloads: list[dict[str, Any]] = []
         latencies: list[float] = []
@@ -570,3 +572,9 @@ def _safe_error(response: bytes) -> str:
     except (json.JSONDecodeError, AttributeError):
         pass
     return response.decode("utf-8", errors="replace")[:500]
+
+
+def _portable_seed(seed: int) -> int:
+    """Keep deterministic seeds inside the signed INT32 range shared by providers."""
+
+    return int(seed) % (MAX_PORTABLE_SEED + 1)

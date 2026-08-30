@@ -403,6 +403,64 @@ def adaptive_radar_batch(candidates: list[dict]) -> dict:
     }
 
 
+@app.function(
+    image=image,
+    cpu=4,
+    memory=8_192,
+    timeout=3_600,
+    retries=modal.Retries(max_retries=2, backoff_coefficient=2.0, initial_delay=5.0),
+    volumes={HF_CACHE_ROOT: hf_cache},
+)
+def build_fresh_wikipedia_prompts(
+    excluded_ids: dict[str, list[str]],
+    calibration_per_language: int = 100,
+    evaluation_per_language: int = 50,
+    seed: int = 20260831,
+    shuffle_buffer: int = 50_000,
+) -> dict:
+    """Select fresh bilingual prompt topics from the pinned Wikipedia snapshot."""
+
+    from datasets import load_dataset
+    from unmarker_text_bench.adaptive_confirmation import (
+        select_fresh_wikipedia_prompts,
+    )
+    from unmarker_text_bench.detector_controls import (
+        CONFIGS,
+        DATASET_NAME,
+        DATASET_REVISION,
+    )
+
+    streams = {
+        language: load_dataset(
+            DATASET_NAME,
+            config,
+            split="train",
+            streaming=True,
+            revision=DATASET_REVISION,
+        ).shuffle(
+            seed=seed + index,
+            buffer_size=shuffle_buffer,
+        )
+        for index, (language, config) in enumerate(CONFIGS.items())
+    }
+    rows = select_fresh_wikipedia_prompts(
+        streams,
+        {key: set(value) for key, value in excluded_ids.items()},
+        calibration_per_language=calibration_per_language,
+        evaluation_per_language=evaluation_per_language,
+    )
+    return {
+        "rows": rows,
+        "metadata": {
+            "dataset": DATASET_NAME,
+            "revision": DATASET_REVISION,
+            "configs": CONFIGS,
+            "seed": seed,
+            "shuffle_buffer": shuffle_buffer,
+        },
+    }
+
+
 @app.local_entrypoint()
 def main(
     action: str,

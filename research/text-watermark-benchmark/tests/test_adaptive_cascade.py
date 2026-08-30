@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,18 @@ from unmarker_text_bench.adaptive_cascade import (
     pareto_front,
     select_from_pareto,
 )
-from unmarker_text_bench.adaptive_cli import AdaptiveBatchRunner
+from unmarker_text_bench.adaptive_cli import (
+    AdaptiveBatchRunner,
+    _select_route_configs,
+)
+from unmarker_text_bench.adaptive_confirmation import (
+    build_fresh_adaptive_slice,
+    build_fresh_confirmation_prompts,
+    select_fresh_wikipedia_prompts,
+)
+from unmarker_text_bench.adaptive_confirmation_report import (
+    summarize_confirmation_rows,
+)
 from unmarker_text_bench.adaptive_evaluation import (
     CalibratedGenericDetector,
     CompositeCascadeEvaluator,
@@ -28,6 +40,11 @@ from unmarker_text_bench.adaptive_holdout import build_controlled_holdout
 from unmarker_text_bench.adaptive_modal import (
     ModalCascadeEvaluator,
     ModalEntityExtractor,
+)
+from unmarker_text_bench.adaptive_sweep_report import (
+    rank_complete_models,
+    summarize_sweep_result,
+    write_sweep_report,
 )
 from unmarker_text_bench.openrouter_backend import RewriteResponse
 from unmarker_text_bench.protected_spans import (
@@ -682,9 +699,310 @@ class AdaptiveHoldoutTests(unittest.TestCase):
 
             self.assertEqual(manifest["request_count"], 4)
             self.assertEqual(manifest["eligible_counts"], {"en": 2, "it": 2})
+            self.assertEqual(
+                manifest["artifact_kind"],
+                "adaptive-cascade-controlled-holdout",
+            )
+            self.assertTrue(
+                all(row["request_id"].startswith("adaptive-holdout-") for row in requests)
+            )
             self.assertEqual({row["generator_family"] for row in requests}, {"qwen"})
             self.assertEqual({row["target_algorithm"] for row in requests}, {"EXP"})
             self.assertEqual(target["thresholds"]["EXP"], {"en": 2.4, "it": 1.7})
+
+    def test_builder_can_select_only_english_development_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            generations_path = root / "generations.jsonl"
+            candidates_path = root / "candidates.jsonl"
+            generations_path.write_text(
+                json.dumps(
+                    {
+                        "sample_id": "sample-en",
+                        "language": "en",
+                        "split": "evaluation",
+                        "algorithm": "EXP",
+                        "watermarked_text": "Watermarked English",
+                        "calibrated_threshold_1pct": 2.4,
+                        "calibrated_watermarked_detected": True,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            candidates_path.write_text(
+                json.dumps(
+                    {
+                        "sample_id": "sample-en",
+                        "algorithm": "EXP",
+                        "attack_split": "development",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            manifest = build_controlled_holdout(
+                generations_path,
+                candidates_path,
+                root / "output",
+                per_language=1,
+                attack_split="development",
+                languages=("en",),
+            )
+
+            self.assertEqual(manifest["attack_split"], "development")
+            self.assertEqual(manifest["eligible_counts"], {"en": 1})
+            self.assertEqual(manifest["languages"], ["en"])
+
+    def test_route_config_subset_is_explicit_and_order_preserving(self) -> None:
+        routes = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
+        self.assertEqual(
+            _select_route_configs(routes, ("c", "a")),
+            [{"id": "a"}, {"id": "c"}],
+        )
+        with self.assertRaisesRegex(ValueError, "Unknown route IDs"):
+            _select_route_configs(routes, ("missing",))
+
+
+class AdaptiveConfirmationTests(unittest.TestCase):
+    def test_fresh_slice_uses_only_detected_evaluation_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            generations_path = root / "generations.jsonl"
+            rows = []
+            for language, threshold in (("en", 2.4), ("it", 1.7)):
+                for index in range(3):
+                    rows.append(
+                        {
+                            "sample_id": f"fresh-{language}-{index}",
+                            "language": language,
+                            "split": "evaluation",
+                            "algorithm": "EXP",
+                            "watermarked_text": f"Fresh {language} text {index}",
+                            "calibrated_threshold_1pct": threshold,
+                            "calibrated_watermarked_detected": index != 2,
+                        }
+                    )
+            generations_path.write_text(
+                "".join(json.dumps(row) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+
+            manifest = build_fresh_adaptive_slice(
+                generations_path,
+                root / "slice",
+                per_language=2,
+                seed=9,
+            )
+            requests = [
+                json.loads(line)
+                for line in (root / "slice" / "input.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+            ]
+
+            self.assertEqual(manifest["request_count"], 4)
+            self.assertEqual(manifest["eligible_counts"], {"en": 2, "it": 2})
+            self.assertEqual(
+                manifest["contract"],
+                "independent-confirmation-no-development-selection-v1",
+            )
+            self.assertEqual({row["target_algorithm"] for row in requests}, {"EXP"})
+
+    def test_fresh_selector_excludes_prior_ids_and_builds_both_splits(self) -> None:
+        streams = {}
+        for language in ("en", "it"):
+            streams[language] = [
+                {
+                    "id": str(index),
+                    "title": f"Topic {language} {index}",
+                    "text": "x" * 900,
+                }
+                for index in range(5)
+            ]
+        rows = select_fresh_wikipedia_prompts(
+            streams,
+            {"en": {"0"}, "it": {"0"}},
+            calibration_per_language=2,
+            evaluation_per_language=1,
+        )
+        self.assertEqual(len(rows), 6)
+        self.assertNotIn("wikipedia-en-0", {row["id"] for row in rows})
+        self.assertEqual(
+            Counter((row["language"], row["split"]) for row in rows),
+            Counter(
+                {
+                    ("en", "calibration"): 2,
+                    ("en", "evaluation"): 1,
+                    ("it", "calibration"): 2,
+                    ("it", "evaluation"): 1,
+                }
+            ),
+        )
+
+    def test_fresh_builder_revalidates_remote_exclusions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            exclusions = root / "prior.jsonl"
+            exclusions.write_text(
+                json.dumps(
+                    {
+                        "id": "wikipedia-en-1",
+                        "language": "en",
+                        "source": {"article_id": "1"},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            def invoker(app: str, function: str, arguments: tuple[Any, ...]) -> dict:
+                rows = []
+                for language in ("en", "it"):
+                    for split, article_id in (
+                        ("calibration", "2"),
+                        ("evaluation", "3"),
+                    ):
+                        rows.append(
+                            {
+                                "id": f"wikipedia-{language}-{article_id}",
+                                "language": language,
+                                "split": split,
+                                "source": {"article_id": article_id},
+                            }
+                        )
+                return {"rows": rows, "metadata": {"remote": True}}
+
+            manifest = build_fresh_confirmation_prompts(
+                (exclusions,),
+                root / "output",
+                calibration_per_language=1,
+                evaluation_per_language=1,
+                invoker=invoker,
+            )
+            self.assertEqual(manifest["prompt_count"], 4)
+            self.assertEqual(manifest["overlap_with_exclusions"], 0)
+
+
+class AdaptiveSweepReportTests(unittest.TestCase):
+    def test_confirmation_summary_reports_conditional_detector_evasion(self) -> None:
+        row = {
+            "status": "success",
+            "request_id": "confirmation-1",
+            "result": {
+                "baseline": {
+                    "detector_signals": [
+                        {
+                            "detector_id": "radar",
+                            "detected": True,
+                            "calibrated_margin": 0.5,
+                        },
+                        {
+                            "detector_id": "markllm_exp",
+                            "detected": True,
+                            "calibrated_margin": 0.4,
+                        },
+                    ]
+                },
+                "selected": {
+                    "accepted": True,
+                    "quality_pass": True,
+                    "changed_token_ratio": 0.1,
+                    "judge": {"material_error": False},
+                    "deterministic_quality": {"passes": True},
+                    "detector_signals": [
+                        {
+                            "detector_id": "radar",
+                            "detected": False,
+                            "calibrated_margin": -0.2,
+                        },
+                        {
+                            "detector_id": "markllm_exp",
+                            "detected": False,
+                            "calibrated_margin": -0.3,
+                        },
+                    ],
+                },
+                "metadata": {
+                    "usage": {"cost_usd": 0.02, "latency_ms": 1500}
+                },
+            },
+        }
+
+        summary = summarize_confirmation_rows([row], expected_count=1)
+
+        self.assertTrue(summary["complete"])
+        self.assertEqual(summary["accepted_count"], 1)
+        self.assertEqual(summary["quality_and_target_clear_count"], 1)
+        self.assertEqual(summary["quality_and_all_generic_clear_count"], 1)
+        self.assertEqual(
+            summary["detectors"]["radar"]["conditional_evasion_rate"],
+            1.0,
+        )
+        self.assertAlmostEqual(
+            summary["detectors"]["radar"]["mean_margin_change"], -0.7
+        )
+
+    def test_summary_and_ranking_require_complete_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "results.jsonl"
+            row = {
+                "status": "success",
+                "request_id": "paired-1",
+                "result": {
+                    "baseline": {
+                        "detector_signals": [
+                            {"detector_id": "radar", "detected": True},
+                            {"detector_id": "markllm_exp", "detected": True},
+                        ]
+                    },
+                    "selected": {
+                        "accepted": True,
+                        "quality_pass": True,
+                        "changed_token_ratio": 0.2,
+                        "judge": {"material_error": False},
+                        "deterministic_quality": {"passes": True},
+                        "candidate": {"stage": "conservative"},
+                        "detector_signals": [
+                            {"detector_id": "radar", "detected": False},
+                            {"detector_id": "markllm_exp", "detected": False},
+                        ],
+                    },
+                    "metadata": {
+                        "usage": {
+                            "cost_usd": 0.01,
+                            "latency_ms": 1000,
+                        }
+                    },
+                },
+            }
+            path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+            complete = summarize_sweep_result(path, expected_count=1)
+            incomplete = summarize_sweep_result(path, expected_count=2)
+
+            self.assertTrue(complete["complete"])
+            self.assertEqual(complete["accepted_rate"], 1.0)
+            self.assertEqual(complete["radar_clear_rate"], 1.0)
+            self.assertEqual(complete["conditional_radar_evasion_rate"], 1.0)
+            self.assertEqual(
+                rank_complete_models({"complete": complete, "partial": incomplete}),
+                ["complete"],
+            )
+
+            rejected_path = Path(directory) / "rejected.jsonl"
+            rejected = json.loads(json.dumps(row))
+            rejected["result"]["selected"]["accepted"] = False
+            rejected_path.write_text(json.dumps(rejected) + "\n", encoding="utf-8")
+            report = write_sweep_report(
+                {"winner": path, "other": rejected_path},
+                Path(directory) / "report",
+                expected_count=1,
+            )
+            paired = report["paired_acceptance"]["other_vs_winner"]
+            self.assertEqual(paired["model_b_only_accepted"], 1)
+            self.assertEqual(paired["mcnemar_exact_two_sided_p"], 1.0)
 
 
 if __name__ == "__main__":

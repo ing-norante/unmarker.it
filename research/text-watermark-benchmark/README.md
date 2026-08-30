@@ -33,6 +33,12 @@ backtranslation, structural regeneration, optional compatible-target
 position-aware BIRA, and multi-objective Pareto selection.
 The first controlled adaptive EXP holdout and its language-stratified result are
 recorded in [`ADAPTIVE_HOLDOUT_RESULTS.md`](ADAPTIVE_HOLDOUT_RESULTS.md).
+The paired non-Qwen development sweep and its frozen Grok confirmation choice
+are recorded in
+[`ADAPTIVE_MODEL_SWEEP_RESULTS.md`](ADAPTIVE_MODEL_SWEEP_RESULTS.md).
+The resulting fully fresh bilingual full-ensemble confirmation and product
+decision are recorded in
+[`GATE2D_FRESH_CONFIRMATION_RESULTS.md`](GATE2D_FRESH_CONFIRMATION_RESULTS.md).
 
 The next independent-detector stage is documented in
 [`GENERIC_DETECTORS.md`](GENERIC_DETECTORS.md). It turns the 60 held-out

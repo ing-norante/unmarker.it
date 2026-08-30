@@ -1,0 +1,28 @@
+{
+  "routes": [
+    {
+      "id": "gpt-5.6-terra",
+      "family": "openai",
+      "model": "openai/gpt-5.6-terra",
+      "provider": "OpenAI",
+      "temperature": null,
+      "reasoning_effort": "medium"
+    },
+    {
+      "id": "grok-4.6",
+      "family": "x-ai",
+      "model": "x-ai/grok-4.6",
+      "provider": "xAI",
+      "temperature": 0.2,
+      "reasoning_effort": "medium"
+    },
+    {
+      "id": "gemini-3.7-flash",
+      "family": "google",
+      "model": "google/gemini-3.7-flash",
+      "provider": "Google AI Studio",
+      "temperature": 0.2,
+      "reasoning_effort": "medium"
+    }
+  ]
+}

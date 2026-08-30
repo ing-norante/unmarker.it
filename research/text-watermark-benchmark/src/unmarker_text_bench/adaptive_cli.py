@@ -34,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--routes", type=Path, required=True)
+    parser.add_argument(
+        "--route-ids",
+        default="",
+        help="Optional comma-separated subset of route IDs to evaluate",
+    )
     parser.add_argument("--calibration", type=Path, required=True)
     parser.add_argument("--gliner-calibration", type=Path, required=True)
     parser.add_argument("--env-file", type=Path)
@@ -61,7 +66,12 @@ def main() -> None:
     calibration = _read_json(args.calibration)
     gliner = _read_json(args.gliner_calibration)
     target = _read_json(args.target_config) if args.target_config else {}
-    route_configs = routes_payload.get("routes", [])
+    requested_route_ids = tuple(
+        value.strip() for value in args.route_ids.split(",") if value.strip()
+    )
+    route_configs = _select_route_configs(
+        routes_payload.get("routes", []), requested_route_ids
+    )
     if not route_configs:
         raise ValueError("Routes config must contain a non-empty routes array")
 
@@ -317,6 +327,25 @@ def _load_env_key(path: Path, key: str) -> None:
             os.environ[key] = cleaned
             return
     raise ValueError(f"{key} was not found in {path}")
+
+
+def _select_route_configs(
+    routes: list[dict[str, Any]], requested_ids: tuple[str, ...]
+) -> list[dict[str, Any]]:
+    if not routes:
+        raise ValueError("Routes config must contain a non-empty routes array")
+    route_ids = [str(value.get("id")) for value in routes]
+    if len(route_ids) != len(set(route_ids)):
+        raise ValueError("Routes config contains duplicate route IDs")
+    if not requested_ids:
+        return routes
+    if len(requested_ids) != len(set(requested_ids)):
+        raise ValueError("--route-ids contains duplicates")
+    unknown = sorted(set(requested_ids) - set(route_ids))
+    if unknown:
+        raise ValueError(f"Unknown route IDs: {unknown}")
+    requested = set(requested_ids)
+    return [value for value in routes if str(value["id"]) in requested]
 
 
 def _read_json(path: Path | None) -> dict[str, Any]:

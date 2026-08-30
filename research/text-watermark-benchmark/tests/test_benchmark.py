@@ -521,9 +521,15 @@ class OpenRouterTests(unittest.TestCase):
                 "logit_bias_supported"
             ]
         )
-        response = client.rewrite("system", "user", logit_bias={12: -4.0})
+        response = client.rewrite(
+            "system",
+            "user",
+            logit_bias={12: -4.0},
+            seed=3_165_819_038,
+        )
         body = json.loads(requests[-1].data)
         self.assertEqual(body["logit_bias"], {"12": -4.0})
+        self.assertEqual(body["seed"], 1_018_335_390)
         self.assertEqual(body["reasoning"], {"effort": "low", "exclude": True})
         self.assertEqual(response.cost_usd, 0.01)
         self.assertNotIn("not-a-real-key", json.dumps(client.metadata))

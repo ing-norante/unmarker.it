@@ -13,6 +13,10 @@ unmarker-unicode-hygiene = "unmarker_text_bench.unicode_cli:main"
 unmarker-generic-detectors = "unmarker_text_bench.generic_detector_cli:main"
 unmarker-adaptive-rewrite = "unmarker_text_bench.adaptive_cli:main"
 unmarker-adaptive-holdout = "unmarker_text_bench.adaptive_holdout:main"
+unmarker-adaptive-fresh-prompts = "unmarker_text_bench.adaptive_confirmation:main"
+unmarker-adaptive-fresh-slice = "unmarker_text_bench.adaptive_confirmation:slice_main"
+unmarker-adaptive-sweep-report = "unmarker_text_bench.adaptive_sweep_report:main"
+unmarker-adaptive-confirmation-report = "unmarker_text_bench.adaptive_confirmation_report:main"
 
 [project.optional-dependencies]
 markllm = [

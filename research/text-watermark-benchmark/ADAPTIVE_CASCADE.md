@@ -168,3 +168,82 @@ Pass the generated `input.jsonl` to `unmarker-adaptive-rewrite` and its
 `target-config.json` through `--target-config`. A row previously used by the
 fixed-grid benchmark remains an adaptive-method holdout, not a
 generation-level virgin holdout; preserve that distinction in reports.
+
+## Development model sweep
+
+`--route-ids` runs exactly one or more named routes from a shared configuration.
+This is useful for a paired model comparison because every route receives the
+same frozen input rows and all other validators remain unchanged:
+
+```bash
+uv run unmarker-adaptive-rewrite \
+  --input results/<sweep>/slice/input.jsonl \
+  --output results/<sweep>/<model>/results.jsonl \
+  --routes configs/adaptive-routes-non-qwen.json \
+  --route-ids <route-id> \
+  --calibration results/<source>/generic-detectors/calibration.json \
+  --gliner-calibration results/<source>/ner-calibration/gliner-thresholds.json \
+  --target-config results/<sweep>/slice/target-config.json \
+  --detectors radar \
+  --env-file ../../.env
+```
+
+Summarize only after every model has the expected number of successful rows:
+
+```bash
+uv run unmarker-adaptive-sweep-report \
+  --model terra=results/<sweep>/terra/results.jsonl \
+  --model grok=results/<sweep>/grok/results.jsonl \
+  --model gemini=results/<sweep>/gemini/results.jsonl \
+  --output results/<sweep>/report \
+  --expected-count 18
+```
+
+The fixed tie-break order is full-gate acceptance, RADAR clearance, compatible
+target clearance, material-error rate, edit ratio, and cost. Partial runs are
+reported but cannot be selected.
+
+## Fully fresh confirmation corpus
+
+The prompt builder streams the pinned Wikipedia snapshot on Modal and excludes
+article IDs from every supplied historical artifact. Both calibration and
+evaluation prompts are new; the output manifest records source hashes and
+asserts zero overlap:
+
+```bash
+uv run unmarker-adaptive-fresh-prompts \
+  --exclude datasets/markllm-wikipedia-v1.jsonl \
+    results/<gate2b>/modal-prepare/generations.jsonl \
+    results/<gate2c>/modal-prepare/generations.jsonl \
+  --output results/<fresh-run>/prompts \
+  --calibration-per-language 100 \
+  --evaluation-per-language 50 \
+  --seed 20260831
+```
+
+Generate and calibrate official EXP against those 300 prompts, then freeze the
+independent target-detected confirmation slice:
+
+```bash
+uv run modal run modal_pipeline.py \
+  --stage prepare \
+  --run-id <fresh-run> \
+  --prompts results/<fresh-run>/prompts/prompts.jsonl \
+  --output results/<fresh-run>/modal-prepare \
+  --algorithms EXP \
+  --calibration-prompts-per-language 100 \
+  --evaluation-prompts-per-language 50 \
+  --evidence-profile gate2b_exp_pilot
+
+uv run unmarker-adaptive-fresh-slice \
+  --generations results/<fresh-run>/modal-prepare/generations.jsonl \
+  --output results/<fresh-run>/adaptive-slice \
+  --algorithm EXP \
+  --per-language 20 \
+  --seed 20260831 \
+  --generator-family qwen
+```
+
+Do not inspect or use fresh-corpus outcomes while choosing the development
+winner. The confirmation contract is invalid if routes or thresholds are
+changed after opening that corpus.
