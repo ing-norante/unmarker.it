@@ -17,6 +17,7 @@ unmarker-adaptive-fresh-prompts = "unmarker_text_bench.adaptive_confirmation:mai
 unmarker-adaptive-fresh-slice = "unmarker_text_bench.adaptive_confirmation:slice_main"
 unmarker-adaptive-sweep-report = "unmarker_text_bench.adaptive_sweep_report:main"
 unmarker-adaptive-confirmation-report = "unmarker_text_bench.adaptive_confirmation_report:main"
+unmarker-anthropic-mark-eval = "unmarker_text_bench.anthropic_mark_evaluation:main"
 
 [project.optional-dependencies]
 markllm = [

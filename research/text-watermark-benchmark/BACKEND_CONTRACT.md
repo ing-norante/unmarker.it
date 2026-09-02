@@ -21,6 +21,8 @@ GET /capabilities
   "rewrite_stages": ["conservative", "contextual_chunk", "backtranslation", "structural", "position_aware_bira"],
   "generic_detector_ensemble": ["binoculars", "fast_detect_gpt", "logrank", "radar"],
   "watermark_research_scope": ["KGW", "Unigram", "SynthID", "EXP"],
+  "external_holdout_detectors": ["anthropic_text_watermark_private_preview"],
+  "file_provenance_checks": ["c2pa"],
   "production_detector_claim": false
 }
 ```
@@ -39,6 +41,13 @@ the rewritten text, Unicode audit, deterministic and neural quality checks,
 cost, latency, and a versioned model/config manifest. Partial item failures must
 not fail the entire batch. The service must never expose research detector
 scores as proof about an undisclosed production watermark.
+
+Anthropic's public Claude Content Checker must not be exposed as a text
+detector: it reads C2PA credentials from supported media files locally in the
+browser. Official embedded-text detection remains private preview. Until an
+approved API contract is available, Anthropic results can enter only through
+the hash-validated post-hoc holdout boundary documented in
+`ANTHROPIC_MARKS.md`; they cannot participate in online cascade stopping.
 
 Before exposing the HTTP contract, decide from adaptive holdout evidence:
 

@@ -129,6 +129,42 @@ and pass a target config such as:
 The zeroes above illustrate the schema only. Replace them with thresholds from
 the exact compatible calibration run; never use the example as evidence.
 
+## Anthropic official detector holdout
+
+The public Claude Content Checker verifies C2PA credentials on supported media
+files; it does not detect the embedded text watermark. Anthropic's text
+detector is currently a private preview with no published API contract.
+
+The adaptive pipeline therefore treats official Anthropic detection as a
+post-hoc holdout, never as a score visible during candidate selection. Once a
+new cascade run starts from a currently supported marked Claude model, freeze
+its source/selected pairs with:
+
+```bash
+uv run unmarker-anthropic-mark-eval export \
+  --adaptive-results results/<run>/en/results.jsonl \
+  --adaptive-results results/<run>/it/results.jsonl \
+  --output results/<run>/anthropic-official-holdout \
+  --source-provenance supported_claude_marked \
+  --expected-generator-family anthropic \
+  --source-model <exact-supported-model-id> \
+  --source-surface <claude-product-or-api-surface>
+```
+
+After an approved private-preview client maps the official responses to the
+generated normalized template, validate and report them with:
+
+```bash
+uv run unmarker-anthropic-mark-eval report \
+  --batch results/<run>/anthropic-official-holdout/batch.jsonl \
+  --results results/<run>/anthropic-official-holdout/detector-results.jsonl \
+  --output results/<run>/anthropic-official-report
+```
+
+See [`ANTHROPIC_MARKS.md`](ANTHROPIC_MARKS.md) for the evidence contract and
+current access boundary. Existing Qwen/EXP corpora are not valid positive
+sources for this test.
+
 ## Output
 
 Every successful item includes:

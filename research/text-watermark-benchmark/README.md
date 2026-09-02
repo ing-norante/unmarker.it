@@ -40,6 +40,13 @@ The resulting fully fresh bilingual full-ensemble confirmation and product
 decision are recorded in
 [`GATE2D_FRESH_CONFIRMATION_RESULTS.md`](GATE2D_FRESH_CONFIRMATION_RESULTS.md).
 
+Anthropic's public Content Checker and private-preview text watermark are
+separated in [`ANTHROPIC_MARKS.md`](ANTHROPIC_MARKS.md). The public checker is a
+local C2PA file-credential verifier, not a text detector. The benchmark now has
+a hash-locked export/import/report boundary for an official Anthropic text-mark
+holdout when private-preview access and a supported marked Claude corpus are
+available; no official Anthropic result is claimed yet.
+
 The next independent-detector stage is documented in
 [`GENERIC_DETECTORS.md`](GENERIC_DETECTORS.md). It turns the 60 held-out
 originals and 240 selected rewrites into one hash-locked corpus and evaluates
