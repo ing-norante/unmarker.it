@@ -1,7 +1,7 @@
 import {
-  CheckCircleIcon,
+  EyeIcon,
   FileSearchIcon,
-  ShieldCheckIcon,
+  QuestionIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
@@ -42,28 +42,32 @@ export function VerificationDiff({
     return null;
   }
 
+  const visibleChecked = diff.visibleAfter === "detected" || diff.visibleAfter === "not-detected";
+  const metadataChecked = diff.metadataAfterCount !== null && postflightAudit?.metadataScan?.warnings.length === 0;
+  const checksComplete = visibleChecked && metadataChecked && postflightAudit?.warnings.length === 0;
+
   return (
-    <Card className="bg-card/95">
+    <Card className="@container/verification min-w-0 bg-card/95">
       <CardHeader>
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3 [&>div]:min-w-0 [&>div]:flex-1 [&>div]:basis-48">
           <div>
             <CardTitle>{t("verification.title")}</CardTitle>
             <CardDescription>
               {t("verification.description")}
             </CardDescription>
           </div>
-          <Badge variant={postflightAudit ? "default" : "outline"}>
-            {postflightAudit ? t("verification.verified") : t("verification.partial")}
+          <Badge variant={checksComplete ? "default" : "outline"}>
+            {checksComplete ? t("verification.verified") : t("verification.partial")}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-3">
+      <CardContent className="grid gap-3 @min-[48rem]/verification:grid-cols-3">
         <DiffTile
           icon="metadata"
           label={t("verification.metadata")}
           before={formatCount(diff.metadataBeforeCount, translate)}
           after={formatCount(diff.metadataAfterCount, translate)}
-          partial={diff.metadataAfterCount === null}
+          partial={!metadataChecked}
         />
         <DiffTile
           icon="visible"
@@ -72,7 +76,7 @@ export function VerificationDiff({
           after={
             diff.visibleAfter ? formatStatus(diff.visibleAfter, translate) : t("verification.partial")
           }
-          partial={diff.visibleAfter === null}
+          partial={!visibleChecked}
         />
         <DiffTile
           icon="hidden"
@@ -87,7 +91,7 @@ export function VerificationDiff({
         />
 
         {diff.warnings.length > 0 && (
-          <div className="bg-muted/40 text-muted-foreground border p-3 text-sm sm:col-span-3 sm:text-base">
+          <div className="bg-muted/40 text-muted-foreground border p-3 text-base leading-relaxed @min-[48rem]/verification:col-span-3">
             {diff.warnings.map((warning) => translateMessage(t, warning)).join(" ")}
           </div>
         )}
@@ -114,21 +118,21 @@ function DiffTile({
     icon === "metadata"
       ? FileSearchIcon
       : icon === "hidden"
-        ? ShieldCheckIcon
-        : CheckCircleIcon;
+        ? QuestionIcon
+        : EyeIcon;
 
   return (
     <div className="bg-muted/35 flex min-w-0 flex-col gap-3 border p-3">
       <div className="flex items-center justify-between gap-3">
         <Icon
-          className={partial ? "text-muted-foreground" : "text-primary"}
+          className={partial || icon === "hidden" ? "text-muted-foreground" : "text-primary-text"}
           weight="bold"
         />
         {partial && <WarningCircleIcon className="text-muted-foreground" />}
       </div>
       <div>
         <p className="text-ui-overline text-muted-foreground">{label}</p>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-sm sm:text-base">
+        <div className="mt-2 grid grid-cols-2 gap-2 text-base leading-normal tabular-nums wrap-anywhere">
           <div>
             <p className="text-muted-foreground text-xs font-bold uppercase">
               {t("verification.before")}

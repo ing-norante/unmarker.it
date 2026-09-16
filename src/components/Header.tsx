@@ -10,25 +10,24 @@ export function Header({ className }: { className?: string }) {
   return (
     <header
       className={cn(
-        "relative flex shrink-0 flex-col gap-5 pb-1 2xl:gap-7",
+        "@container/brand relative flex min-w-0 shrink-0 flex-col gap-5 pb-1 2xl:gap-7",
         className,
       )}
     >
       <div className="flex justify-end"><LanguageSwitcher /></div>
       <div className="relative flex flex-col gap-3 2xl:gap-5">
-        {/* <Sparkles className="fill-primary text-primary absolute top-0 right-10 size-5 sm:right-16" /> */}
         <h1 className="wide-hero-title text-foreground text-5xl leading-none font-black tracking-normal wrap-break-word sm:text-6xl lg:text-7xl xl:text-[5rem] 2xl:text-8xl">
-          <span className="font-mono block uppercase whitespace-nowrap">
+          <span className="font-mono block text-[min(1em,14cqi)] uppercase whitespace-nowrap">
             Unmarker.it
           </span>
-          <span className="locale-hero-subtitle text-primary block text-2xl leading-tight font-black sm:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl">
+          <span className="locale-hero-subtitle text-primary-text block text-2xl leading-snug font-black text-balance sm:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl">
             {t("header.product")}
           </span>
         </h1>
-        <p className="locale-hero-copy text-muted-foreground text-xl leading-tight font-bold sm:text-2xl xl:text-3xl 2xl:text-4xl">
+        <p className="locale-hero-copy text-muted-foreground max-w-[36ch] text-xl leading-snug font-bold text-pretty sm:text-2xl xl:text-3xl 2xl:text-4xl">
           {t("header.tagline")}
           <br />
-          <span className="text-primary">{t("header.clientSide")}</span>{" "}
+          <span className="text-primary-text">{t("header.clientSide")}</span>{" "}
           <span className="text-muted-foreground">
             {t("header.privacy")}
           </span>

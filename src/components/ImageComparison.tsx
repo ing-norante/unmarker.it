@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -43,10 +44,10 @@ export function ImageComparison({
     phase === "complete";
 
   return (
-    <div className="flex flex-col gap-4 pb-2">
+    <div className="@container/comparison flex min-w-0 flex-col gap-4 pb-2">
       <AnalysisPanel audit={preflightAudit} phase={phase} />
 
-      <div className="grid gap-4 md:grid-cols-2 md:gap-5">
+      <div className="grid gap-4 @min-[40rem]/comparison:grid-cols-2 @min-[40rem]/comparison:gap-5">
         <Card className="bg-card/95 overflow-hidden">
           <CardHeader className="border-b px-4 py-3">
             <CardTitle>{t("comparison.original")}</CardTitle>
@@ -54,11 +55,12 @@ export function ImageComparison({
               {t("comparison.originalDescription")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="bg-muted/35 relative flex h-56 items-center justify-center p-3 sm:h-64 lg:h-[min(48vh,24rem)]">
-            <img
+          <CardContent className="bg-muted/35 relative flex min-h-56 items-center justify-center p-3 @min-[40rem]/comparison:min-h-64">
+            <ImagePreview
+              key={originalImageUrl}
               src={originalImageUrl}
               alt={t("comparison.originalAlt")}
-              className="max-h-full max-w-full object-contain"
+              errorDescription={t("comparison.originalPreviewUnavailable")}
             />
           </CardContent>
         </Card>
@@ -75,12 +77,14 @@ export function ImageComparison({
                   : t("comparison.processingDescription")}
               </CardDescription>
             </CardHeader>
-            <CardContent className="bg-muted/35 relative flex h-56 items-center justify-center p-3 sm:h-64 lg:h-[min(48vh,24rem)]">
+            <CardContent className="bg-muted/35 relative flex min-h-56 items-center justify-center p-3 @min-[40rem]/comparison:min-h-64">
               {processedImageUrl ? (
-                <img
+                <ImagePreview
+                  key={processedImageUrl}
                   src={processedImageUrl}
                   alt={t("comparison.processedAlt")}
-                  className="max-h-full max-w-full object-contain"
+                  errorDescription={t("comparison.processedPreviewUnavailable")}
+                  processed
                 />
               ) : (
                 <Empty className="border">
@@ -116,6 +120,40 @@ export function ImageComparison({
           warnings={workflowWarnings}
         />
       )}
+    </div>
+  );
+}
+
+function ImagePreview({ src, alt, errorDescription, processed = false }: {
+  src: string;
+  alt: string;
+  errorDescription: string;
+  processed?: boolean;
+}) {
+  const { t } = useTranslation("workflow");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  if (status === "error") {
+    return (
+      <Empty role="status">
+        <EmptyHeader>
+          <EmptyMedia variant="icon"><ImageSquareIcon /></EmptyMedia>
+          <EmptyTitle>{t("comparison.previewUnavailable")}</EmptyTitle>
+          <EmptyDescription>{errorDescription}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  return (
+    <div className={`${processed ? "result-preview-frame " : ""}relative flex max-w-full`} data-ready={status === "ready"}>
+      <img
+        src={src}
+        alt={alt}
+        className="max-h-[min(60svh,24rem)] max-w-full object-contain"
+        onLoad={() => setStatus("ready")}
+        onError={() => setStatus("error")}
+      />
     </div>
   );
 }

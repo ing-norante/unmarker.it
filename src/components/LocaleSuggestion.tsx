@@ -55,7 +55,7 @@ export function LocaleSuggestion() {
   if (!visible || !eligible) return null;
 
   return (
-    <Alert className="bg-background fixed right-4 bottom-4 left-4 z-40 mx-auto max-w-md shadow-xl sm:right-6 sm:left-auto">
+    <Alert className="locale-suggestion bg-background fixed right-4 bottom-4 left-4 z-40 mx-auto max-w-md shadow-xl sm:right-6 sm:left-auto">
       <AlertTitle>{t("suggestion.title")}</AlertTitle>
       <AlertDescription className="flex flex-col gap-3">
         <span>{t("suggestion.description")}</span>

@@ -38,7 +38,7 @@ describe("translation resources", () => {
 
   it("keeps approved brands and technical terms unchanged", () => {
     const allChinese = [...flatten(resources["zh-Hans"]).values()].join("\n");
-    for (const term of ["Unmarker.it", "Gemini", "OpenCV.js", "C2PA", "JPEG"]) {
+    for (const term of ["Unmarker.it", "Gemini", "Nano Banana", "C2PA", "JPEG"]) {
       expect(allChinese).toContain(term);
     }
   });
@@ -46,8 +46,8 @@ describe("translation resources", () => {
   it("contains no denied English UI phrases", () => {
     const allChinese = [...flatten(resources["zh-Hans"]).values()].join("\n");
     for (const phrase of [
-      "Drag an image", "WORKFLOW", "Needs attention", "Core facts",
-      "Analyze, remove, and verify", "Built with", "No cleanup needed", "Failed",
+      "Add an image", "WORKFLOW", "Needs attention", "Core facts",
+      "Analyze, process, and check", "Built with", "No cleanup needed", "Failed",
     ]) expect(allChinese).not.toContain(phrase);
   });
 });
@@ -71,10 +71,10 @@ describe("isolated SSR i18n instances", () => {
     const firstEn = await render("en");
     const zh = await render("zh-Hans");
     const secondEn = await render("en");
-    expect(firstEn.appHtml).toContain("Drag an image");
-    expect(zh.appHtml).toContain("拖入图片");
-    expect(zh.appHtml).not.toContain("Drag an image");
-    expect(secondEn.appHtml).toContain("Drag an image");
+    expect(firstEn.appHtml).toContain("Add an image");
+    expect(zh.appHtml).toContain("添加图片");
+    expect(zh.appHtml).not.toContain("Add an image");
+    expect(secondEn.appHtml).toContain("Add an image");
   });
 });
 

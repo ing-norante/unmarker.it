@@ -1,5 +1,6 @@
 export const metadata = {
   panel: {
+    unavailable: "Metadata could not be read.",
     title: "Metadata",
     scanning: "Scanning metadata",
     scanningShort: "Scanning",
@@ -8,11 +9,11 @@ export const metadata = {
     found: "AI metadata found",
     foundShort: "Found",
     clean: "No AI metadata found",
-    cleanShort: "Clean",
+    cleanShort: "None found",
     reading: "Reading file bytes in the browser.",
-    cleanAvailable: "A metadata-only clean copy is available for this format.",
+    cleanAvailable: "Download a copy with supported AI metadata removed. This does not remove watermarks in the image pixels.",
     scanOnly: "AI markers were detected, but this file is scan-only in this version.",
-    noCleanup: "No cleanup needed.",
+    noCleanup: "No removable AI metadata was found in this scan.",
     categories: "Metadata categories",
     signals: "Signals",
     warnings: "Warnings",

@@ -199,7 +199,11 @@ function WorkflowLayout({
 
                 <div className="min-h-0 flex-1 overflow-auto lg:overscroll-contain">
                   <div className="flex flex-col gap-4">
-                    <WorkflowSummary phase={state.phase} />
+                    <WorkflowSummary
+                      phase={state.phase}
+                      hasWarnings={workflowWarnings.length > 0}
+                      verificationFailed={state.phase === "complete" && !state.postflightAudit}
+                    />
                     {state.phase !== "analysis-only" && (
                       <PipelineSteps steps={steps} />
                     )}
@@ -224,7 +228,7 @@ function WorkflowLayout({
 
             <section
               className={cn(
-                "order-2 flex min-w-0 flex-col lg:col-start-2 lg:min-h-0",
+                "@container/workspace order-2 flex min-w-0 flex-col lg:col-start-2 lg:min-h-0",
                 !originalImage && "sticky-uploader-column",
               )}
             >
@@ -256,7 +260,7 @@ function WorkflowLayout({
               )}
 
               {originalImage && originalImageUrl && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 flex flex-col gap-4 duration-500 lg:min-h-0 lg:flex-1">
+                <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1">
                   <ActionBar
                     fileName={originalImage.name}
                     phase={state.phase}

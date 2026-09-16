@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -22,6 +23,7 @@ export function CrushQualityControl({
 }: CrushQualityControlProps) {
   const { t } = useTranslation("workflow");
   const percent = Math.round(value * 100);
+  const descriptionId = useId();
 
   return (
     <Card size="sm" className="bg-card/95 mt-2 border py-0">
@@ -34,7 +36,7 @@ export function CrushQualityControl({
             {percent}%
           </span>
         </div>
-        <p className="text-muted-foreground text-ui-body">
+        <p id={descriptionId} className="text-muted-foreground text-ui-body">
           {t("quality.description")}
         </p>
         <Slider
@@ -45,6 +47,8 @@ export function CrushQualityControl({
           onValueChange={([next]) => onChange(next / 100)}
           disabled={disabled}
           aria-label={t("quality.aria")}
+          aria-describedby={descriptionId}
+          aria-valuetext={`${percent}%`}
         />
         <div className="text-muted-foreground text-ui-caption flex justify-between">
           <span>{t("quality.compression")}</span>

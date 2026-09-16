@@ -6,7 +6,7 @@ import { translateMessage, messageId } from "@/i18n/messages";
 export function FilePolicyDetails({ policy }: { policy: FileModePolicy }) {
   const { t } = useTranslation();
   return (
-    <div className="text-muted-foreground text-ui-body leading-6 sm:leading-7">
+    <div className="text-muted-foreground text-ui-body">
       <span>{translateMessage(t, policy.supportedCopy)}</span>
       {policy.limitCopy.map((limit) => (
         <span key={messageId(limit)} className="block">
@@ -17,19 +17,40 @@ export function FilePolicyDetails({ policy }: { policy: FileModePolicy }) {
   );
 }
 
-export function WorkflowSummary({ phase }: { phase: WorkflowPhase }) {
+export function WorkflowSummary({
+  phase,
+  hasWarnings = false,
+  verificationFailed = false,
+}: {
+  phase: WorkflowPhase;
+  hasWarnings?: boolean;
+  verificationFailed?: boolean;
+}) {
   const { t } = useTranslation("workflow");
+  const description =
+    phase === "complete" && verificationFailed
+      ? t("phase.complete.verificationUnavailable")
+      : phase === "complete" && hasWarnings
+        ? t("phase.complete.withWarnings")
+        : t(`phase.${phase}.description`);
+
   return (
-    <div className="bg-card text-card-foreground flex flex-col gap-3 border p-3 text-sm sm:p-4 sm:text-base">
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="bg-card text-card-foreground flex flex-col gap-3 border p-3 text-sm sm:p-4 sm:text-base"
+    >
       <div className="flex items-center justify-between gap-3">
-        <span className="font-bold">{t(`phase.${phase}.title`)}</span>
-        <span className="text-muted-foreground text-ui-caption">
+        <span className="text-ui-title">{t(`phase.${phase}.title`)}</span>
+        <span
+          aria-hidden="true"
+          className="text-muted-foreground text-ui-caption"
+        >
           {t(`phase.${phase}.label`)}
         </span>
       </div>
-      <p className="text-muted-foreground text-ui-body">
-        {t(`phase.${phase}.description`)}
-      </p>
+      <p className="text-muted-foreground text-ui-body">{description}</p>
     </div>
   );
 }

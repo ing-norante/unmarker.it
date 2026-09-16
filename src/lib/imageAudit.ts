@@ -35,7 +35,7 @@ export function buildImageAudit({
     metadataScan,
     visibleWatermark,
     hiddenWatermark: createHiddenWatermarkAudit(stage),
-    aiScore: inferAiProvenanceScore(metadataScan, visibleDetection),
+    aiScore: inferAiProvenanceScore(metadataScan, visibleDetection, visibleWatermark.status),
     warnings,
   };
 }

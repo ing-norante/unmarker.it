@@ -12,6 +12,7 @@ describe("imageAudit", () => {
     });
 
     expect(audit.visibleWatermark.status).toBe("not-scanned");
+    expect(audit.aiScore).toMatchObject({ kind: "incomplete", percentage: null });
     expect(audit.hiddenWatermark.status).toBe("at-risk");
   });
 

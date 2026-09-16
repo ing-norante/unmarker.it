@@ -3,6 +3,7 @@ import type {
   GeminiDetectionResult,
   MetadataScanResult,
   MetadataSignal,
+  VisibleWatermarkStatus,
 } from "@/lib/types";
 import { message } from "@/i18n/messages";
 
@@ -34,9 +35,17 @@ const STRONG_PROVENANCE_PATTERNS = [
 export function inferAiProvenanceScore(
   metadataScan: MetadataScanResult | null,
   geminiDetection: GeminiDetectionResult | null,
+  visibleStatus: VisibleWatermarkStatus = geminiDetection
+    ? geminiDetection.detected ? "detected" : "not-detected"
+    : "not-scanned",
 ): AiProvenanceScore {
   const signals = metadataScan?.signals ?? [];
   const evidence = createEvidence(signals, geminiDetection);
+  const incomplete = !metadataScan || metadataScan.warnings.length > 0 ||
+    (visibleStatus !== "detected" && visibleStatus !== "not-detected");
+  if (incomplete) {
+    evidence.push(message("workflow:audit.score.evidenceIncomplete"));
+  }
   const providerMatch = findProvider(signals);
   const hasStrongProvenance =
     signals.some((signal) => signal.type === "c2pa") ||
@@ -82,11 +91,21 @@ export function inferAiProvenanceScore(
     };
   }
 
+  if (incomplete) {
+    return {
+      percentage: null,
+      kind: "incomplete",
+      provider: null,
+      evidence,
+      confidence: "low",
+    };
+  }
+
   return {
     percentage: 12,
     kind: "none",
     provider: null,
-    evidence,
+    evidence: [message("workflow:audit.score.evidenceNone")],
     confidence: "low",
   };
 }
@@ -101,10 +120,6 @@ function createEvidence(
     evidence.push(message("workflow:audit.score.evidenceGemini", {
       confidence: Math.round(geminiDetection.confidence * 100),
     }));
-  }
-
-  if (evidence.length === 0) {
-    evidence.push(message("workflow:audit.score.evidenceNone"));
   }
 
   return evidence;
