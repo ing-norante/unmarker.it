@@ -164,20 +164,20 @@ export function useUnmarkPipeline({
         });
 
         updateStep("shake", { status: "running", progress: 10 });
-        await delay(500, signal);
+        await yieldToBrowser(signal);
 
         const shakeSource = createCanvasSnapshot(canvas);
         await applyShake(ctx, shakeSource, DEFAULT_OPTIONS.shake, signal);
         updateStep("shake", { status: "done", progress: 100 });
 
         updateStep("stir", { status: "running", progress: 10 });
-        await delay(500, signal);
+        await yieldToBrowser(signal);
 
         await applyStir(ctx, DEFAULT_OPTIONS.stir, signal);
         updateStep("stir", { status: "done", progress: 100 });
 
         updateStep("crush", { status: "running", progress: 10 });
-        await delay(500, signal);
+        await yieldToBrowser(signal);
 
         const resultBlob = await applyCrush(
           canvas,
@@ -278,7 +278,8 @@ const assertNotAborted = (signal?: AbortSignal) => {
   }
 };
 
-const delay = (ms: number, signal?: AbortSignal) =>
+// Let pending UI updates and cancellation run without holding up completed work.
+const yieldToBrowser = (signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
       reject(createAbortError());
@@ -288,7 +289,7 @@ const delay = (ms: number, signal?: AbortSignal) =>
     const timeout = window.setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
       resolve();
-    }, ms);
+    }, 0);
 
     const onAbort = () => {
       window.clearTimeout(timeout);

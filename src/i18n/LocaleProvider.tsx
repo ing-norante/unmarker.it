@@ -8,6 +8,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { flushSync } from "react-dom";
+import { readPreference, writePreference } from "@/lib/preferenceStorage";
 import type { i18n } from "i18next";
 import {
   applyDocumentMetadataToDom,
@@ -57,11 +58,11 @@ export function LocaleProvider({
 
   useEffect(() => {
     queueMicrotask(() => {
-      const preference = localStorage.getItem(PREFERENCE_KEY);
+      const preference = readPreference(PREFERENCE_KEY);
       if (preference === "en" || preference === "zh-Hans") {
         setExplicitPreference(preference);
       }
-      const decision = localStorage.getItem(SUGGESTION_KEY);
+      const decision = readPreference(SUGGESTION_KEY);
       if (decision === "accepted" || decision === "dismissed") {
         setSuggestionDecision(decision);
       }
@@ -87,11 +88,11 @@ export function LocaleProvider({
   );
 
   const recordPreference = useCallback((nextLocale: SupportedLocale) => {
-    localStorage.setItem(PREFERENCE_KEY, nextLocale);
+    writePreference(PREFERENCE_KEY, nextLocale);
     setExplicitPreference(nextLocale);
     const suggestionStatus =
       nextLocale === "zh-Hans" ? "accepted" : "dismissed";
-    localStorage.setItem(SUGGESTION_KEY, suggestionStatus);
+    writePreference(SUGGESTION_KEY, suggestionStatus);
     setSuggestionDecision(suggestionStatus);
   }, []);
 
@@ -123,8 +124,8 @@ export function LocaleProvider({
   );
 
   const dismissSuggestion = useCallback(async () => {
-    localStorage.setItem(PREFERENCE_KEY, "en");
-    localStorage.setItem(SUGGESTION_KEY, "dismissed");
+    writePreference(PREFERENCE_KEY, "en");
+    writePreference(SUGGESTION_KEY, "dismissed");
     setExplicitPreference("en");
     setSuggestionDecision("dismissed");
     await trackLocaleAction(

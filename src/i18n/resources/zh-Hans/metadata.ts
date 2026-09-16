@@ -1,5 +1,6 @@
 export const metadata = {
   panel: {
+    unavailable: "无法读取元数据。",
     title: "元数据",
     scanning: "正在扫描元数据",
     scanningShort: "扫描中",
@@ -8,11 +9,11 @@ export const metadata = {
     found: "发现 AI 元数据",
     foundShort: "已发现",
     clean: "未发现 AI 元数据",
-    cleanShort: "无标记",
+    cleanShort: "未发现",
     reading: "正在浏览器中读取文件字节。",
-    cleanAvailable: "此格式可以下载仅清理元数据的副本。",
+    cleanAvailable: "可下载移除了受支持 AI 元数据的副本。此操作不会移除图像像素中的水印。",
     scanOnly: "检测到 AI 标记，但当前版本只能扫描此文件。",
-    noCleanup: "无需清理。",
+    noCleanup: "此次扫描未发现可移除的 AI 元数据。",
     categories: "元数据类别",
     signals: "信号",
     warnings: "警告",

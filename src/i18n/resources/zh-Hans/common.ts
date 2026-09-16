@@ -85,11 +85,11 @@ export const common = {
   },
   actions: {
     cancel: "取消",
-    reset: "重置",
+    reset: "重新开始",
     retry: "重试",
     reprocess: "重新处理",
     downloadJpeg: "下载 JPEG",
-    cleanMetadata: "清理元数据",
+    cleanMetadata: "清理元数据并下载",
     chooseImage: "选择图片",
   },
   theme: {

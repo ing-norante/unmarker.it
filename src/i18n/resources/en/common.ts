@@ -85,12 +85,12 @@ export const common = {
   },
   actions: {
     cancel: "Cancel",
-    reset: "Reset",
+    reset: "Start over",
     retry: "Retry",
     reprocess: "Reprocess",
     downloadJpeg: "Download JPEG",
-    cleanMetadata: "Clean metadata",
-    chooseImage: "Choose Image",
+    cleanMetadata: "Clean metadata & download",
+    chooseImage: "Choose image",
   },
   theme: {
     light: "Switch to light mode",

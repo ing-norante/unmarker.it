@@ -14,6 +14,10 @@ export function MetadataSignalsList({
   emptyCopy,
 }: MetadataSignalsListProps) {
   const { t } = useTranslation("metadata");
+  if (!scanResult) {
+    return <p className="text-muted-foreground text-ui-body">{t("panel.unavailable")}</p>;
+  }
+
   const categories = scanResult
     ? [
         ...new Set(
@@ -35,7 +39,7 @@ export function MetadataSignalsList({
             ))}
           </div>
         ) : (
-          <p className="text-muted-foreground border border-dashed p-3 text-sm sm:text-base">
+          <p className="text-muted-foreground border border-dashed p-3 text-base leading-relaxed">
             {emptyCopy ?? t("panel.empty")}
           </p>
         )}
@@ -50,15 +54,15 @@ export function MetadataSignalsList({
                 key={`${signal.location}-${signal.marker ?? messageId(signal.label)}-${index}`}
                 className="bg-muted/40 flex min-w-0 flex-col gap-1 border p-2"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-bold sm:text-base">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="min-w-0 text-sm font-bold wrap-anywhere sm:text-base">
                     {translateMessage(t, signal.label)}
                   </span>
                   <Badge variant={signal.removable ? "default" : "outline"}>
                     {signal.removable ? t("panel.removable") : t("panel.scanOnlyBadge")}
                   </Badge>
                 </div>
-                <p className="text-muted-foreground truncate font-mono text-xs sm:text-sm">
+                <p className="text-muted-foreground font-mono text-xs wrap-anywhere sm:text-sm">
                   {signal.location}
                   {signal.marker ? ` / ${signal.marker}` : ""}
                 </p>
@@ -75,7 +79,7 @@ export function MetadataSignalsList({
             {scanResult.warnings.map((warning) => (
               <li
                 key={metadataWarningId(warning)}
-                className="bg-muted/50 text-muted-foreground border p-2 text-sm sm:text-base"
+                className="bg-muted/50 text-muted-foreground border p-2 text-base leading-relaxed"
               >
                 {translateMetadataWarning(t, warning)}
               </li>

@@ -1,8 +1,7 @@
 import {
   CircleNotchIcon,
   EyeIcon,
-  ShieldCheckIcon,
-  ShieldWarningIcon,
+  QuestionIcon,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,42 +30,52 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <Card className="bg-card/95">
+    <div className="grid min-w-0 gap-4 @min-[52rem]/comparison:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <Card className="@container/panel min-w-0 bg-card/95">
         <CardHeader>
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 [&>div]:flex-1 [&>div]:basis-48">
             <div>
               <CardTitle>{t("workflow:analysis.provenance")}</CardTitle>
               <CardDescription>{t(`workflow:audit.score.${audit.aiScore.kind}.description`)}</CardDescription>
             </div>
             <Badge variant={scoreBadgeVariant(audit.aiScore.confidence)}>
-              {t(`common:confidence.${audit.aiScore.confidence}`)}
+              {audit.aiScore.kind === "incomplete"
+                ? t("common:generic.partial")
+                : t(`common:confidence.${audit.aiScore.confidence}`)}
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex items-end justify-between gap-4">
+          <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-4xl leading-none font-black">
-                {audit.aiScore.percentage}%
-              </p>
-              <p className="text-muted-foreground text-sm font-medium sm:text-base">
+              {audit.aiScore.percentage !== null && (
+                <p className="text-4xl leading-none font-black tabular-nums">
+                  {audit.aiScore.percentage}%
+                </p>
+              )}
+              <p className="text-muted-foreground text-ui-body">
                 {t(`workflow:audit.score.${audit.aiScore.kind}.label`)}
               </p>
             </div>
-            <Badge variant="outline">
+            <Badge variant="outline" className="h-auto max-w-full whitespace-normal wrap-anywhere">
               {audit.aiScore.provider ??
                 (audit.aiScore.kind === "none"
                   ? t("common:generic.noProvider")
                   : t("workflow:audit.score.unknownProvider"))}
             </Badge>
           </div>
-          <Progress value={audit.aiScore.percentage} />
+          {audit.aiScore.percentage !== null && (
+            <Progress
+              role="meter"
+              value={audit.aiScore.percentage}
+              aria-label={t("workflow:analysis.provenance")}
+            />
+          )}
           <div className="flex flex-col gap-2">
             {audit.aiScore.evidence.slice(0, 4).map((item) => (
               <p
                 key={messageId(item)}
-                className="bg-muted/40 text-muted-foreground border p-2 text-sm sm:text-base"
+                className="bg-muted/40 text-muted-foreground border p-2 text-base leading-relaxed wrap-anywhere"
               >
                 {translateMessage(t, item)}
               </p>
@@ -75,14 +84,14 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
         </CardContent>
       </Card>
 
-      <Card className="bg-card/95">
+      <Card className="@container/panel min-w-0 bg-card/95">
         <CardHeader>
           <CardTitle>{t("workflow:analysis.watermarkScan")}</CardTitle>
           <CardDescription>
             {t("workflow:analysis.watermarkDescription")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
+        <CardContent className="grid gap-3 @min-[30rem]/panel:grid-cols-2">
           <SignalStatus
             icon="visible"
             title={t("workflow:analysis.visible")}
@@ -96,11 +105,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
             title={t("workflow:analysis.hidden")}
             label={t(`workflow:audit.hidden.${audit.hiddenWatermark.status === "neutralized-unverified" ? "neutralized" : "risk"}.label`)}
             description={t(`workflow:audit.hidden.${audit.hiddenWatermark.status === "neutralized-unverified" ? "neutralized" : "risk"}.description`)}
-            tone={
-              audit.hiddenWatermark.status === "neutralized-unverified"
-                ? "ok"
-                : "warning"
-            }
+            tone="neutral"
             badge={
               audit.hiddenWatermark.status === "neutralized-unverified"
                 ? t("common:generic.processed")
@@ -110,9 +115,9 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
         </CardContent>
       </Card>
 
-      <Card className="bg-card/95 lg:col-span-2">
+      <Card className="min-w-0 bg-card/95 @min-[52rem]/comparison:col-span-2">
         <CardHeader>
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 [&>div]:flex-1 [&>div]:basis-48">
             <div>
               <CardTitle>{t("workflow:analysis.metadata")}</CardTitle>
               <CardDescription>
@@ -132,7 +137,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
       </Card>
 
       {audit.warnings.length > 0 && (
-        <Card className="bg-card/95 lg:col-span-2">
+        <Card className="min-w-0 bg-card/95 @min-[52rem]/comparison:col-span-2">
           <CardHeader>
             <CardTitle>{t("workflow:analysis.warnings")}</CardTitle>
           </CardHeader>
@@ -141,7 +146,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
               {audit.warnings.map((warning) => (
                 <li
                   key={messageId(warning)}
-                  className="bg-muted/50 text-muted-foreground border p-2 text-sm sm:text-base"
+                  className="bg-muted/50 text-muted-foreground border p-2 text-base leading-relaxed"
                 >
                   {translateMessage(t, warning)}
                 </li>
@@ -157,7 +162,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
 function AnalysisSkeleton({ phase }: { phase: WorkflowPhase }) {
   const { t } = useTranslation("workflow");
   return (
-    <Card className="bg-card/95">
+    <Card className="@container/panel min-w-0 bg-card/95">
       <CardHeader>
         <div className="flex items-center gap-3">
           <CircleNotchIcon className="text-muted-foreground animate-spin" />
@@ -197,12 +202,7 @@ function SignalStatus({
   badge: string;
   icon: "visible" | "hidden";
 }) {
-  const Icon =
-    icon === "visible"
-      ? EyeIcon
-      : tone === "ok"
-        ? ShieldCheckIcon
-        : ShieldWarningIcon;
+  const Icon = icon === "visible" ? EyeIcon : QuestionIcon;
 
   return (
     <div className="bg-muted/35 flex min-w-0 flex-col gap-3 border p-3">
@@ -212,10 +212,10 @@ function SignalStatus({
       </div>
       <div className="min-w-0">
         <p className="text-ui-overline text-muted-foreground">{title}</p>
-        <p className="text-foreground text-sm font-black sm:text-base">
+        <p className="text-foreground text-base leading-snug font-bold text-balance">
           {label}
         </p>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+        <p className="text-muted-foreground text-ui-body mt-1">
           {description}
         </p>
       </div>
@@ -276,11 +276,11 @@ function statusBadgeVariant(tone: "ok" | "warning" | "danger" | "neutral") {
 
 function statusIconClass(tone: "ok" | "warning" | "danger" | "neutral") {
   if (tone === "danger") {
-    return "text-destructive";
+    return "text-destructive-text";
   }
 
   if (tone === "ok") {
-    return "text-primary";
+    return "text-primary-text";
   }
 
   if (tone === "warning") {

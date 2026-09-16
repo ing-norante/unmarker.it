@@ -41,11 +41,30 @@ describe("aiProvenanceScore", () => {
   });
 
   it("does not claim human provenance when no local signals are found", () => {
-    const score = inferAiProvenanceScore(emptyScan(), null);
+    const score = inferAiProvenanceScore(emptyScan(), null, "not-detected");
 
     expect(score.percentage).toBe(12);
     expect(score.kind).toBe("none");
     expect(score.provider).toBeNull();
+  });
+
+  it.each(["not-scanned", "scan-failed"] as const)("does not score a %s visible check as negative", (status) => {
+    const score = inferAiProvenanceScore(emptyScan(), null, status);
+    expect(score).toMatchObject({ kind: "incomplete", percentage: null });
+    expect(score.evidence).not.toContainEqual(message("workflow:audit.score.evidenceNone"));
+  });
+
+  it("does not score missing or partial metadata as a complete negative result", () => {
+    for (const scan of [null, { ...emptyScan(), warnings: [{ code: "unsupported-scan" as const }] }]) {
+      expect(inferAiProvenanceScore(scan, null, "not-detected"))
+        .toMatchObject({ kind: "incomplete", percentage: null });
+    }
+  });
+
+  it("retains positive evidence while disclosing missing checks", () => {
+    const score = inferAiProvenanceScore(scanWithSignal("c2pa", "C2PA", "openai"), null, "scan-failed");
+    expect(score.kind).toBe("strong");
+    expect(score.evidence).toContainEqual(message("workflow:audit.score.evidenceIncomplete"));
   });
 });
 

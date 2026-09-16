@@ -1,0 +1,917 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-15T22:52:36.475Z",
+  "title": "Design System: Unmarker.it",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Muted Petrol Blue",
+        "tonalRamp": [
+          "oklch(0.15 0.105 223.128)",
+          "oklch(0.25 0.105 223.128)",
+          "oklch(0.35 0.105 223.128)",
+          "oklch(0.45 0.105 223.128)",
+          "oklch(0.6 0.105 223.128)",
+          "oklch(0.72 0.105 223.128)",
+          "oklch(0.84 0.105 223.128)",
+          "oklch(0.95 0.105 223.128)"
+        ]
+      },
+      "dark-primary": {
+        "role": "primary",
+        "displayName": "Dark · Muted Petrol Blue",
+        "tonalRamp": [
+          "oklch(0.15 0.085 224.283)",
+          "oklch(0.25 0.085 224.283)",
+          "oklch(0.35 0.085 224.283)",
+          "oklch(0.45 0.085 224.283)",
+          "oklch(0.6 0.085 224.283)",
+          "oklch(0.72 0.085 224.283)",
+          "oklch(0.84 0.085 224.283)",
+          "oklch(0.95 0.085 224.283)"
+        ]
+      },
+      "primary-foreground": {
+        "role": "primary",
+        "displayName": "Ice Text",
+        "tonalRamp": [
+          "oklch(0.15 0.019 200.873)",
+          "oklch(0.25 0.019 200.873)",
+          "oklch(0.35 0.019 200.873)",
+          "oklch(0.45 0.019 200.873)",
+          "oklch(0.6 0.019 200.873)",
+          "oklch(0.72 0.019 200.873)",
+          "oklch(0.84 0.019 200.873)",
+          "oklch(0.95 0.019 200.873)"
+        ]
+      },
+      "dark-primary-foreground": {
+        "role": "primary",
+        "displayName": "Dark · Ice Text",
+        "tonalRamp": [
+          "oklch(0.15 0.019 200.873)",
+          "oklch(0.25 0.019 200.873)",
+          "oklch(0.35 0.019 200.873)",
+          "oklch(0.45 0.019 200.873)",
+          "oklch(0.6 0.019 200.873)",
+          "oklch(0.72 0.019 200.873)",
+          "oklch(0.84 0.019 200.873)",
+          "oklch(0.95 0.019 200.873)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.25 0 0)",
+          "oklch(0.35 0 0)",
+          "oklch(0.45 0 0)",
+          "oklch(0.6 0 0)",
+          "oklch(0.72 0 0)",
+          "oklch(0.84 0 0)",
+          "oklch(0.95 0 0)"
+        ]
+      },
+      "dark-background": {
+        "role": "neutral",
+        "displayName": "Dark · Paper",
+        "tonalRamp": [
+          "oklch(0.15 0.006 107.1)",
+          "oklch(0.25 0.006 107.1)",
+          "oklch(0.35 0.006 107.1)",
+          "oklch(0.45 0.006 107.1)",
+          "oklch(0.6 0.006 107.1)",
+          "oklch(0.72 0.006 107.1)",
+          "oklch(0.84 0.006 107.1)",
+          "oklch(0.95 0.006 107.1)"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "tonalRamp": [
+          "oklch(0.15 0.006 107.1)",
+          "oklch(0.25 0.006 107.1)",
+          "oklch(0.35 0.006 107.1)",
+          "oklch(0.45 0.006 107.1)",
+          "oklch(0.6 0.006 107.1)",
+          "oklch(0.72 0.006 107.1)",
+          "oklch(0.84 0.006 107.1)",
+          "oklch(0.95 0.006 107.1)"
+        ]
+      },
+      "dark-foreground": {
+        "role": "neutral",
+        "displayName": "Dark · Warm Ink",
+        "tonalRamp": [
+          "oklch(0.15 0.003 106.5)",
+          "oklch(0.25 0.003 106.5)",
+          "oklch(0.35 0.003 106.5)",
+          "oklch(0.45 0.003 106.5)",
+          "oklch(0.6 0.003 106.5)",
+          "oklch(0.72 0.003 106.5)",
+          "oklch(0.84 0.003 106.5)",
+          "oklch(0.95 0.003 106.5)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Work Surface",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.25 0 0)",
+          "oklch(0.35 0 0)",
+          "oklch(0.45 0 0)",
+          "oklch(0.6 0 0)",
+          "oklch(0.72 0 0)",
+          "oklch(0.84 0 0)",
+          "oklch(0.95 0 0)"
+        ]
+      },
+      "dark-card": {
+        "role": "neutral",
+        "displayName": "Dark · Work Surface",
+        "tonalRamp": [
+          "oklch(0.15 0.013 107.4)",
+          "oklch(0.25 0.013 107.4)",
+          "oklch(0.35 0.013 107.4)",
+          "oklch(0.45 0.013 107.4)",
+          "oklch(0.6 0.013 107.4)",
+          "oklch(0.72 0.013 107.4)",
+          "oklch(0.84 0.013 107.4)",
+          "oklch(0.95 0.013 107.4)"
+        ]
+      },
+      "card-foreground": {
+        "role": "neutral",
+        "displayName": "Work Surface Text",
+        "tonalRamp": [
+          "oklch(0.15 0.006 107.1)",
+          "oklch(0.25 0.006 107.1)",
+          "oklch(0.35 0.006 107.1)",
+          "oklch(0.45 0.006 107.1)",
+          "oklch(0.6 0.006 107.1)",
+          "oklch(0.72 0.006 107.1)",
+          "oklch(0.84 0.006 107.1)",
+          "oklch(0.95 0.006 107.1)"
+        ]
+      },
+      "dark-card-foreground": {
+        "role": "neutral",
+        "displayName": "Dark · Work Surface Text",
+        "tonalRamp": [
+          "oklch(0.15 0.003 106.5)",
+          "oklch(0.25 0.003 106.5)",
+          "oklch(0.35 0.003 106.5)",
+          "oklch(0.45 0.003 106.5)",
+          "oklch(0.6 0.003 106.5)",
+          "oklch(0.72 0.003 106.5)",
+          "oklch(0.84 0.003 106.5)",
+          "oklch(0.95 0.003 106.5)"
+        ]
+      },
+      "popover": {
+        "role": "neutral",
+        "displayName": "Popover Surface",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.25 0 0)",
+          "oklch(0.35 0 0)",
+          "oklch(0.45 0 0)",
+          "oklch(0.6 0 0)",
+          "oklch(0.72 0 0)",
+          "oklch(0.84 0 0)",
+          "oklch(0.95 0 0)"
+        ]
+      },
+      "dark-popover": {
+        "role": "neutral",
+        "displayName": "Dark · Popover Surface",
+        "tonalRamp": [
+          "oklch(0.15 0.013 107.4)",
+          "oklch(0.25 0.013 107.4)",
+          "oklch(0.35 0.013 107.4)",
+          "oklch(0.45 0.013 107.4)",
+          "oklch(0.6 0.013 107.4)",
+          "oklch(0.72 0.013 107.4)",
+          "oklch(0.84 0.013 107.4)",
+          "oklch(0.95 0.013 107.4)"
+        ]
+      },
+      "popover-foreground": {
+        "role": "neutral",
+        "displayName": "Popover Text",
+        "tonalRamp": [
+          "oklch(0.15 0.006 107.1)",
+          "oklch(0.25 0.006 107.1)",
+          "oklch(0.35 0.006 107.1)",
+          "oklch(0.45 0.006 107.1)",
+          "oklch(0.6 0.006 107.1)",
+          "oklch(0.72 0.006 107.1)",
+          "oklch(0.84 0.006 107.1)",
+          "oklch(0.95 0.006 107.1)"
+        ]
+      },
+      "dark-popover-foreground": {
+        "role": "neutral",
+        "displayName": "Dark · Popover Text",
+        "tonalRamp": [
+          "oklch(0.15 0.003 106.5)",
+          "oklch(0.25 0.003 106.5)",
+          "oklch(0.35 0.003 106.5)",
+          "oklch(0.45 0.003 106.5)",
+          "oklch(0.6 0.003 106.5)",
+          "oklch(0.72 0.003 106.5)",
+          "oklch(0.84 0.003 106.5)",
+          "oklch(0.95 0.003 106.5)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Secondary Surface",
+        "tonalRamp": [
+          "oklch(0.15 0.001 286.375)",
+          "oklch(0.25 0.001 286.375)",
+          "oklch(0.35 0.001 286.375)",
+          "oklch(0.45 0.001 286.375)",
+          "oklch(0.6 0.001 286.375)",
+          "oklch(0.72 0.001 286.375)",
+          "oklch(0.84 0.001 286.375)",
+          "oklch(0.95 0.001 286.375)"
+        ]
+      },
+      "dark-secondary": {
+        "role": "neutral",
+        "displayName": "Dark · Secondary Surface",
+        "tonalRamp": [
+          "oklch(0.15 0.006 286.033)",
+          "oklch(0.25 0.006 286.033)",
+          "oklch(0.35 0.006 286.033)",
+          "oklch(0.45 0.006 286.033)",
+          "oklch(0.6 0.006 286.033)",
+          "oklch(0.72 0.006 286.033)",
+          "oklch(0.84 0.006 286.033)",
+          "oklch(0.95 0.006 286.033)"
+        ]
+      },
+      "secondary-foreground": {
+        "role": "neutral",
+        "displayName": "Secondary Text",
+        "tonalRamp": [
+          "oklch(0.15 0.006 285.885)",
+          "oklch(0.25 0.006 285.885)",
+          "oklch(0.35 0.006 285.885)",
+          "oklch(0.45 0.006 285.885)",
+          "oklch(0.6 0.006 285.885)",
+          "oklch(0.72 0.006 285.885)",
+          "oklch(0.84 0.006 285.885)",
+          "oklch(0.95 0.006 285.885)"
+        ]
+      },
+      "dark-secondary-foreground": {
+        "role": "neutral",
+        "displayName": "Dark · Secondary Text",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.25 0 0)",
+          "oklch(0.35 0 0)",
+          "oklch(0.45 0 0)",
+          "oklch(0.6 0 0)",
+          "oklch(0.72 0 0)",
+          "oklch(0.84 0 0)",
+          "oklch(0.95 0 0)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Quiet Surface",
+        "tonalRamp": [
+          "oklch(0.15 0.005 106.5)",
+          "oklch(0.25 0.005 106.5)",
+          "oklch(0.35 0.005 106.5)",
+          "oklch(0.45 0.005 106.5)",
+          "oklch(0.6 0.005 106.5)",
+          "oklch(0.72 0.005 106.5)",
+          "oklch(0.84 0.005 106.5)",
+          "oklch(0.95 0.005 106.5)"
+        ]
+      },
+      "dark-muted": {
+        "role": "neutral",
+        "displayName": "Dark · Quiet Surface",
+        "tonalRamp": [
+          "oklch(0.15 0.016 107.4)",
+          "oklch(0.25 0.016 107.4)",
+          "oklch(0.35 0.016 107.4)",
+          "oklch(0.45 0.016 107.4)",
+          "oklch(0.6 0.016 107.4)",
+          "oklch(0.72 0.016 107.4)",
+          "oklch(0.84 0.016 107.4)",
+          "oklch(0.95 0.016 107.4)"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Warm Gray Text",
+        "tonalRamp": [
+          "oklch(0.15 0.025 107.3)",
+          "oklch(0.25 0.025 107.3)",
+          "oklch(0.35 0.025 107.3)",
+          "oklch(0.45 0.025 107.3)",
+          "oklch(0.6 0.025 107.3)",
+          "oklch(0.72 0.025 107.3)",
+          "oklch(0.84 0.025 107.3)",
+          "oklch(0.95 0.025 107.3)"
+        ]
+      },
+      "dark-muted-foreground": {
+        "role": "neutral",
+        "displayName": "Dark · Warm Gray Text",
+        "tonalRamp": [
+          "oklch(0.15 0.018 106.9)",
+          "oklch(0.25 0.018 106.9)",
+          "oklch(0.35 0.018 106.9)",
+          "oklch(0.45 0.018 106.9)",
+          "oklch(0.6 0.018 106.9)",
+          "oklch(0.72 0.018 106.9)",
+          "oklch(0.84 0.018 106.9)",
+          "oklch(0.95 0.018 106.9)"
+        ]
+      },
+      "accent": {
+        "role": "neutral",
+        "displayName": "Hover Surface",
+        "tonalRamp": [
+          "oklch(0.15 0.005 106.5)",
+          "oklch(0.25 0.005 106.5)",
+          "oklch(0.35 0.005 106.5)",
+          "oklch(0.45 0.005 106.5)",
+          "oklch(0.6 0.005 106.5)",
+          "oklch(0.72 0.005 106.5)",
+          "oklch(0.84 0.005 106.5)",
+          "oklch(0.95 0.005 106.5)"
+        ]
+      },
+      "dark-accent": {
+        "role": "neutral",
+        "displayName": "Dark · Hover Surface",
+        "tonalRamp": [
+          "oklch(0.15 0.016 107.4)",
+          "oklch(0.25 0.016 107.4)",
+          "oklch(0.35 0.016 107.4)",
+          "oklch(0.45 0.016 107.4)",
+          "oklch(0.6 0.016 107.4)",
+          "oklch(0.72 0.016 107.4)",
+          "oklch(0.84 0.016 107.4)",
+          "oklch(0.95 0.016 107.4)"
+        ]
+      },
+      "accent-foreground": {
+        "role": "neutral",
+        "displayName": "Hover Text",
+        "tonalRamp": [
+          "oklch(0.15 0.013 107.4)",
+          "oklch(0.25 0.013 107.4)",
+          "oklch(0.35 0.013 107.4)",
+          "oklch(0.45 0.013 107.4)",
+          "oklch(0.6 0.013 107.4)",
+          "oklch(0.72 0.013 107.4)",
+          "oklch(0.84 0.013 107.4)",
+          "oklch(0.95 0.013 107.4)"
+        ]
+      },
+      "dark-accent-foreground": {
+        "role": "neutral",
+        "displayName": "Dark · Hover Text",
+        "tonalRamp": [
+          "oklch(0.15 0.003 106.5)",
+          "oklch(0.25 0.003 106.5)",
+          "oklch(0.35 0.003 106.5)",
+          "oklch(0.45 0.003 106.5)",
+          "oklch(0.6 0.003 106.5)",
+          "oklch(0.72 0.003 106.5)",
+          "oklch(0.84 0.003 106.5)",
+          "oklch(0.95 0.003 106.5)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "tonalRamp": [
+          "oklch(0.15 0.007 106.5)",
+          "oklch(0.25 0.007 106.5)",
+          "oklch(0.35 0.007 106.5)",
+          "oklch(0.45 0.007 106.5)",
+          "oklch(0.6 0.007 106.5)",
+          "oklch(0.72 0.007 106.5)",
+          "oklch(0.84 0.007 106.5)",
+          "oklch(0.95 0.007 106.5)"
+        ]
+      },
+      "dark-border": {
+        "role": "neutral",
+        "displayName": "Dark · Hairline",
+        "tonalRamp": [
+          "oklch(0.15 0 0 / 10%)",
+          "oklch(0.25 0 0 / 10%)",
+          "oklch(0.35 0 0 / 10%)",
+          "oklch(0.45 0 0 / 10%)",
+          "oklch(0.6 0 0 / 10%)",
+          "oklch(0.72 0 0 / 10%)",
+          "oklch(0.84 0 0 / 10%)",
+          "oklch(0.95 0 0 / 10%)"
+        ]
+      },
+      "input": {
+        "role": "neutral",
+        "displayName": "Input Stroke",
+        "tonalRamp": [
+          "oklch(0.15 0.007 106.5)",
+          "oklch(0.25 0.007 106.5)",
+          "oklch(0.35 0.007 106.5)",
+          "oklch(0.45 0.007 106.5)",
+          "oklch(0.6 0.007 106.5)",
+          "oklch(0.72 0.007 106.5)",
+          "oklch(0.84 0.007 106.5)",
+          "oklch(0.95 0.007 106.5)"
+        ]
+      },
+      "dark-input": {
+        "role": "neutral",
+        "displayName": "Dark · Input Stroke",
+        "tonalRamp": [
+          "oklch(0.15 0 0 / 15%)",
+          "oklch(0.25 0 0 / 15%)",
+          "oklch(0.35 0 0 / 15%)",
+          "oklch(0.45 0 0 / 15%)",
+          "oklch(0.6 0 0 / 15%)",
+          "oklch(0.72 0 0 / 15%)",
+          "oklch(0.84 0 0 / 15%)",
+          "oklch(0.95 0 0 / 15%)"
+        ]
+      },
+      "ring": {
+        "role": "neutral",
+        "displayName": "Focus Ring",
+        "tonalRamp": [
+          "oklch(0.15 0.021 106.9)",
+          "oklch(0.25 0.021 106.9)",
+          "oklch(0.35 0.021 106.9)",
+          "oklch(0.45 0.021 106.9)",
+          "oklch(0.6 0.021 106.9)",
+          "oklch(0.72 0.021 106.9)",
+          "oklch(0.84 0.021 106.9)",
+          "oklch(0.95 0.021 106.9)"
+        ]
+      },
+      "dark-ring": {
+        "role": "neutral",
+        "displayName": "Dark · Focus Ring",
+        "tonalRamp": [
+          "oklch(0.15 0.031 107.3)",
+          "oklch(0.25 0.031 107.3)",
+          "oklch(0.35 0.031 107.3)",
+          "oklch(0.45 0.031 107.3)",
+          "oklch(0.6 0.031 107.3)",
+          "oklch(0.72 0.031 107.3)",
+          "oklch(0.84 0.031 107.3)",
+          "oklch(0.95 0.031 107.3)"
+        ]
+      },
+      "destructive": {
+        "role": "status",
+        "displayName": "Alert Red",
+        "tonalRamp": [
+          "oklch(0.15 0.245 27.325)",
+          "oklch(0.25 0.245 27.325)",
+          "oklch(0.35 0.245 27.325)",
+          "oklch(0.45 0.245 27.325)",
+          "oklch(0.6 0.245 27.325)",
+          "oklch(0.72 0.245 27.325)",
+          "oklch(0.84 0.245 27.325)",
+          "oklch(0.95 0.245 27.325)"
+        ]
+      },
+      "dark-destructive": {
+        "role": "status",
+        "displayName": "Dark · Alert Red",
+        "tonalRamp": [
+          "oklch(0.15 0.191 22.216)",
+          "oklch(0.25 0.191 22.216)",
+          "oklch(0.35 0.191 22.216)",
+          "oklch(0.45 0.191 22.216)",
+          "oklch(0.6 0.191 22.216)",
+          "oklch(0.72 0.191 22.216)",
+          "oklch(0.84 0.191 22.216)",
+          "oklch(0.95 0.191 22.216)"
+        ]
+      },
+      "chart-2": {
+        "role": "status",
+        "displayName": "Completion Rose",
+        "tonalRamp": [
+          "oklch(0.15 0.246 16.439)",
+          "oklch(0.25 0.246 16.439)",
+          "oklch(0.35 0.246 16.439)",
+          "oklch(0.45 0.246 16.439)",
+          "oklch(0.6 0.246 16.439)",
+          "oklch(0.72 0.246 16.439)",
+          "oklch(0.84 0.246 16.439)",
+          "oklch(0.95 0.246 16.439)"
+        ]
+      },
+      "dark-chart-2": {
+        "role": "status",
+        "displayName": "Dark · Completion Rose",
+        "tonalRamp": [
+          "oklch(0.15 0.246 16.439)",
+          "oklch(0.25 0.246 16.439)",
+          "oklch(0.35 0.246 16.439)",
+          "oklch(0.45 0.246 16.439)",
+          "oklch(0.6 0.246 16.439)",
+          "oklch(0.72 0.246 16.439)",
+          "oklch(0.84 0.246 16.439)",
+          "oklch(0.95 0.246 16.439)"
+        ]
+      },
+      "primary-text": {
+        "role": "primary",
+        "displayName": "Muted Petrol Text",
+        "tonalRamp": [
+          "oklch(0.15 0.105 223.128)",
+          "oklch(0.25 0.105 223.128)",
+          "oklch(0.35 0.105 223.128)",
+          "oklch(0.45 0.105 223.128)",
+          "oklch(0.6 0.105 223.128)",
+          "oklch(0.72 0.105 223.128)",
+          "oklch(0.84 0.105 223.128)",
+          "oklch(0.95 0.105 223.128)"
+        ]
+      },
+      "completion-text": {
+        "role": "status",
+        "displayName": "Completion Rose Text",
+        "tonalRamp": [
+          "oklch(0.15 0.18 16.439)",
+          "oklch(0.25 0.18 16.439)",
+          "oklch(0.35 0.18 16.439)",
+          "oklch(0.45 0.18 16.439)",
+          "oklch(0.6 0.18 16.439)",
+          "oklch(0.72 0.18 16.439)",
+          "oklch(0.84 0.18 16.439)",
+          "oklch(0.95 0.18 16.439)"
+        ]
+      },
+      "destructive-text": {
+        "role": "status",
+        "displayName": "Alert Text",
+        "tonalRamp": [
+          "oklch(0.15 0.2 27.325)",
+          "oklch(0.25 0.2 27.325)",
+          "oklch(0.35 0.2 27.325)",
+          "oklch(0.45 0.2 27.325)",
+          "oklch(0.6 0.2 27.325)",
+          "oklch(0.72 0.2 27.325)",
+          "oklch(0.84 0.2 27.325)",
+          "oklch(0.95 0.2 27.325)"
+        ]
+      },
+      "dark-primary-text": {
+        "role": "primary",
+        "displayName": "Dark · Muted Petrol Text",
+        "tonalRamp": [
+          "oklch(0.15 0.1 224.283)",
+          "oklch(0.25 0.1 224.283)",
+          "oklch(0.35 0.1 224.283)",
+          "oklch(0.45 0.1 224.283)",
+          "oklch(0.6 0.1 224.283)",
+          "oklch(0.72 0.1 224.283)",
+          "oklch(0.84 0.1 224.283)",
+          "oklch(0.95 0.1 224.283)"
+        ]
+      },
+      "dark-completion-text": {
+        "role": "status",
+        "displayName": "Dark · Completion Rose Text",
+        "tonalRamp": [
+          "oklch(0.15 0.14 16.439)",
+          "oklch(0.25 0.14 16.439)",
+          "oklch(0.35 0.14 16.439)",
+          "oklch(0.45 0.14 16.439)",
+          "oklch(0.6 0.14 16.439)",
+          "oklch(0.72 0.14 16.439)",
+          "oklch(0.84 0.14 16.439)",
+          "oklch(0.95 0.14 16.439)"
+        ]
+      },
+      "dark-destructive-text": {
+        "role": "status",
+        "displayName": "Dark · Alert Text",
+        "tonalRamp": [
+          "oklch(0.15 0.12 22.216)",
+          "oklch(0.25 0.12 22.216)",
+          "oklch(0.35 0.12 22.216)",
+          "oklch(0.45 0.12 22.216)",
+          "oklch(0.6 0.12 22.216)",
+          "oklch(0.72 0.12 22.216)",
+          "oklch(0.84 0.12 22.216)",
+          "oklch(0.95 0.12 22.216)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "display",
+        "purpose": "Small-screen role; see DESIGN.md for responsive overrides."
+      },
+      "headline": {
+        "displayName": "headline",
+        "purpose": "Small-screen role; see DESIGN.md for responsive overrides."
+      },
+      "title": {
+        "displayName": "title",
+        "purpose": "Workflow and control titles at 1rem / 800, rising to 1.125rem on wide screens."
+      },
+      "body": {
+        "displayName": "body",
+        "purpose": "Reading prose at 1rem / 1.625, max 65ch. Chinese explanations use 1.7 leading and max 36ic."
+      },
+      "ui-body": {
+        "displayName": "ui-body",
+        "purpose": "Stable 1rem instructions at 1.625 leading; compact labels and metadata remain separate roles."
+      },
+      "label": {
+        "displayName": "label",
+        "purpose": "Small-screen role; see DESIGN.md for responsive overrides."
+      },
+      "caption": {
+        "displayName": "caption",
+        "purpose": "Small-screen role; see DESIGN.md for responsive overrides."
+      },
+      "overline": {
+        "displayName": "overline",
+        "purpose": "Small-screen role; see DESIGN.md for responsive overrides."
+      },
+      "zh-body": {
+        "displayName": "zh-body",
+        "purpose": "Locale-specific family override; sizes inherit component rules."
+      },
+      "panel-title": {
+        "displayName": "panel-title",
+        "purpose": "Panel headings at 1.125rem / 700, rising to 1.25rem on wide screens; balanced wrapping."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-ring",
+        "value": "0 0 0 1px color-mix(in oklab, var(--foreground, oklch(0.153 0.006 107.1)) 10%, transparent)",
+        "purpose": "Card boundary, not cast elevation."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px color-mix(in oklab, var(--ring, oklch(0.48 0.105 223.128)) 50%, transparent)",
+        "purpose": "Keyboard focus on controls."
+      },
+      {
+        "name": "shadow-sm",
+        "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        "purpose": "Selected default tab in library and metadata image preview."
+      },
+      {
+        "name": "shadow-xl",
+        "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+        "purpose": "Fixed locale suggestion overlay."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-duration",
+        "value": "150ms",
+        "purpose": "Tailwind default for transitions."
+      },
+      {
+        "name": "state-easing",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default state-transition easing."
+      },
+      {
+        "name": "loading-spin",
+        "value": "spin 1s linear infinite",
+        "purpose": "Busy indicators."
+      },
+      {
+        "name": "loading-pulse",
+        "value": "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "purpose": "Skeleton loading."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "Under prefers-reduced-motion: reduce, animations run once, transitions are near-instant, and scrolling is not smoothed."
+      },
+      {
+        "name": "preview-frame-arrival",
+        "value": "460ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "One frame trace after the processed image loads. The image remains visible. Reduced motion uses a static frame."
+      },
+      {
+        "name": "upload-feedback",
+        "value": "120ms ease-out",
+        "purpose": "Border and background acknowledge drag and keyboard focus."
+      },
+      {
+        "name": "upload-icon-feedback",
+        "value": "160ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Drag compresses the upload icon to 0.94 scale; no movement with reduced motion."
+      },
+      {
+        "name": "progress-fill",
+        "value": "200ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Transform-only transition; progress semantics reflect the actual value immediately."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "40rem"
+      },
+      {
+        "name": "md",
+        "value": "48rem"
+      },
+      {
+        "name": "lg",
+        "value": "64rem"
+      },
+      {
+        "name": "xl",
+        "value": "80rem"
+      },
+      {
+        "name": "2xl",
+        "value": "96rem"
+      },
+      {
+        "name": "sticky-uploader",
+        "value": "1439px",
+        "purpose": "Applies only when the viewport is at least 700px tall."
+      },
+      {
+        "name": "wide-display",
+        "value": "1800px"
+      },
+      {
+        "name": "workspace-actions-wrap",
+        "value": "28rem",
+        "purpose": "Workspace container width; stack actions below this threshold."
+      },
+      {
+        "name": "signal-tiles",
+        "value": "30rem",
+        "purpose": "Signal panel container width for two columns."
+      },
+      {
+        "name": "comparison-previews",
+        "value": "40rem",
+        "purpose": "Comparison container width for two previews."
+      },
+      {
+        "name": "verification-cells",
+        "value": "48rem",
+        "purpose": "Verification container width for three cells."
+      },
+      {
+        "name": "workspace-analysis",
+        "value": "52rem",
+        "purpose": "Available container width for two analysis panels and horizontal action layout."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Existing primary variant at its default primitive size; workflow overrides are documented in DESIGN.md.",
+      "html": "<button type=\"button\" class=\"ds-btn-primary\">Download JPEG</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:0;background:transparent;color:var(--foreground, oklch(0.153 0.006 107.1));font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:.875rem;font-weight:500;line-height:1.428571;white-space:nowrap;cursor:pointer;outline:none;transition:all 150ms cubic-bezier(.4,0,.2,1);background:var(--primary, oklch(0.52 0.105 223.128));color:var(--primary-foreground, oklch(0.984 0.019 200.873));}.ds-btn-primary:focus-visible{outline:2px solid var(--ring, oklch(0.48 0.105 223.128));outline-offset:2px;}.ds-btn-primary:active:not([aria-haspopup]){transform:translateY(1px)}.ds-btn-primary:disabled{pointer-events:none;opacity:.5}.ds-btn-primary:hover{background:color-mix(in oklab, var(--primary, oklch(0.52 0.105 223.128)) 95%, transparent)}@media(any-pointer:coarse),(max-width:639px){.ds-btn-primary{min-width:44px;min-height:44px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Existing outline variant at its default primitive size; workflow overrides are documented in DESIGN.md.",
+      "html": "<button type=\"button\" class=\"ds-btn-outline\">Reset</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:0;background:transparent;color:var(--foreground, oklch(0.153 0.006 107.1));font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:.875rem;font-weight:500;line-height:1.428571;white-space:nowrap;cursor:pointer;outline:none;transition:all 150ms cubic-bezier(.4,0,.2,1);background:var(--background, oklch(1 0 0));border-color:var(--border, oklch(0.93 0.007 106.5));}.ds-btn-outline:hover{background:var(--muted, oklch(0.966 0.005 106.5));color:var(--foreground, oklch(0.153 0.006 107.1));}.ds-btn-outline:focus-visible{outline:2px solid var(--ring, oklch(0.48 0.105 223.128));outline-offset:2px;}.ds-btn-outline:active:not([aria-haspopup]){transform:translateY(1px)}.ds-btn-outline:disabled{pointer-events:none;opacity:.5}:host-context(.dark) .ds-btn-outline{background:color-mix(in oklab, var(--input, oklch(0.93 0.007 106.5)) 30%, transparent);border-color:var(--input, oklch(0.93 0.007 106.5))}:host-context(.dark) .ds-btn-outline:hover{background:color-mix(in oklab, var(--input, oklch(0.93 0.007 106.5)) 50%, transparent)}.ds-btn-outline[aria-expanded=\"true\"]{background:var(--muted, oklch(0.966 0.005 106.5));color:var(--foreground, oklch(0.153 0.006 107.1));}@media(any-pointer:coarse),(max-width:639px){.ds-btn-outline{min-width:44px;min-height:44px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Existing secondary variant at its default primitive size; workflow overrides are documented in DESIGN.md.",
+      "html": "<button type=\"button\" class=\"ds-btn-secondary\">ing.norante</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:0;background:transparent;color:var(--foreground, oklch(0.153 0.006 107.1));font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:.875rem;font-weight:500;line-height:1.428571;white-space:nowrap;cursor:pointer;outline:none;transition:all 150ms cubic-bezier(.4,0,.2,1);background:var(--secondary, oklch(0.967 0.001 286.375));color:var(--secondary-foreground, oklch(0.21 0.006 285.885));}.ds-btn-secondary:hover{background:color-mix(in oklab, var(--secondary, oklch(0.967 0.001 286.375)) 80%, transparent);}.ds-btn-secondary:focus-visible{outline:2px solid var(--ring, oklch(0.48 0.105 223.128));outline-offset:2px;}.ds-btn-secondary:active:not([aria-haspopup]){transform:translateY(1px)}.ds-btn-secondary:disabled{pointer-events:none;opacity:.5}.ds-btn-secondary[aria-expanded=\"true\"]{background:color-mix(in oklab, var(--secondary, oklch(0.967 0.001 286.375)) 100%, transparent);}@media(any-pointer:coarse),(max-width:639px){.ds-btn-secondary{min-width:44px;min-height:44px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Existing ghost variant at its default primitive size; workflow overrides are documented in DESIGN.md.",
+      "html": "<button type=\"button\" class=\"ds-btn-ghost\">简体中文</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:0;background:transparent;color:var(--foreground, oklch(0.153 0.006 107.1));font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:.875rem;font-weight:500;line-height:1.428571;white-space:nowrap;cursor:pointer;outline:none;transition:all 150ms cubic-bezier(.4,0,.2,1);}.ds-btn-ghost:hover{background:var(--muted, oklch(0.966 0.005 106.5));color:var(--foreground, oklch(0.153 0.006 107.1));}.ds-btn-ghost:focus-visible{outline:2px solid var(--ring, oklch(0.48 0.105 223.128));outline-offset:2px;}.ds-btn-ghost:active:not([aria-haspopup]){transform:translateY(1px)}.ds-btn-ghost:disabled{pointer-events:none;opacity:.5}:host-context(.dark) .ds-btn-ghost:hover{background:color-mix(in oklab, var(--muted, oklch(0.966 0.005 106.5)) 50%, transparent)}.ds-btn-ghost[aria-expanded=\"true\"]{background:var(--muted, oklch(0.966 0.005 106.5));color:var(--foreground, oklch(0.153 0.006 107.1));}@media(any-pointer:coarse),(max-width:639px){.ds-btn-ghost{min-width:44px;min-height:44px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Existing destructive variant at its default primitive size; workflow overrides are documented in DESIGN.md.",
+      "html": "<button type=\"button\" class=\"ds-btn-destructive\">Cancel</button>",
+      "css": ".ds-btn-destructive{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:0;background:transparent;color:var(--foreground, oklch(0.153 0.006 107.1));font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:.875rem;font-weight:500;line-height:1.428571;white-space:nowrap;cursor:pointer;outline:none;transition:all 150ms cubic-bezier(.4,0,.2,1);background:color-mix(in oklab, var(--destructive, oklch(0.577 0.245 27.325)) 10%, transparent);color:var(--destructive-text, oklch(0.49 0.2 27.325));}.ds-btn-destructive:hover{background:color-mix(in oklab, var(--destructive, oklch(0.577 0.245 27.325)) 20%, transparent);}.ds-btn-destructive:focus-visible{outline:2px solid var(--ring, oklch(0.48 0.105 223.128));outline-offset:2px;}.ds-btn-destructive:active:not([aria-haspopup]){transform:translateY(1px)}.ds-btn-destructive:disabled{pointer-events:none;opacity:.5}.ds-btn-destructive:focus-visible{outline:2px solid var(--ring, oklch(0.48 0.105 223.128));outline-offset:2px;}:host-context(.dark) .ds-btn-destructive{background:color-mix(in oklab, var(--destructive, oklch(0.577 0.245 27.325)) 20%, transparent)}:host-context(.dark) .ds-btn-destructive:hover{background:color-mix(in oklab, var(--destructive, oklch(0.577 0.245 27.325)) 30%, transparent)}:host-context(.dark) .ds-btn-destructive:focus-visible{outline:2px solid var(--ring, oklch(0.48 0.105 223.128));outline-offset:2px;}@media(any-pointer:coarse),(max-width:639px){.ds-btn-destructive{min-width:44px;min-height:44px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}"
+    },
+    {
+      "name": "Link Button",
+      "kind": "button",
+      "refersTo": "button-link",
+      "description": "Existing link variant at its default primitive size; workflow overrides are documented in DESIGN.md.",
+      "html": "<button type=\"button\" class=\"ds-btn-link\">Feedback</button>",
+      "css": ".ds-btn-link{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:0;background:transparent;color:var(--foreground, oklch(0.153 0.006 107.1));font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:.875rem;font-weight:500;line-height:1.428571;white-space:nowrap;cursor:pointer;outline:none;transition:all 150ms cubic-bezier(.4,0,.2,1);color:var(--primary-text, oklch(0.48 0.105 223.128));text-decoration:none;text-underline-offset:4px;}.ds-btn-link:hover{text-decoration:underline;}.ds-btn-link:focus-visible{outline:2px solid var(--ring, oklch(0.48 0.105 223.128));outline-offset:2px;}.ds-btn-link:active:not([aria-haspopup]){transform:translateY(1px)}.ds-btn-link:disabled{pointer-events:none;opacity:.5}@media(any-pointer:coarse),(max-width:639px){.ds-btn-link{min-width:44px;min-height:44px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Existing library primitive; not currently used in the image workflow.",
+      "html": "<input class=\"ds-input\" aria-label=\"Text field\" placeholder=\"Text field\">",
+      "css": ".ds-input{display:block;width:100%;min-width:0;height:2rem;padding:.25rem .625rem;border:1px solid var(--input, oklch(0.93 0.007 106.5));border-radius:0;background:transparent;color:var(--foreground, oklch(0.153 0.006 107.1));font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:1rem;outline:none;transition:color 150ms,background-color 150ms,border-color 150ms,box-shadow 150ms}.ds-input::placeholder{color:var(--muted-foreground, oklch(0.44 0.025 107.3))}.ds-input:focus-visible{border-color:var(--ring, oklch(0.48 0.105 223.128));box-shadow:0 0 0 3px color-mix(in oklab, var(--ring, oklch(0.48 0.105 223.128)) 50%, transparent);}.ds-input:disabled{pointer-events:none;cursor:not-allowed;opacity:.5;background:color-mix(in oklab, var(--input, oklch(0.93 0.007 106.5)) 50%, transparent)}.ds-input[aria-invalid=\"true\"]{border-color:var(--destructive, oklch(0.577 0.245 27.325));box-shadow:0 0 0 3px color-mix(in oklab, var(--destructive, oklch(0.577 0.245 27.325)) 20%, transparent)}:host-context(.dark) .ds-input{background:color-mix(in oklab, var(--input, oklch(0.93 0.007 106.5)) 30%, transparent)}:host-context(.dark) .ds-input:disabled{background:color-mix(in oklab, var(--input, oklch(0.93 0.007 106.5)) 80%, transparent)}:host-context(.dark) .ds-input[aria-invalid=\"true\"]{border-color:color-mix(in oklab, var(--destructive, oklch(0.577 0.245 27.325)) 50%, transparent);box-shadow:0 0 0 3px color-mix(in oklab, var(--destructive, oklch(0.577 0.245 27.325)) 40%, transparent)}@media(min-width:48rem){.ds-input{font-size:.875rem}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}"
+    },
+    {
+      "name": "Language Navigation",
+      "kind": "nav",
+      "refersTo": "language-navigation",
+      "description": "Selected primary link and inactive ghost link in the existing bordered language group.",
+      "html": "<nav class=\"ds-language\" aria-label=\"Language\"><a class=\"ds-language-link\" href=\"/\" aria-current=\"page\" lang=\"en\">EN</a><a class=\"ds-language-link\" href=\"/zh-hans/\" lang=\"zh-Hans\">简体中文</a></nav>",
+      "css": ".ds-language{display:flex;width:fit-content;align-self:flex-end;border:1px solid var(--border, oklch(0.93 0.007 106.5))}.ds-language-link{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:.375rem;height:2rem;padding:0 .625rem;border:1px solid transparent;border-radius:0;background:transparent;color:var(--foreground, oklch(0.153 0.006 107.1));font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:.875rem;font-weight:500;line-height:1.428571;white-space:nowrap;cursor:pointer;outline:none;transition:all 150ms cubic-bezier(.4,0,.2,1);height:1.75rem;padding:0 .75rem;border:0;font-size:.8rem;font-weight:900;text-decoration:none}.ds-language-link[aria-current=\"page\"]{background:var(--primary, oklch(0.52 0.105 223.128));color:var(--primary-foreground, oklch(0.984 0.019 200.873))}.ds-language-link:hover{background:var(--muted, oklch(0.966 0.005 106.5))}.ds-language-link[aria-current=\"page\"]:hover{background:color-mix(in oklab, var(--primary, oklch(0.52 0.105 223.128)) 95%, transparent)}.ds-language-link:focus-visible{outline:2px solid var(--ring, oklch(0.48 0.105 223.128));outline-offset:2px;}.ds-language-link:active:not([aria-haspopup]){transform:translateY(1px)}.ds-language-link:disabled{pointer-events:none;opacity:.5}:host-context(.dark) .ds-language-link:not([aria-current]):hover{background:color-mix(in oklab, var(--muted, oklch(0.966 0.005 106.5)) 50%, transparent)}@media(any-pointer:coarse),(max-width:639px){.ds-language-link{min-width:44px;min-height:44px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Default card, including title, description, and an inset content region.",
+      "html": "<section class=\"ds-card\"><header class=\"ds-card-header\"><h3 class=\"ds-card-title\">Before / after verification</h3><p class=\"ds-card-description\">The JPEG output is rechecked locally after processing.</p></header><div class=\"ds-card-content\">Metadata · Visible watermark · Hidden watermark</div></section>",
+      "css": ".ds-card{display:flex;flex-direction:column;gap:1rem;overflow:hidden;padding:1rem 0;border-radius:0;background:var(--card, oklch(1 0 0));color:var(--card-foreground, oklch(0.153 0.006 107.1));box-shadow:0 0 0 1px color-mix(in oklab, var(--foreground, oklch(0.153 0.006 107.1)) 10%, transparent);font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:.875rem}.ds-card-header{display:grid;gap:.25rem;padding:0 1rem}.ds-card-title{margin:0;font-family:var(--locale-font-heading,\"Geist Mono Variable\", monospace);font-size:1.125rem;font-weight:700;line-height:1.375;text-wrap:balance}.ds-card-description{margin:0;color:var(--muted-foreground, oklch(0.44 0.025 107.3));font-size:1rem;line-height:1.625;max-width:65ch;text-wrap:pretty}.ds-card-content{padding:0 1rem}@media(min-width:40rem){.ds-card{font-size:1rem}.ds-card-title{font-size:1.125rem}.ds-card-description{font-size:1rem}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}@media(min-width:96rem){.ds-card-title{font-size:1.25rem}}:host-context([data-locale=\"zh-Hans\"]) .ds-card-description{line-height:1.7;max-inline-size:36ic}"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Default badge primitive; pipeline-specific status colors and stronger type are documented separately.",
+      "html": "<span class=\"ds-badge\">high</span>",
+      "css": ".ds-badge{display:inline-flex;width:fit-content;align-items:center;justify-content:center;gap:.25rem;height:1.5rem;padding:.125rem .625rem;border:1px solid transparent;border-radius:0;background:var(--primary, oklch(0.52 0.105 223.128));color:var(--primary-foreground, oklch(0.984 0.019 200.873));font-family:var(--locale-font-body, \"Geist Mono Variable\", monospace);font-size:.75rem;font-weight:500;white-space:nowrap;transition:all 150ms cubic-bezier(.4,0,.2,1)}a.ds-badge:hover{background:color-mix(in oklab, var(--primary, oklch(0.52 0.105 223.128)) 95%, transparent)}.ds-badge:focus-visible{border-color:var(--ring, oklch(0.48 0.105 223.128));box-shadow:0 0 0 3px color-mix(in oklab, var(--ring, oklch(0.48 0.105 223.128)) 50%, transparent);}@media(min-width:40rem){.ds-badge{height:1.75rem;padding-left:.75rem;padding-right:.75rem;font-size:.875rem}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Image Workbench",
+    "overview": "Unmarker.it is bold, utilitarian, and assertive. The Image Workbench describes a practical arrangement of tools, visible steps, and clear results. Heavy monospaced headings establish identity; square controls, restrained color, and explicit status labels make the working areas legible.\n\nThe composition combines generous space around the image workspace with compact analysis panels. Muted Petrol Blue identifies primary actions and active processing. Light and dark themes use the same structure, while Simplified Chinese substitutes a system sans-serif stack and more accommodating text rhythm. Components are bold, utilitarian, and assertive.",
+    "keyCharacteristics": [
+      "Heavy monospaced English typography with a distinct Chinese text stack.",
+      "Square controls, outlined groups, and a dashed image-selection boundary.",
+      "Muted Petrol Blue actions against warm neutrals; rose completion signals.",
+      "Fluid page width, stacked small-screen content, and a wide two-column workspace."
+    ],
+    "rules": [
+      {
+        "name": "Semantic Color",
+        "body": "Use the existing semantic color variables; active processing, completion, and errors have distinct implemented treatments.",
+        "section": "colors"
+      },
+      {
+        "name": "Locale-Aware Type",
+        "body": "Preserve the Chinese font and line-height overrides; keep the Latin product wordmark in Geist Mono.",
+        "section": "typography"
+      },
+      {
+        "name": "Flat Work Surface",
+        "body": "Keep working panels flat, separated by borders, rings, and tonal changes. Reserve cast shadows for the existing overlays and specific component states.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve semantic color roles in both light and dark themes.",
+      "Do use the existing locale-aware font stacks and responsive rem-based sizing.",
+      "Do keep primary working panels square, with borders or tonal separation.",
+      "Do pair status color with the existing labels and icons.",
+      "Do keep image previews contained without cropping and retain the working layout’s responsive ordering.",
+      "Do retain visible keyboard focus and the documented hover, pressed, disabled, and invalid states."
+    ],
+    "donts": [
+      "Don’t replace the implemented palette with generic success-green or error-red assumptions; completion currently uses chart-2.",
+      "Don’t replace the Chinese font stack with the Latin-only bundled font.",
+      "Don’t infer a uniform pixel scale from rem values; the root font size changes at two viewport thresholds.",
+      "Don’t turn the square interface into rounded cards or pill buttons during routine extensions.",
+      "Don’t invent a navigation sidebar, decorative background imagery, or a new display font when reproducing this system.",
+      "Don’t treat generated tonal ramps as additional approved application colors."
+    ]
+  }
+}

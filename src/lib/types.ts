@@ -148,8 +148,8 @@ export interface HiddenWatermarkAudit {
 }
 
 export interface AiProvenanceScore {
-  percentage: number;
-  kind: "strong" | "metadata" | "visible" | "none";
+  percentage: number | null;
+  kind: "strong" | "metadata" | "visible" | "none" | "incomplete";
   provider: string | null;
   evidence: MessageDescriptor[];
   confidence: "high" | "medium" | "low";

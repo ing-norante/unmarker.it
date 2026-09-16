@@ -1,52 +1,52 @@
 export const homepage = {
   header: {
     product: "AI Watermark Remover",
-    tagline: "Analyze, remove, and verify AI watermarks.",
-    clientSide: "100% client-side.",
-    privacy: "Your image stays in your browser.",
-    private: "100% Private",
-    fast: "Blazing Fast",
-    noUploads: "No Uploads",
+    tagline: "Analyze, process, and check your image.",
+    clientSide: "Processed in your browser.",
+    privacy: "No uploads needed.",
+    private: "Images Stay Local",
+    fast: "No Account Needed",
+    noUploads: "No Image Uploads",
   },
   workflowHeading: "WORKFLOW",
   uploader: {
-    title: "Drag an image",
+    title: "Add an image",
     dragging: "Drop your image",
     description:
-      "Drop it here to analyze local AI signals, then remove watermarks automatically when processing is available.",
+      "Choose or drop an image to analyze it and start processing automatically when supported.",
     defaultDescription: "Drop it here, or click to select a file from your device.",
-    privacy: "Your image is never uploaded. Everything runs locally in your browser.",
+    privacy: "Your image is processed in this browser and is never uploaded.",
   },
   loading: {
     preparing: "Preparing {{fileName}}",
-    description: "Loading the local image workflow...",
+    description: "Loading the image tools...",
   },
   loadError: {
-    title: "Update available",
+    title: "Could not load image tools",
     description:
-      "This tab is out of date after a new release. Reload the page to continue.",
+      "Check your connection and reload the page. This can happen after a site update.",
     action: "Reload",
   },
   facts: {
     eyebrow: "Core facts",
-    heading: "Client-side AI watermark analysis and removal, with no image uploads.",
+    heading: "Work on AI watermarks without uploading your image.",
     introduction:
-      "Unmarker.it is a privacy-first browser tool that neutralizes invisible AI watermark signals embedded in images - no uploads, no servers, no data leaving your device. Built on adversarial disruption techniques from recent computer vision research, it applies targeted, mathematically precise perturbations directly in your browser to break machine-readable watermark patterns without visible degradation.",
+      "Unmarker.it checks for AI clues in your image, attempts to remove visible Gemini / Nano Banana sparkle marks, and applies changes designed to disrupt hidden watermarks. Hidden-watermark removal cannot be confirmed by this tool.",
     browser: {
       title: "Images stay in the browser",
-      body: "Unmarker.it processes browser-decodable images locally with Canvas API operations. There are no processing uploads, server-side image endpoints, or account requirements.",
+      body: "Image analysis and processing happen in your browser. No account or image upload is needed. When analytics is enabled, the site sends usage and error events.",
     },
     workflow: {
-      title: "Analyze, remove, verify",
-      body: "Upload once: Unmarker.it scans metadata and visible marks, runs the local watermark disruption pipeline when possible, then checks the generated JPEG again.",
+      title: "Analyze, process, check",
+      body: "Choose an image once. The tool reads metadata (information stored in the file), checks for a Gemini sparkle mark, processes supported images, then checks the JPEG output again.",
     },
     formats: {
       title: "Supported files and output",
-      body: "Processing accepts browser-readable image files up to 40 megapixels and 25 MB. Analysis-only supports PNG, JPEG, WebP, AVIF, HEIF, and JXL metadata.",
+      body: "Process browser-readable images up to 40 megapixels and 25 MB. The output is a compressed JPEG and may lose detail. PNG, JPEG, WebP, AVIF, HEIF, and JXL also support metadata analysis when image processing is unavailable.",
     },
     responsible: {
-      title: "Designed for honest testing",
-      body: "Results depend on the watermarking method, detector, input image, compression level, and downstream reuse. The tool is meant for privacy research, robustness testing, personal media workflows, and education.",
+      title: "Check the result before using it",
+      body: "Compare the original and processed image before downloading. Results vary by image and watermark method; processing does not guarantee that a watermark is removed or undetectable.",
     },
   },
 } as const;

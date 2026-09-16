@@ -39,6 +39,7 @@ function App() {
 function AppContent() {
   const { t } = useTranslation(["homepage", "workflow"]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [focusUploader, setFocusUploader] = useState(false);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
   );
@@ -52,6 +53,7 @@ function AppContent() {
     }
 
     setStatusMessage(null);
+    setFocusUploader(false);
     setSelectedFile(file);
   }, []);
 
@@ -62,7 +64,10 @@ function AppContent() {
           <WorkflowApp
             key={`${selectedFile.name}:${selectedFile.size}:${selectedFile.lastModified}`}
             initialFile={selectedFile}
-            onResetToShell={() => setSelectedFile(null)}
+            onResetToShell={() => {
+              setFocusUploader(true);
+              setSelectedFile(null);
+            }}
           />
         </Suspense>
       </ChunkErrorBoundary>
@@ -109,6 +114,7 @@ function AppContent() {
 
               <div className="flex min-h-[min(62vh,50rem)] flex-col lg:min-h-[min(70vh,50rem)] lg:flex-1 2xl:min-h-[min(72vh,56rem)]">
                 <ImageUploader
+                  autoFocus={focusUploader}
                   onImageSelect={selectImage}
                   accept={filePolicy.accept}
                   title={t("homepage:uploader.title")}

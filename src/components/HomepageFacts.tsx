@@ -14,11 +14,11 @@ export function HomepageFacts() {
           <p className="text-muted-foreground text-ui-overline">{t("facts.eyebrow")}</p>
           <h2
             id="homepage-facts-heading"
-            className="locale-facts-heading text-foreground text-2xl leading-tight font-black sm:text-3xl xl:text-4xl 2xl:text-5xl"
+            className="locale-facts-heading text-foreground text-2xl leading-snug font-black text-balance sm:text-3xl xl:text-4xl 2xl:text-5xl"
           >
             {t("facts.heading")}
           </h2>
-          <p className="text-muted-foreground text-sm leading-relaxed font-medium sm:text-base 2xl:text-lg">
+          <p className="text-muted-foreground text-reading">
             {t("facts.introduction")}
           </p>
         </div>
@@ -29,10 +29,10 @@ export function HomepageFacts() {
               key={fact}
               className="bg-card text-card-foreground flex flex-col gap-2 border p-4 2xl:p-5"
             >
-              <h3 className="locale-fact-title text-base leading-tight font-black sm:text-lg 2xl:text-2xl">
+              <h3 className="locale-fact-title text-lg leading-snug font-bold text-balance 2xl:text-xl">
                 {t(`facts.${fact}.title`)}
               </h3>
-              <p className="text-muted-foreground text-sm leading-relaxed font-medium sm:text-base 2xl:text-lg">
+              <p className="text-muted-foreground text-reading">
                 {t(`facts.${fact}.body`)}
               </p>
             </article>

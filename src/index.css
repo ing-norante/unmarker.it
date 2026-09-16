@@ -29,6 +29,8 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-text: var(--primary-text);
+  --color-completion-text: var(--completion-text);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -37,6 +39,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-text: var(--destructive-text);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -73,6 +76,8 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.153 0.006 107.1);
   --primary: oklch(0.52 0.105 223.128);
+  --primary-text: oklch(0.48 0.105 223.128);
+  --completion-text: oklch(0.49 0.18 16.439);
   --primary-foreground: oklch(0.984 0.019 200.873);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
@@ -81,9 +86,10 @@
   --accent: oklch(0.966 0.005 106.5);
   --accent-foreground: oklch(0.228 0.013 107.4);
   --destructive: oklch(0.577 0.245 27.325);
+  --destructive-text: oklch(0.49 0.2 27.325);
   --border: oklch(0.93 0.007 106.5);
   --input: oklch(0.93 0.007 106.5);
-  --ring: oklch(0.737 0.021 106.9);
+  --ring: oklch(0.48 0.105 223.128);
   --chart-1: oklch(0.81 0.117 11.638);
   --chart-2: oklch(0.645 0.246 16.439);
   --chart-3: oklch(0.586 0.253 17.585);
@@ -107,6 +113,8 @@
   --popover: oklch(0.228 0.013 107.4);
   --popover-foreground: oklch(0.988 0.003 106.5);
   --primary: oklch(0.45 0.085 224.283);
+  --primary-text: oklch(0.76 0.1 224.283);
+  --completion-text: oklch(0.78 0.14 16.439);
   --primary-foreground: oklch(0.984 0.019 200.873);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
@@ -115,9 +123,10 @@
   --accent: oklch(0.286 0.016 107.4);
   --accent-foreground: oklch(0.988 0.003 106.5);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-text: oklch(0.82 0.12 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.58 0.031 107.3);
+  --ring: oklch(0.76 0.1 224.283);
   --chart-1: oklch(0.81 0.117 11.638);
   --chart-2: oklch(0.645 0.246 16.439);
   --chart-3: oklch(0.586 0.253 17.585);
@@ -140,7 +149,7 @@
 
   html {
     @apply scroll-smooth font-sans antialiased;
-    font-size: 15px;
+    font-size: 100%;
   }
 
   body {
@@ -161,21 +170,16 @@ html[data-locale="zh-Hans"] .wide-hero-title { font-size: clamp(3rem, 6vw, 6.5re
 html[data-locale="zh-Hans"] .locale-hero-subtitle { font-size: clamp(1.5rem, 3vw, 3rem); line-height: 1.25; }
 html[data-locale="zh-Hans"] .locale-hero-copy { font-size: clamp(1.125rem, 2vw, 1.875rem); line-height: 1.5; }
 html[data-locale="zh-Hans"] .locale-facts-heading { font-size: clamp(1.25rem, 2.5vw, 2.25rem); line-height: 1.4; }
-html[data-locale="zh-Hans"] .locale-fact-title { font-size: clamp(0.875rem, 1.4vw, 1.25rem); line-height: 1.45; }
-
-@media (min-width: 640px) {
-  html {
-    font-size: 16px;
-  }
-}
+html[data-locale="zh-Hans"] .locale-fact-title { font-size: clamp(1.125rem, 1.4vw, 1.25rem); line-height: 1.45; }
+html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-description"], [data-slot="alert-description"], [data-slot="empty-description"]) { line-height: 1.7; max-inline-size: 36ic; }
 
 @media (min-width: 1536px) {
   html {
-    font-size: 17px;
+    font-size: 106.25%;
   }
 }
 
-@media (min-width: 1439px) {
+@media (min-width: 1439px) and (min-height: 700px) {
   .sticky-uploader-column {
     position: sticky;
     top: var(--page-gutter);
@@ -184,15 +188,112 @@ html[data-locale="zh-Hans"] .locale-fact-title { font-size: clamp(0.875rem, 1.4v
   }
 }
 
-@layer utilities {
-  /* Card/step titles — replaces ~0.84rem (~13px) */
-  .text-ui-title {
-    @apply text-sm font-extrabold sm:text-base 2xl:text-lg;
+/* Keep compact pointer controls, with physical tap targets on touch devices. */
+@media (any-pointer: coarse), (max-width: 639px) {
+  [data-slot="button"] {
+    min-width: 44px;
+    min-height: 44px;
   }
 
-  /* Secondary descriptions — replaces ~0.68rem (~11px) */
+  [data-slot="slider"][data-orientation="horizontal"] {
+    min-height: 44px;
+    width: calc(100% - 16px);
+    margin-inline: 8px;
+  }
+
+  [data-slot="slider-thumb"]::after {
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.locale-suggestion {
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  max-height: calc(100svh - 2rem - env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+/* The image stays visible; only its frame acknowledges the loaded preview. */
+.result-preview-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--primary-text);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.result-preview-frame[data-ready="true"]::after {
+  opacity: 0.75;
+}
+
+.image-dropzone[data-dragging="true"] .dropzone-boundary,
+.image-dropzone:has(> button:focus-visible) .dropzone-boundary {
+  border-color: var(--primary-text);
+  border-style: solid;
+}
+
+.image-dropzone[data-dragging="true"] .dropzone-icon,
+.image-dropzone:has(> button:focus-visible) .dropzone-icon {
+  background-color: var(--accent);
+  border-color: var(--primary-text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dropzone-boundary,
+  .dropzone-icon {
+    transition: border-color 120ms ease-out, background-color 120ms ease-out;
+  }
+
+  .dropzone-icon {
+    transition: border-color 120ms ease-out, background-color 120ms ease-out,
+      transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .image-dropzone[data-dragging="true"] .dropzone-icon {
+    transform: scale(0.94);
+  }
+
+  .result-preview-frame[data-ready="true"]::after {
+    animation: preview-frame-arrival 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes preview-frame-arrival {
+  0% { clip-path: inset(0 100% 0 0); opacity: 0.75; }
+  70% { clip-path: inset(0); opacity: 0.75; }
+  100% { clip-path: inset(0); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer utilities {
+  /* Stable labels for workflow steps and controls. */
+  .text-ui-title {
+    @apply text-base leading-snug font-extrabold text-balance 2xl:text-lg;
+  }
+
+  /* Instructions and explanations retain a readable floor on phones. */
   .text-ui-body {
-    @apply text-xs leading-snug font-medium sm:text-sm sm:leading-normal 2xl:text-base;
+    @apply max-w-[65ch] text-base leading-relaxed font-medium text-pretty;
+  }
+
+  .text-reading {
+    @apply max-w-[65ch] text-base leading-relaxed font-medium text-pretty 2xl:text-lg;
   }
 
   /* Badges, hints, fine print — replaces ~0.64rem (~10px) */

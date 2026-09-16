@@ -68,7 +68,7 @@ export function MetadataPanel({
   }, [scanResult, t]);
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 flex flex-col gap-4 duration-500 lg:min-h-0 lg:flex-1">
+    <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1">
       <div className="bg-card/95 text-card-foreground flex flex-col justify-between gap-4 border p-4 lg:sticky lg:top-0 lg:z-10 lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-center gap-2 text-sm font-medium sm:text-base">
           <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center border">
@@ -196,7 +196,7 @@ export function MetadataPanel({
             )}
 
             {cleanResult && cleanResult.removedCount > 0 && (
-              <div className="bg-primary/10 text-primary flex items-start gap-2 border p-3 text-sm font-bold sm:text-base">
+              <div className="bg-primary/10 text-primary-text flex items-start gap-2 border p-3 text-sm font-bold sm:text-base">
                 <CheckCircleIcon className="mt-0.5 shrink-0" weight="bold" />
                 <p>
                   {t("metadata:panel.cleanReady", { count: cleanResult.removedCount })}
@@ -255,7 +255,7 @@ function StatusIcon({ tone }: { tone: MetadataStatus["tone"] }) {
   if (tone === "found") {
     return (
       <ShieldWarningIcon
-        className="text-destructive size-7 shrink-0"
+        className="text-destructive-text size-7 shrink-0"
         weight="bold"
       />
     );
@@ -271,7 +271,7 @@ function StatusIcon({ tone }: { tone: MetadataStatus["tone"] }) {
   }
 
   return (
-    <CheckCircleIcon className="text-primary size-7 shrink-0" weight="bold" />
+    <CheckCircleIcon className="text-primary-text size-7 shrink-0" weight="bold" />
   );
 }
 

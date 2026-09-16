@@ -11,7 +11,7 @@
     <title id="meta-title">Unmarker.it AI Watermark Remover | Client-Side Tool</title>
     <meta
       id="meta-description" name="description"
-      content="Remove invisible AI watermarks in your browser with Unmarker.it. Images stay local as shake, stir, and JPEG crush steps disrupt watermark signals. No uploads."
+      content="Analyze and process AI watermarks in your browser. No image uploads. Check Gemini marks and metadata; hidden-watermark removal is unverified."
     />
     <meta
       id="meta-keywords" name="keywords"
@@ -24,10 +24,10 @@
     <meta id="meta-robots" name="robots" content="index,follow" />
     <meta name="theme-color" content="#000000" />
     <!-- Open Graph / Facebook -->
-    <meta id="meta-og-title" property="og:title" content="Unmarker.it - Shake Off AI Watermarks" />
+    <meta id="meta-og-title" property="og:title" content="Unmarker.it - AI Watermark Tools" />
     <meta
       id="meta-og-description" property="og:description"
-      content="Shake, stir, and crush invisible AI watermarks entirely in your browser. Unmarker.it is a 100% client-side tool: no image uploads, no servers."
+      content="Check AI clues, process your image, and compare the JPEG output. Images stay in your browser. Hidden-watermark removal cannot be confirmed."
     />
     <meta property="og:type" content="website" />
     <meta id="meta-og-url" property="og:url" content="https://www.unmarker.it/" />
@@ -44,11 +44,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       id="meta-twitter-title" name="twitter:title"
-      content="Unmarker.it - Shake Off AI Watermarks"
+      content="Unmarker.it - AI Watermark Tools"
     />
     <meta
       id="meta-twitter-description" name="twitter:description"
-      content="Client-side AI watermark disruptor. Drop an image and Unmarker.it shakes, stirs, and crushes it locally to scramble invisible AI watermarks."
+      content="Analyze and process images locally without uploading them. Check Gemini marks and metadata, then compare the JPEG output. Hidden-watermark removal is unverified."
     />
     <meta id="meta-twitter-image" name="twitter:image" content="https://www.unmarker.it/og-image.png" />
     <meta
@@ -64,7 +64,7 @@
             "@id": "https://www.unmarker.it/#website",
             "url": "https://www.unmarker.it/",
             "name": "Unmarker.it",
-            "description": "Unmarker.it is a 100% client-side AI watermark remover and image scrambler for disrupting invisible AI watermark signals in the browser.",
+            "description": "Unmarker.it analyzes AI clues and processes images in the browser, with no image uploads. Hidden-watermark removal cannot be confirmed.",
             "inLanguage": "en",
             "publisher": {
               "@id": "https://www.unmarker.it/#creator"
@@ -75,7 +75,7 @@
             "@id": "https://www.unmarker.it/#webpage",
             "url": "https://www.unmarker.it/",
             "name": "Unmarker.it AI Watermark Remover | Client-Side Tool",
-            "description": "Remove invisible AI watermarks in your browser with Unmarker.it. Images stay local while shake, stir, and JPEG crush steps disrupt watermark signals.",
+            "description": "Analyze and process AI watermarks in your browser. Check Gemini marks and metadata, then compare the JPEG output. Hidden-watermark removal is unverified.",
             "isPartOf": {
               "@id": "https://www.unmarker.it/#website"
             },
@@ -93,7 +93,7 @@
             "@id": "https://www.unmarker.it/#software",
             "name": "Unmarker.it",
             "url": "https://www.unmarker.it/",
-            "description": "A browser-based image processing tool that disrupts invisible AI watermark signals through subtle geometry changes, low-amplitude RGB noise, and JPEG recompression.",
+            "description": "A browser image tool that checks Gemini marks and AI metadata, and applies geometry changes, color noise, and JPEG compression to try to disrupt hidden watermarks.",
             "applicationCategory": "MultimediaApplication",
             "applicationSubCategory": "Browser-based image processing tool",
             "operatingSystem": "Web",
@@ -137,10 +137,11 @@
       // Dark mode initialization - runs before React to avoid FOUC
       // Default to light mode unless explicitly set to dark
       (function () {
-        const theme = localStorage.getItem("theme");
-        if (theme === "dark") {
-          document.documentElement.classList.add("dark");
-        }
+        try {
+          if (localStorage.getItem("theme") === "dark") {
+            document.documentElement.classList.add("dark");
+          }
+        } catch { /* Use the default theme when storage is unavailable. */ }
       })();
     </script>
     <div id="root"></div>

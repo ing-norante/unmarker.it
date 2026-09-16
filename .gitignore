@@ -28,3 +28,7 @@ dist-ssr
 !.env.example
 .sponsor-data/
 .seo-cache/
+
+
+# Research files
+research/

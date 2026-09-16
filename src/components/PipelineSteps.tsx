@@ -42,14 +42,14 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="text-foreground text-ui-title">
                       {t(`steps.${step.id}.label`)}
                     </span>
                     {step.status === "done" && (
                       <CheckIcon
-                        className="text-chart-2 size-4 shrink-0"
+                        className="text-completion-text size-4 shrink-0"
                         weight="bold"
                       />
                     )}
@@ -63,7 +63,11 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
             </div>
 
             {step.status === "running" && (
-              <Progress className="h-1 w-full" value={step.progress} />
+              <Progress
+                className="h-1 w-full"
+                value={step.progress}
+                aria-label={t(`steps.${step.id}.label`)}
+              />
             )}
           </CardContent>
         </Card>
@@ -84,7 +88,7 @@ function StepGlyph({
   }
 
   if (status === "error") {
-    return <XIcon className="text-destructive size-6" weight="bold" />;
+    return <XIcon className="text-destructive-text size-6" weight="bold" />;
   }
 
   switch (id) {
@@ -105,7 +109,7 @@ function StatusBadge({ status, label }: { status: PipelineStepState["status"]; l
   switch (status) {
     case "done":
       return (
-        <Badge className="border-chart-2/20 bg-chart-2/10 text-chart-2 text-ui-caption shrink-0 font-bold uppercase">
+        <Badge className="border-chart-2/20 bg-chart-2/10 text-completion-text text-ui-caption shrink-0 font-bold uppercase">
           <span className="bg-chart-2 size-1.5" />
           {label}
         </Badge>
@@ -122,7 +126,7 @@ function StatusBadge({ status, label }: { status: PipelineStepState["status"]; l
       );
     case "running":
       return (
-        <Badge className="border-primary/30 bg-primary/10 text-primary text-ui-caption shrink-0 font-bold uppercase">
+        <Badge className="border-primary/30 bg-primary/10 text-primary-text text-ui-caption shrink-0 font-bold uppercase">
           <Spinner data-icon="inline-start" />
           {label}
         </Badge>

@@ -15,7 +15,6 @@ async function bootstrap() {
   const locale = resolveLocaleFromPathname(window.location.pathname);
   const instance = await initializeClientI18n(locale);
   applyDocumentMetadataToDom(createDocumentMetadata(locale, instance));
-  await initAnalytics(locale);
 
   const app = (
     <StrictMode>
@@ -32,6 +31,11 @@ async function bootstrap() {
 
   if (root.hasChildNodes()) hydrateRoot(root, app);
   else createRoot(root).render(app);
+
+  // Optional analytics must not gate hydration or file selection.
+  void initAnalytics(locale).catch((error: unknown) => {
+    console.warn("Analytics initialization failed", error);
+  });
 }
 
 void bootstrap();
