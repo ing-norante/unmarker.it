@@ -9,16 +9,22 @@ https://unmarker-it-sponsor-preview.vercel.app
 
 - Vercel project: `unmarker-it`, **Preview** environment, branch-specific variables.
 - Neon project: `unmarker-postgres-production-db`, isolated branch
-  `sponsor-preview` (`br-red-bonus-avhdbxtl`), database `neondb`.
+  `sponsor-preview` (`br-red-bonus-avhdbxtl`), database `unmarker_stripe_sandbox`.
+  The previous account's test records remain in `neondb`; they must not be reused
+  with the new account's Stripe credentials.
 - `SPONSOR_DATABASE_URL` explicitly selects that branch, independently of the
   Marketplace-managed `DATABASE_URL`. The API, migrations and test runner use
   this override when present and otherwise fall back to `DATABASE_URL`.
-- Stripe test credentials and the existing €500 one-time test price. Live payments
+- Stripe sandbox `acct_1UGRgJEO1GBBIQQi`, belonging to the dedicated Unmarker live
+  account `acct_1UGRfqCwozMNRcOx`, and the €500 one-time test price
+  `price_1UGRr4EO1GBBIQQijDtIUQo2`. Live payments
   remain disabled. A dedicated test webhook receives events at
   `/api/sponsors?action=webhook` on the stable origin above.
 - Separate session and reconciliation secrets. The branch-specific empty
   `VITE_PUBLIC_POSTHOG_KEY` prevents QA traffic from entering production analytics.
 - Credentials live in Vercel environment variables, never in this repository.
+  The app uses `STRIPE_PRIVATE_KEY`; if the source environment calls the key
+  `STRIPE_SECRET_KEY`, map it to `STRIPE_PRIVATE_KEY` when configuring the preview.
 
 ## Updating the preview
 

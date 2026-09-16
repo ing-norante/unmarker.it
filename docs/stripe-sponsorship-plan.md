@@ -147,9 +147,15 @@ docker compose -p unmarker-sponsors-5486 -f compose.sponsors.yml stop
 
 ### Test account objects
 
-- Account: `acct_1SmYbmERgtKRH2sI`
-- Product: `prod_VGm40oGPn8sGNl`
-- One-time Price: `price_1UGEWDERgtKRH2sIITxes0cM` (€500, test mode)
+- Live account: `acct_1UGRfqCwozMNRcOx` (not enabled by this setup)
+- Sandbox account: `acct_1UGRgJEO1GBBIQQi`
+- Product: `prod_VGzqOdN5yDre5d`
+- One-time Price: `price_1UGRr4EO1GBBIQQijDtIUQo2` (€500, test mode)
+
+Set `STRIPE_ACCOUNT_ID` to the sandbox account ID before running
+`pnpm sponsors:stripe:setup`. The script checks the account authenticated by the
+test key before creating any objects. A dedicated Stripe sandbox has a different
+account ID from its parent live account.
 
 These are identifiers, not credentials. Local keys, signing/session/cron secrets
 and the PostgreSQL connection string remain in `.env` only.

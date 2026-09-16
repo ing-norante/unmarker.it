@@ -5,8 +5,11 @@ const key = process.env.STRIPE_PRIVATE_KEY;
 if (!key?.startsWith("sk_test_"))
   throw new Error("This setup command only accepts Stripe test keys.");
 const stripe = new Stripe(key);
-const account = await stripe.accounts.retrieve("acct_1SmYbmERgtKRH2sI");
-if (account.id !== "acct_1SmYbmERgtKRH2sI")
+const expectedAccount = process.env.STRIPE_ACCOUNT_ID;
+if (!expectedAccount)
+  throw new Error("STRIPE_ACCOUNT_ID must identify the intended test account or sandbox.");
+const account = await stripe.accounts.retrieve();
+if (account.id !== expectedAccount)
   throw new Error("Unexpected Stripe account.");
 let product: Stripe.Product | undefined;
 for await (const candidate of stripe.products.list({
