@@ -26,7 +26,7 @@ function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 const emptyMediaVariants = cva(
-  "mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none",
   {
     variants: {
       variant: {
@@ -73,7 +73,7 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
     <div
       data-slot="empty-description"
       className={cn(
-        "text-muted-foreground [&>a:hover]:text-primary-text max-w-[65ch] text-base/relaxed text-pretty [&>a]:underline [&>a]:underline-offset-4",
+        "text-muted-foreground max-w-[65ch] text-base/relaxed text-pretty [&>a]:underline [&>a]:underline-offset-4",
         className,
       )}
       {...props}

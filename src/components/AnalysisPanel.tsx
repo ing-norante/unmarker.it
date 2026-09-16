@@ -33,7 +33,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
     <div className="grid min-w-0 gap-4 @min-[52rem]/comparison:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <Card className="@container/panel min-w-0 bg-card/95">
         <CardHeader>
-          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 [&>div]:min-w-0 [&>div]:flex-1 [&>div]:basis-48">
+          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 [&>div]:flex-1 [&>div]:basis-48">
             <div>
               <CardTitle>{t("workflow:analysis.provenance")}</CardTitle>
               <CardDescription>{t(`workflow:audit.score.${audit.aiScore.kind}.description`)}</CardDescription>
@@ -117,7 +117,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
 
       <Card className="min-w-0 bg-card/95 @min-[52rem]/comparison:col-span-2">
         <CardHeader>
-          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 [&>div]:min-w-0 [&>div]:flex-1 [&>div]:basis-48">
+          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 [&>div]:flex-1 [&>div]:basis-48">
             <div>
               <CardTitle>{t("workflow:analysis.metadata")}</CardTitle>
               <CardDescription>

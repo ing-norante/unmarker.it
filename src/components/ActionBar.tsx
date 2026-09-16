@@ -98,7 +98,7 @@ export function ActionBar({
         </span>
         <span ref={fileNameRef} tabIndex={-1} className="truncate focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">{fileName}</span>
       </div>
-      <div className="grid min-w-0 grid-cols-1 gap-2 @min-[28rem]/workspace:flex @min-[28rem]/workspace:flex-wrap [&>[data-slot=button]]:h-auto [&>[data-slot=button]]:min-h-8 [&>[data-slot=button]]:min-w-0 [&>[data-slot=button]]:max-w-full [&>[data-slot=button]]:py-2 [&>[data-slot=button]]:whitespace-normal [&>[data-slot=button]]:wrap-anywhere">
+      <div className="grid min-w-0 grid-cols-1 gap-2 @min-[28rem]/workspace:flex @min-[28rem]/workspace:flex-wrap *:data-[slot=button]:h-auto *:data-[slot=button]:min-h-8 *:data-[slot=button]:max-w-full *:data-[slot=button]:py-2 *:data-[slot=button]:whitespace-normal *:data-[slot=button]:wrap-anywhere">
         {canCancel && (
           <Button variant="destructive" onClick={handleCancel}>
             <XCircleIcon data-icon="inline-start" />

@@ -122,7 +122,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       <button
         autoFocus={autoFocus}
         type="button"
-        className="focus-visible:outline-primary-text absolute inset-0 z-10 cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-3 focus-visible:-outline-offset-3 disabled:cursor-not-allowed"
+        className="focus-visible:outline-primary-text absolute inset-0 z-10 cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-3 focus-visible:-outline-offset-3"
         aria-label={t("common:actions.chooseImage")}
         aria-describedby={descriptionId}
         aria-controls={fileInputId}
