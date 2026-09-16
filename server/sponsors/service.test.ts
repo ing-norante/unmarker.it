@@ -113,6 +113,7 @@ describe.skipIf(!connection)(
       const url = new URL(connection!);
       url.searchParams.set("options", `-c search_path=${schema}`);
       vi.stubEnv("DATABASE_URL", url.toString());
+      vi.stubEnv("SPONSOR_DATABASE_URL", url.toString());
       vi.stubEnv("STRIPE_PRIVATE_KEY", "sk_test_mock");
       vi.stubEnv("STRIPE_PRICE_ID", "price_test");
       vi.stubEnv("SPONSOR_SESSION_SECRET", "x".repeat(64));
@@ -385,6 +386,21 @@ describe.skipIf(!connection)(
       expect(restored.status).toBe("active");
       expect(restored.starts_at!.getTime()).toBe(event.created * 1000);
       expect((await catalog()).availableSpots).toBe(15);
+    });
+    it("returns a safe JSON error if session creation loses its database connection", async () => {
+      const connect = vi.spyOn(database(), "connect").mockRejectedValueOnce(new Error("Database unavailable"));
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const response = await handleSponsorRequest(new Request("http://localhost:5173/api/sponsors?action=session", {
+          method: "POST",
+          headers: { origin: "http://localhost:5173", "x-sponsor-client": "1" },
+        }));
+        expect(response.status).toBe(503);
+        expect(await response.json()).toEqual({ error: "temporary_error" });
+      } finally {
+        connect.mockRestore();
+        log.mockRestore();
+      }
     });
     it("uses exactly 720 hours across daylight-saving changes and hides expired campaigns", async () => {
       const { purchase } = await order();

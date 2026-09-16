@@ -137,6 +137,8 @@ The [Stripe sponsorship implementation guide](docs/stripe-sponsorship-plan.md)
 contains local PostgreSQL/Stripe setup, test commands, server architecture and
 the production database, webhook and scheduler connection steps. The completed
 Stripe test checkout has been verified locally; live sales are disabled.
+The [online sandbox preview guide](docs/sponsor-preview.md) describes the isolated
+Neon branch, Vercel Preview settings and online QA procedure.
 
 ## Environment Variables
 

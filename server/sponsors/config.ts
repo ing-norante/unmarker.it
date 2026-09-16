@@ -14,10 +14,11 @@ export function getConfig() {
   const {
     STRIPE_PRIVATE_KEY: key,
     STRIPE_PRICE_ID: priceId,
-    DATABASE_URL: databaseUrl,
     SPONSOR_SESSION_SECRET: secret,
     STRIPE_WEBHOOK_SECRET: webhookSecret,
   } = process.env;
+  // A dedicated connection can isolate sponsor previews from Marketplace-managed defaults.
+  const databaseUrl = process.env.SPONSOR_DATABASE_URL || process.env.DATABASE_URL;
   if (!key || !priceId || !databaseUrl || !secret || secret.length < 32)
     throw new SponsorError("unavailable", 503);
   const live = key.startsWith("sk_live_");

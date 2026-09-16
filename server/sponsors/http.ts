@@ -216,7 +216,7 @@ export async function handleSponsorRequest(
     if (request.method !== "POST")
       return json({ error: "method_not_allowed" }, 405, { Allow: "POST" });
     checkOrigin(request);
-    if (action === "session") return session(request);
+    if (action === "session") return await session(request);
     const buyerId = await buyer(request);
     if (action === "checkout") {
       const raw = await boundedBody(request);

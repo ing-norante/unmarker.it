@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-const db = new Pool({ connectionString: process.env.DATABASE_URL });
+const connectionString = process.env.SPONSOR_DATABASE_URL || process.env.DATABASE_URL;
+if (!connectionString) throw new Error("SPONSOR_DATABASE_URL or DATABASE_URL is required");
+const db = new Pool({ connectionString });
 try {
   await db.query(
     await readFile(
