@@ -16,7 +16,7 @@ and local PostgreSQL. No live payments or production deployment were made.
 - All positions have the same price. Paired desktop cards have equal 10-second
   phases in a 20-second cycle. Actual impressions depend on visibility, visit
   duration, screen size and pauses; equal impression counts are not promised.
-- There are 20 places including the four house projects: initially 16 available
+- There are 20 places including the three house projects: initially 17 available
   paid places. Pending Checkouts reserve capacity for up to 40 minutes. Capacity
   is released only after Stripe confirms expiry/cancellation or absence of a
   remotely created Checkout. An uncertain response does not free the place.
@@ -48,7 +48,7 @@ purchases. Webhooks, the return page and reconciliation all call the same sync.
   in `.env` is retained for potential future integrations.
 - The return dialog verifies the purchase on the server and displays its dates.
   It never trusts a success query parameter as proof of payment.
-- `useSponsorCatalog` combines the four bundled house ads with paid campaigns
+- `useSponsorCatalog` combines the three bundled house ads with paid campaigns
   from the API, refreshing every 15 seconds and when the tab becomes visible.
   An additional local timer removes expired campaigns from already-open pages.
   During an outage, existing cards remain only until their known expiry and

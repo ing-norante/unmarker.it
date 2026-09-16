@@ -14,14 +14,6 @@ export interface Sponsor {
 /** House ads. Paid campaigns come from the server catalog. */
 export const sponsors: Sponsor[] = [
   {
-    id: "officine-nora",
-    kind: "house",
-    name: "Officine Nora",
-    claim: "Coworking jewellery studio and shop in Florence, Italy",
-    url: "https://www.officinenora.it",
-    icon: "/sponsors/officine-nora.ico",
-  },
-  {
     id: "mycodosing",
     kind: "house",
     name: "Mycodosing.WTF",

@@ -70,7 +70,7 @@ pnpm preview
 
 ## Sponsors
 
-Manage the four house projects in `src/lib/sponsors.ts`. Each entry has a unique `id`,
+Manage the three house projects in `src/lib/sponsors.ts`. Each entry has a unique `id`,
 `name`, `claim`, destination `url`, and `icon` (a local image path or emoji).
 House projects use `kind: "house"`; paid campaigns arrive automatically from the
 PostgreSQL-backed catalog with `kind: "paid"`.

@@ -222,8 +222,8 @@ describe.skipIf(!connection)(
       const results = await Promise.allSettled(
         owners.map((owner) => reservePurchase(owner.id, form(), randomUUID())),
       );
-      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(16);
-      expect(results.filter((r) => r.status === "rejected")).toHaveLength(4);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(17);
+      expect(results.filter((r) => r.status === "rejected")).toHaveLength(3);
       expect((await catalog()).availableSpots).toBe(0);
     });
     it("reuses duplicate requests and rejects changed creative with the same idempotency key", async () => {
@@ -348,11 +348,11 @@ describe.skipIf(!connection)(
     });
     it("releases capacity only after Stripe confirms cancellation", async () => {
       const { owner, purchase } = await order();
-      expect((await catalog()).availableSpots).toBe(15);
+      expect((await catalog()).availableSpots).toBe(16);
       expect((await cancelPurchase(purchase.id, owner.id)).status).toBe(
         "cancelled",
       );
-      expect((await catalog()).availableSpots).toBe(16);
+      expect((await catalog()).availableSpots).toBe(17);
     });
     it("uses current Stripe state for out-of-order events, including refunds", async () => {
       const { purchase } = await order();
@@ -380,12 +380,12 @@ describe.skipIf(!connection)(
       fake.disputes = [{ status: "needs_response" } as Stripe.Dispute];
       expect((await syncSponsorPurchase(purchase.id)).status).toBe("disputed");
       expect((await catalog()).sponsors).toHaveLength(0);
-      expect((await catalog()).availableSpots).toBe(15);
+      expect((await catalog()).availableSpots).toBe(16);
       fake.disputes = [{ status: "won" } as Stripe.Dispute];
       const restored = await syncSponsorPurchase(purchase.id);
       expect(restored.status).toBe("active");
       expect(restored.starts_at!.getTime()).toBe(event.created * 1000);
-      expect((await catalog()).availableSpots).toBe(15);
+      expect((await catalog()).availableSpots).toBe(16);
     });
     it("returns a safe JSON error if session creation loses its database connection", async () => {
       const connect = vi.spyOn(database(), "connect").mockRejectedValueOnce(new Error("Database unavailable"));

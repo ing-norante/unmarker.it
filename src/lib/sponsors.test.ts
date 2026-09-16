@@ -28,7 +28,7 @@ function cardSponsors(cards: SidebarCard[]) {
 }
 
 describe("sponsor placement", () => {
-  it.each([0, 1, 4, 5, 9, 10, 11, 12, 19, 20, 21, 25])(
+  it.each([0, 1, 3, 4, 5, 9, 10, 11, 12, 19, 20, 21, 25])(
     "shows each supported sponsor exactly once per device layout with %i entries",
     (count) => {
       const list = makeSponsors(count);
