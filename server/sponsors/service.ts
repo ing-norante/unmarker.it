@@ -230,6 +230,8 @@ export async function ensureCheckout(purchaseId: string, buyerId: string) {
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
+        // NoMaDe remains the seller, regardless of the account's Managed Payments default.
+        managed_payments: { enabled: false },
         adaptive_pricing: { enabled: false },
         customer: customerId,
         payment_method_types: ["card"],

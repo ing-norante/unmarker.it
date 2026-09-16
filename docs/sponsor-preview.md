@@ -25,6 +25,9 @@ https://unmarker-it-sponsor-preview.vercel.app
 - Credentials live in Vercel environment variables, never in this repository.
   The app uses `STRIPE_PRIVATE_KEY`; if the source environment calls the key
   `STRIPE_SECRET_KEY`, map it to `STRIPE_PRIVATE_KEY` when configuring the preview.
+- Checkout explicitly disables Managed Payments per session. The new sandbox
+  enables it by default, but this integration uses standard Checkout with NoMaDe
+  as the seller, a fixed EUR price and card payments.
 
 ## Updating the preview
 

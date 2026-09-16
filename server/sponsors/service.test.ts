@@ -55,6 +55,9 @@ vi.mock("./config.ts", async (importOriginal) => {
               if (session.customer === customer) yield structuredClone(session);
           },
           create: async (params: Stripe.Checkout.SessionCreateParams) => {
+            // New Stripe accounts may default to Managed Payments, which rejects these options.
+            if (params.managed_payments?.enabled !== false)
+              throw new Error("Managed Payments rejects payment_method_types");
             fake.creates++;
             const session = {
               id: `cs_test_${randomUUID()}`,
