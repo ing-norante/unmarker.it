@@ -1,0 +1,399 @@
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { readFile } from "node:fs/promises";
+import { randomBytes, randomUUID, createHash } from "node:crypto";
+import { Pool } from "pg";
+import Stripe from "stripe";
+import sharp from "sharp";
+import { database } from "./db";
+import {
+  reservePurchase,
+  ensureCheckout,
+  syncSponsorPurchase,
+  processWebhook,
+  catalog,
+  normalizeIcon,
+  cancelPurchase,
+} from "./service";
+import { handleSponsorRequest } from "./http";
+
+const fake = vi.hoisted(() => ({
+  sessions: new Map<string, Stripe.Checkout.Session>(),
+  events: [] as Stripe.Event[],
+  creates: 0,
+  failRetrieve: false,
+  disputes: [] as Stripe.Dispute[],
+}));
+vi.mock("./config.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./config")>();
+  const real = new Stripe("sk_test_mock");
+  return {
+    ...original,
+    getStripe: () => ({
+      customers: { create: async () => ({ id: `cus_${randomUUID()}` }) },
+      prices: {
+        retrieve: async (id: string) => ({
+          id,
+          active: true,
+          type: "one_time",
+          currency: "eur",
+          unit_amount: 50000,
+          livemode: false,
+        }),
+      },
+      checkout: {
+        sessions: {
+          list: async function* ({ customer }: { customer: string }) {
+            for (const session of fake.sessions.values())
+              if (session.customer === customer) yield structuredClone(session);
+          },
+          create: async (params: Stripe.Checkout.SessionCreateParams) => {
+            fake.creates++;
+            const session = {
+              id: `cs_test_${randomUUID()}`,
+              mode: "payment",
+              customer: params.customer,
+              metadata: params.metadata,
+              client_reference_id: params.client_reference_id,
+              status: "open",
+              payment_status: "unpaid",
+              currency: "eur",
+              amount_total: 50000,
+              livemode: false,
+              url: "https://checkout.stripe.com/c/pay/test",
+              expires_at: params.expires_at,
+              line_items: {
+                data: [{ price: { id: "price_test" }, quantity: 1 }],
+              },
+              payment_intent: null,
+            } as unknown as Stripe.Checkout.Session;
+            fake.sessions.set(session.id, session);
+            return structuredClone(session);
+          },
+          retrieve: async (id: string) => {
+            if (fake.failRetrieve) throw new Error("Network failed");
+            return structuredClone(fake.sessions.get(id)!);
+          },
+          expire: async (id: string) => {
+            const session = fake.sessions.get(id)!;
+            session.status = "expired";
+            return session;
+          },
+        },
+      },
+      events: {
+        list: async function* () {
+          for (const event of fake.events) yield event;
+        },
+      },
+      disputes: { list: async () => ({ data: fake.disputes }) },
+      webhooks: real.webhooks,
+    }),
+  };
+});
+
+const connection = process.env.SPONSOR_TEST_DATABASE_URL;
+const schema = `sponsor_test_${randomUUID().replaceAll("-", "")}`;
+let admin: Pool;
+let png: Buffer;
+
+describe.skipIf(!connection)(
+  "sponsor purchases with isolated PostgreSQL and mocked Stripe",
+  () => {
+    beforeAll(async () => {
+      admin = new Pool({ connectionString: connection });
+      await admin.query(`CREATE SCHEMA ${schema}`);
+      const url = new URL(connection!);
+      url.searchParams.set("options", `-c search_path=${schema}`);
+      vi.stubEnv("DATABASE_URL", url.toString());
+      vi.stubEnv("STRIPE_PRIVATE_KEY", "sk_test_mock");
+      vi.stubEnv("STRIPE_PRICE_ID", "price_test");
+      vi.stubEnv("SPONSOR_SESSION_SECRET", "x".repeat(64));
+      vi.stubEnv("SPONSOR_APP_URL", "http://localhost:5173");
+      vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_mock");
+      await database().query(
+        await readFile(new URL("./schema.sql", import.meta.url), "utf8"),
+      );
+      png = await sharp({
+        create: { width: 16, height: 16, channels: 4, background: "cyan" },
+      })
+        .png()
+        .toBuffer();
+    });
+    beforeEach(async () => {
+      await database().query(
+        "TRUNCATE sponsor_buyers, sponsor_purchases, sponsor_webhook_receipts, sponsor_analytics_outbox, sponsor_rate_limits CASCADE",
+      );
+      fake.sessions.clear();
+      fake.events = [];
+      fake.creates = 0;
+      fake.failRetrieve = false;
+      fake.disputes = [];
+    });
+    afterAll(async () => {
+      await database().end();
+      await admin.query(`DROP SCHEMA ${schema} CASCADE`);
+      await admin.end();
+      vi.unstubAllEnvs();
+    });
+
+    async function buyer() {
+      const id = randomUUID();
+      const token = randomBytes(32).toString("hex");
+      await database().query(
+        "INSERT INTO sponsor_buyers(id,token_hash) VALUES($1,$2)",
+        [id, createHash("sha256").update(token).digest("hex")],
+      );
+      return { id, token };
+    }
+    function form(requestId = randomUUID()) {
+      const data = new FormData();
+      data.set("name", "Sponsor Test");
+      data.set("url", "https://example.com");
+      data.set("description", "A useful project for creators.");
+      data.set(
+        "icon",
+        new File([new Uint8Array(png)], "icon.png", { type: "image/png" }),
+      );
+      data.set("requestId", requestId);
+      return data;
+    }
+    async function order() {
+      const owner = await buyer();
+      const purchase = await reservePurchase(owner.id, form(), randomUUID());
+      return { owner, purchase: await ensureCheckout(purchase.id, owner.id) };
+    }
+    function pay(sessionId: string, when = Math.floor(Date.now() / 1000)) {
+      const session = fake.sessions.get(sessionId)!;
+      const pi = {
+        id: `pi_${randomUUID()}`,
+        status: "succeeded",
+        currency: "eur",
+        amount_received: 50000,
+        created: when - 3600,
+        latest_charge: { paid: true, amount_refunded: 0, disputed: false },
+      } as Stripe.PaymentIntent;
+      session.status = "complete";
+      session.payment_status = "paid";
+      session.payment_intent = pi;
+      const event = {
+        id: `evt_${randomUUID()}`,
+        type: "payment_intent.succeeded",
+        created: when,
+        livemode: false,
+        data: { object: { ...pi, metadata: session.metadata } },
+      } as Stripe.Event;
+      fake.events.push(event);
+      return event;
+    }
+    function request(action: string, token: string, body: unknown = {}) {
+      return new Request(
+        `http://localhost:5173/api/sponsors?action=${action}`,
+        {
+          method: "POST",
+          headers: {
+            origin: "http://localhost:5173",
+            "x-sponsor-client": "1",
+            cookie: `unmarker_sponsor_session=${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        },
+      );
+    }
+
+    it("validates icon bytes, strips source metadata and rejects SVG", async () => {
+      const icon = await normalizeIcon(png);
+      expect((await sharp(icon).metadata()).format).toBe("webp");
+      await expect(
+        normalizeIcon(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')),
+      ).rejects.toMatchObject({ code: "invalid_icon" });
+    });
+    it("reserves the last available places atomically under concurrent requests", async () => {
+      const owners = await Promise.all(Array.from({ length: 20 }, buyer));
+      const results = await Promise.allSettled(
+        owners.map((owner) => reservePurchase(owner.id, form(), randomUUID())),
+      );
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(16);
+      expect(results.filter((r) => r.status === "rejected")).toHaveLength(4);
+      expect((await catalog()).availableSpots).toBe(0);
+    });
+    it("reuses duplicate requests and rejects changed creative with the same idempotency key", async () => {
+      const owner = await buyer();
+      const requestId = randomUUID();
+      const first = await reservePurchase(
+        owner.id,
+        form(requestId),
+        randomUUID(),
+      );
+      const again = await reservePurchase(
+        owner.id,
+        form(requestId),
+        randomUUID(),
+      );
+      expect(again.id).toBe(first.id);
+      await ensureCheckout(first.id, owner.id);
+      await ensureCheckout(first.id, owner.id);
+      expect(fake.creates).toBe(1);
+      const changed = form(requestId);
+      changed.set("name", "Different sponsor");
+      await expect(
+        reservePurchase(owner.id, changed, randomUUID()),
+      ).rejects.toMatchObject({ code: "request_changed" });
+    });
+    it("recovers a Stripe success whose database attachment was interrupted", async () => {
+      const { owner, purchase } = await order();
+      await database().query(
+        "UPDATE sponsor_purchases SET stripe_session_id=NULL,status='creating' WHERE id=$1",
+        [purchase.id],
+      );
+      const recovered = await ensureCheckout(purchase.id, owner.id);
+      expect(recovered.stripe_session_id).toBe(purchase.stripe_session_id);
+      expect(fake.creates).toBe(1);
+    });
+    it("does not publish an unpaid purchase or trust a success-page visit", async () => {
+      const { purchase } = await order();
+      expect((await syncSponsorPurchase(purchase.id)).status).toBe("pending");
+      expect((await catalog()).sponsors).toHaveLength(0);
+    });
+    it("activates once from verified payment time and never extends on refresh or duplicate webhook", async () => {
+      const { purchase } = await order();
+      const event = pay(purchase.stripe_session_id!);
+      const first = await syncSponsorPurchase(purchase.id, event);
+      await processWebhook(event);
+      await processWebhook(event);
+      const again = await syncSponsorPurchase(purchase.id);
+      expect(first.status).toBe("active");
+      expect(again.starts_at).toEqual(first.starts_at);
+      expect(first.starts_at!.getTime()).toBe(event.created * 1000);
+      expect(first.expires_at!.getTime() - first.starts_at!.getTime()).toBe(
+        30 * 86400000,
+      );
+      expect((await catalog()).sponsors).toHaveLength(1);
+      expect(
+        (await database().query("SELECT * FROM sponsor_analytics_outbox")).rows,
+      ).toHaveLength(2);
+      expect(
+        (await database().query("SELECT * FROM sponsor_webhook_receipts")).rows,
+      ).toHaveLength(1);
+    });
+    it("fulfills via webhook even when the customer never returns", async () => {
+      const { purchase } = await order();
+      const payment = pay(purchase.stripe_session_id!);
+      const stripe = new Stripe("sk_test_mock");
+      const body = JSON.stringify(payment);
+      const signature = stripe.webhooks.generateTestHeaderString({
+        payload: body,
+        secret: "whsec_mock",
+      });
+      const response = await handleSponsorRequest(
+        new Request("http://localhost:5173/api/sponsors?action=webhook", {
+          method: "POST",
+          headers: { "stripe-signature": signature },
+          body,
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect((await catalog()).sponsors).toHaveLength(1);
+    });
+    it("rejects an invalid webhook signature and retries an interrupted fulfillment", async () => {
+      const { purchase } = await order();
+      const event = pay(purchase.stripe_session_id!);
+      expect(
+        (
+          await handleSponsorRequest(
+            new Request("http://localhost:5173/api/sponsors?action=webhook", {
+              method: "POST",
+              body: JSON.stringify(event),
+            }),
+          )
+        ).status,
+      ).toBe(400);
+      fake.failRetrieve = true;
+      await expect(processWebhook(event)).rejects.toThrow();
+      expect(
+        (await database().query("SELECT * FROM sponsor_webhook_receipts")).rows,
+      ).toHaveLength(0);
+      fake.failRetrieve = false;
+      await processWebhook(event);
+      expect((await catalog()).sponsors).toHaveLength(1);
+    });
+    it("rejects cross-origin actions and another buyer's purchase reference", async () => {
+      const { purchase } = await order();
+      const intruder = await buyer();
+      const unauthorized = await handleSponsorRequest(
+        request("status", intruder.token, { id: purchase.id }),
+      );
+      expect(unauthorized.status).toBe(404);
+      const crossOrigin = request("session", intruder.token);
+      crossOrigin.headers.set("origin", "https://evil.example");
+      expect((await handleSponsorRequest(crossOrigin)).status).toBe(403);
+    });
+    it("verifies amount and price before fulfillment", async () => {
+      const { purchase } = await order();
+      pay(purchase.stripe_session_id!);
+      fake.sessions.get(purchase.stripe_session_id!)!.amount_total = 1;
+      await expect(syncSponsorPurchase(purchase.id)).rejects.toMatchObject({
+        code: "payment_mismatch",
+      });
+      expect((await catalog()).sponsors).toHaveLength(0);
+    });
+    it("releases capacity only after Stripe confirms cancellation", async () => {
+      const { owner, purchase } = await order();
+      expect((await catalog()).availableSpots).toBe(15);
+      expect((await cancelPurchase(purchase.id, owner.id)).status).toBe(
+        "cancelled",
+      );
+      expect((await catalog()).availableSpots).toBe(16);
+    });
+    it("uses current Stripe state for out-of-order events, including refunds", async () => {
+      const { purchase } = await order();
+      const event = pay(purchase.stripe_session_id!);
+      await processWebhook(event);
+      const session = fake.sessions.get(purchase.stripe_session_id!)!;
+      const pi = session.payment_intent as Stripe.PaymentIntent;
+      (pi.latest_charge as Stripe.Charge).amount_refunded = 50000;
+      await processWebhook({
+        ...event,
+        id: "evt_late_checkout",
+        type: "checkout.session.completed",
+        data: { object: session },
+      } as Stripe.Event);
+      expect((await syncSponsorPurchase(purchase.id)).status).toBe("refunded");
+      expect((await catalog()).sponsors).toHaveLength(0);
+    });
+    it("keeps a disputed slot reserved so winning the dispute cannot oversell inventory", async () => {
+      const { purchase } = await order();
+      const event = pay(purchase.stripe_session_id!);
+      await processWebhook(event);
+      const session = fake.sessions.get(purchase.stripe_session_id!)!;
+      const pi = session.payment_intent as Stripe.PaymentIntent;
+      (pi.latest_charge as Stripe.Charge).disputed = true;
+      fake.disputes = [{ status: "needs_response" } as Stripe.Dispute];
+      expect((await syncSponsorPurchase(purchase.id)).status).toBe("disputed");
+      expect((await catalog()).sponsors).toHaveLength(0);
+      expect((await catalog()).availableSpots).toBe(15);
+      fake.disputes = [{ status: "won" } as Stripe.Dispute];
+      const restored = await syncSponsorPurchase(purchase.id);
+      expect(restored.status).toBe("active");
+      expect(restored.starts_at!.getTime()).toBe(event.created * 1000);
+      expect((await catalog()).availableSpots).toBe(15);
+    });
+    it("uses exactly 720 hours across daylight-saving changes and hides expired campaigns", async () => {
+      const { purchase } = await order();
+      await database().query("SET timezone='Europe/Rome'");
+      const when = Date.parse("2026-03-20T12:00:00Z") / 1000;
+      const event = pay(purchase.stripe_session_id!, when);
+      const result = await syncSponsorPurchase(purchase.id, event);
+      expect(result.expires_at!.toISOString()).toBe("2026-04-19T12:00:00.000Z");
+      expect((await catalog()).sponsors).toHaveLength(0);
+    });
+  },
+);

@@ -1,4 +1,5 @@
 allowBuilds:
+  '@stripe/cli': true
   core-js: true
   esbuild: true
   msw: false

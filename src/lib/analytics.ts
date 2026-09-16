@@ -1,6 +1,7 @@
 import type { BeforeSendFn, CaptureResult } from "posthog-js";
 
 import type { SupportedLocale } from "@/i18n/locales";
+import { getSponsorAnalyticsContext } from "@/lib/sponsorAnalyticsContext";
 
 // Errors that browser extensions and in-app browsers inject, not our bundle.
 // Page-translation extensions mutate DOM nodes that React owns, so React
@@ -135,9 +136,7 @@ let posthogPromise: Promise<typeof import("posthog-js").default | null> | null =
 function isLocalhost() {
   const { hostname } = window.location;
   return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]"
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
   );
 }
 
@@ -189,9 +188,10 @@ function getPostHog() {
 }
 
 export async function initAnalytics(locale: SupportedLocale) {
+  const properties = getSponsorAnalyticsContext();
   const posthog = await getPostHog();
   posthog?.register({ locale });
-  posthog?.capture("$pageview");
+  posthog?.capture("$pageview", properties);
 }
 
 export function trackAction(
@@ -199,10 +199,11 @@ export function trackAction(
   component: TrackingComponent,
   properties: AnalyticsProperties = {},
 ) {
+  const eventProperties = { ...getSponsorAnalyticsContext(), ...properties };
   // Keep analytics file-agnostic: action events must not include file names,
   // MIME types, dimensions, hashes, or other image-derived values.
   void getPostHog().then((posthog) => {
-    captureAction(posthog, action, component, properties);
+    captureAction(posthog, action, component, eventProperties);
   });
 }
 
@@ -241,8 +242,37 @@ export async function registerAnalyticsLocale(locale: SupportedLocale) {
 }
 
 export async function capturePageview() {
+  if (typeof window !== "undefined")
+    window.dispatchEvent(new Event("unmarker:analytics-pageview"));
+  const properties = getSponsorAnalyticsContext();
   const posthog = await getPostHog();
-  posthog?.capture("$pageview");
+  posthog?.capture("$pageview", properties);
+}
+
+export type SponsorEvent =
+  | "sponsor_impression"
+  | "sponsor_clicked"
+  | "sponsor_advertise_opened"
+  | "sponsor_checkout_clicked";
+
+/** New sponsor events do not use the legacy action_clicked envelope. */
+export function trackSponsorEvent(
+  event: SponsorEvent,
+  properties: AnalyticsProperties,
+) {
+  const eventProperties = {
+    ...getSponsorAnalyticsContext(),
+    ...properties,
+    analytics_schema_version: ANALYTICS_SCHEMA_VERSION,
+    sponsor_tracking_version: 1,
+    component: "sponsors",
+  };
+  void getPostHog().then((posthog) => posthog?.capture(event, eventProperties));
+}
+
+export async function getSponsorAnalyticsId() {
+  const posthog = await getPostHog();
+  return posthog && !posthog.has_opted_out_capturing() ? posthog.get_distinct_id() : null;
 }
 
 export async function trackLocaleAction(

@@ -3,6 +3,8 @@ import { createI18n } from "@/i18n/createI18n";
 import { createDocumentMetadata } from "@/i18n/documentMetadata";
 import { prefersSimplifiedChinese, resolveLocaleFromPathname } from "@/i18n/locales";
 import { resources } from "@/i18n/resources";
+// Loading Vite's full application graph is setup, outside the SSR assertion timeout.
+import { render } from "@/entry-server";
 
 describe("locale resolution", () => {
   it.each([
@@ -67,7 +69,6 @@ describe("isolated SSR i18n instances", () => {
   });
 
   it("renders en → zh-Hans → en without translated tree contamination", async () => {
-    const { render } = await import("@/entry-server");
     const firstEn = await render("en");
     const zh = await render("zh-Hans");
     const secondEn = await render("en");

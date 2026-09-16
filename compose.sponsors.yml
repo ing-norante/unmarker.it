@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "127.0.0.1:55486:5432"
+    environment:
+      POSTGRES_DB: unmarker_sponsors
+      POSTGRES_USER: unmarker
+      POSTGRES_PASSWORD: local-development-only
+    volumes:
+      - sponsor-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U unmarker -d unmarker_sponsors"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  sponsor-postgres:

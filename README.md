@@ -68,6 +68,76 @@ pnpm build
 pnpm preview
 ```
 
+## Sponsors
+
+Manage the four house projects in `src/lib/sponsors.ts`. Each entry has a unique `id`,
+`name`, `claim`, destination `url`, and `icon` (a local image path or emoji).
+House projects use `kind: "house"`; paid campaigns arrive automatically from the
+PostgreSQL-backed catalog with `kind: "paid"`.
+Place new icons in `public/sponsors/` and reference them as `/sponsors/name.ico`;
+the production Content Security Policy allows local images, not remote favicons.
+
+- Up to 20 sponsors: the first 10 fill balanced left/right cards, then sponsors
+  11–20 fill the backs alternately. Extra entries are ignored.
+- Desktop sidebars appear from 1440px; narrower screens use scrolling bars
+  (first 10 at the top, next 10 at the bottom).
+- Paired cards use a 20-second cycle, with equal 10-second front/back phases.
+  Negative animation offsets stagger the cards without adding an initial delay.
+  Animations can be paused, stop while interacting, and respect reduced motion.
+- The advertisement dialog shows availability and €500 per slot for 30 days,
+  starting at confirmed purchase. It requests a name, icon, URL and short description.
+  TanStack Form and shadcn validate the creative and open hosted Stripe Checkout.
+  This is one payment, without automatic renewal. Booking requires the sponsor
+  API and available capacity.
+- Sponsor URLs automatically receive referral UTM parameters for `unmarker.it`.
+  Verified payments publish campaigns automatically; they disappear after 30 days.
+
+For local QA, check desktop/mobile layouts, light/dark themes, both locales,
+upload/reset, the advertisement dialog, and keyboard navigation. Temporarily
+use 12 or 20 uniquely identified sponsors to check both flip columns and the
+bottom mobile bar; enable reduced motion to check the static alternative.
+
+### Sponsor analytics
+
+[PostHog dashboard](https://eu.posthog.com/project/104940/dashboard/955480)
+contains visible impressions, clicks, CTR, workflow completion by rollout/device,
+and a historical baseline with a fixed cutoff before deployment.
+
+- `sponsor_impression`: at least 50% of a placement visible for one continuous
+  second in a foreground tab. Hidden faces, clipping and a modal covering the
+  visible center disqualify exposure. Sampling is conservative, not a guarantee
+  that a person looked at the card. One impression per sponsor/position/face/pageview;
+  repeated rotations, StrictMode remounts and marquee copies are deduplicated.
+- `sponsor_clicked`: every link activation (also keyboard and middle click),
+  with sponsor, location, one-based position, face and optional impression ID.
+  Fast clicks remain counted without fabricating a qualifying impression.
+- `sponsor_advertise_opened` and `sponsor_checkout_clicked`: interest in booking.
+  Checkout clicks do not imply payment. The server separately emits
+  `sponsor_purchase_confirmed` and `sponsor_campaign_activated` through a durable
+  outbox, excluding Stripe test payments.
+- CTR is total clicks / visible impressions for the same sponsor and placement.
+  No impressions means no meaningful CTR. Repeated/fast clicks can exceed 100%.
+  Filter clicks by `first_click_for_impression = true` for a separate metric of
+  clicked qualifying impressions / qualifying impressions.
+- Existing workflow events retain their IDs and receive `sponsor_layout_version`,
+  `sponsor_count` and `sponsor_seen_before_event`. Compare `sponsors_v1` with
+  `legacy_unlabelled` by device. Completion means the same visitor/workflow
+  completes within 30 minutes, including analysis-only results; starts less than
+  30 minutes old are excluded. Missing rollout labels indicate historical code,
+  not a randomized control group. These reports do not prove causality.
+- Sponsor trends exclude project-defined test accounts and filter the production
+  host. Workflow SQL filters `www.unmarker.it` but does not apply project test-account
+  exclusions. SQL windows are explicit and do not follow dashboard date controls.
+  Localhost capture remains disabled; tests mock PostHog and send no events.
+
+The implementation and automated tests are ready for manual QA. Verify clipping,
+background/foreground changes, flipping, duplicate marquee copies and modal
+occlusion locally, then check real ingestion after an approved deployment.
+The [Stripe sponsorship implementation guide](docs/stripe-sponsorship-plan.md)
+contains local PostgreSQL/Stripe setup, test commands, server architecture and
+the production database, webhook and scheduler connection steps. The completed
+Stripe test checkout has been verified locally; live sales are disabled.
+
 ## Environment Variables
 
 Optional analytics configuration:

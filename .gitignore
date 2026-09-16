@@ -24,4 +24,7 @@ dist-ssr
 *.sw?
 .cursor/
 .env
+.env.*
+!.env.example
+.sponsor-data/
 .seo-cache/

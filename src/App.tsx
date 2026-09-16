@@ -21,6 +21,7 @@ import type { StatusMessage } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 import { translateMessage } from "@/i18n/messages";
 import { LocaleSuggestion } from "@/components/LocaleSuggestion";
+import { SponsorLayout } from "@/components/SponsorLayout";
 
 const WorkflowApp = lazyWithReload(
   "workflow-app",
@@ -28,6 +29,14 @@ const WorkflowApp = lazyWithReload(
 );
 
 function App() {
+  return (
+    <SponsorLayout>
+      <AppContent />
+    </SponsorLayout>
+  );
+}
+
+function AppContent() {
   const { t } = useTranslation(["homepage", "workflow"]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(

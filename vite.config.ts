@@ -12,6 +12,11 @@ const emptyNodeModule = path.resolve(
 export default defineConfig({
   base: '/',
   plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      '/api/sponsors': 'http://127.0.0.1:5174',
+    },
+  },
   // Match the dev worker format to production so an ESM worker loads the same
   // way in both. The client creates it with { type: "module" }.
   worker: {
