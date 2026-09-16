@@ -8,7 +8,7 @@ const stripe = new Stripe(key);
 const expectedAccount = process.env.STRIPE_ACCOUNT_ID;
 if (!expectedAccount)
   throw new Error("STRIPE_ACCOUNT_ID must identify the intended test account or sandbox.");
-const account = await stripe.accounts.retrieve();
+const account = await stripe.accounts.retrieveCurrent();
 if (account.id !== expectedAccount)
   throw new Error("Unexpected Stripe account.");
 let product: Stripe.Product | undefined;
