@@ -1,5 +1,12 @@
 import type { BeforeSendFn, CaptureResult } from "posthog-js";
 
+import {
+  clearAnalyticsStorage,
+  getConsent,
+  hasAnalyticsConsent,
+  subscribeConsent,
+  syncSponsorConsent,
+} from "@/lib/cookieConsent";
 import type { SupportedLocale } from "@/i18n/locales";
 import { getSponsorAnalyticsContext } from "@/lib/sponsorAnalyticsContext";
 
@@ -130,6 +137,75 @@ export function getSemanticEventName(action: TrackingAction) {
   return semanticEvents[action];
 }
 
+let activePostHog: typeof import("posthog-js").default | null = null;
+let consentGeneration = 0;
+let sdkInstanceNumber = 0;
+let analyticsRequests: AbortController | null = null;
+let consentListenerInstalled = false;
+let currentLocale: SupportedLocale = "en";
+
+const consentBeforeSend: BeforeSendFn = (event) => {
+  if (!hasAnalyticsConsent()) return null;
+  const filtered = dropForeignScriptExceptions(event);
+  if (!filtered) return null;
+  // Include session-entry and nested initial URLs, not only the pageview URL.
+  for (const properties of [
+    filtered.properties,
+    filtered.properties?.$set,
+    filtered.properties?.$set_once,
+  ]) {
+    if (!properties || typeof properties !== "object") continue;
+    for (const [key, value] of Object.entries(properties)) {
+      if (
+        key !== "$referrer" &&
+        !key.endsWith("_url") &&
+        !key.endsWith("_referrer")
+      )
+        continue;
+      if (typeof value !== "string") continue;
+      try {
+        const url = new URL(value);
+        properties[key] = url.origin + url.pathname;
+      } catch {
+        delete properties[key];
+      }
+    }
+  }
+  return filtered;
+};
+
+function installConsentListener() {
+  if (consentListenerInstalled || typeof window === "undefined") return;
+  consentListenerInstalled = true;
+  const changed = () => {
+    consentGeneration++;
+    window.dispatchEvent(new Event("unmarker:analytics-pageview"));
+    if (!hasAnalyticsConsent()) {
+      // Abort before teardown: the SDK can otherwise retry previously queued requests.
+      analyticsRequests?.abort();
+      analyticsRequests = null;
+      activePostHog?.opt_out_capturing();
+      activePostHog?.stopSessionRecording();
+      activePostHog?.reset(true);
+      void activePostHog?.shutdown();
+      activePostHog = null;
+      clearAnalyticsStorage();
+    } else {
+      void capturePageview();
+    }
+    void syncSponsorConsent();
+  };
+  subscribeConsent(changed);
+  if (!hasAnalyticsConsent()) clearAnalyticsStorage();
+  void syncSponsorConsent();
+  window.addEventListener("online", () => {
+    void syncSponsorConsent();
+  });
+  window.addEventListener("pageshow", () => {
+    void syncSponsorConsent();
+  });
+}
+
 let posthogPromise: Promise<typeof import("posthog-js").default | null> | null =
   null;
 
@@ -141,7 +217,7 @@ function isLocalhost() {
 }
 
 function getPostHog() {
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || !hasAnalyticsConsent()) {
     return Promise.resolve(null);
   }
 
@@ -160,38 +236,89 @@ function getPostHog() {
     return Promise.resolve(null);
   }
 
+  const generation = consentGeneration;
+  const consentAt = getConsent()?.updatedAt;
   posthogPromise ??= import("posthog-js")
-    .then(({ default: posthog }) => {
-      posthog.init(apiKey, {
-        ...(apiHost ? { api_host: apiHost } : {}),
-        ...(uiHost ? { ui_host: uiHost } : {}),
-        defaults: "2025-05-24",
-        capture_pageview: false,
-        capture_exceptions: true,
-        before_send: dropForeignScriptExceptions,
-        debug: import.meta.env.MODE === "development",
-      });
-
-      return posthog;
-    })
+    .then(({ default: posthog }) => posthog)
     .catch((error: unknown) => {
       posthogPromise = null;
-
-      if (import.meta.env.MODE === "development") {
+      if (import.meta.env.MODE === "development")
         console.warn("PostHog failed to initialize", error);
-      }
-
       return null;
     });
-
-  return posthogPromise;
+  return posthogPromise.then((posthog) => {
+    if (
+      !posthog ||
+      !hasAnalyticsConsent() ||
+      generation !== consentGeneration ||
+      consentAt !== getConsent()?.updatedAt
+    )
+      return null;
+    if (!activePostHog) {
+      analyticsRequests = new AbortController();
+      // PostHog forwards fetch_options to fetch. Keep each consent period on its
+      // own instance and aborted signal, including retries after a later opt-in.
+      const fetchOptions = {
+        cache: "no-store" as const,
+        signal: analyticsRequests.signal,
+      };
+      activePostHog =
+        posthog.init(
+          apiKey,
+          {
+            ...(apiHost ? { api_host: apiHost } : {}),
+            ...(uiHost ? { ui_host: uiHost } : {}),
+            defaults: "2025-05-24",
+            capture_pageview: false,
+            capture_pageleave: false,
+            capture_exceptions: true,
+            capture_performance: { web_vitals: true },
+            autocapture: false,
+            rageclick: false,
+            capture_heatmaps: false,
+            disable_session_recording: true,
+            enable_recording_console_log: false,
+            disable_surveys: true,
+            disable_product_tours: true,
+            disable_conversations: true,
+            ip: false,
+            advanced_disable_feature_flags: true,
+            person_profiles: "never",
+            persistence: "localStorage",
+            cross_subdomain_cookie: false,
+            opt_out_capturing_by_default: true,
+            opt_out_persistence_by_default: true,
+            cookieless_mode: undefined,
+            request_batching: false,
+            api_transport: "fetch",
+            disable_beacon: true,
+            fetch_options: fetchOptions,
+            disable_capture_url_hashes: true,
+            save_campaign_params: false,
+            save_referrer: false,
+            before_send: consentBeforeSend,
+            debug: import.meta.env.MODE === "development",
+          },
+          `unmarker_consent_${++sdkInstanceNumber}`,
+        ) ?? null;
+    }
+    if (activePostHog?.has_opted_out_capturing())
+      activePostHog.opt_in_capturing({ captureEventName: false });
+    activePostHog?.register({
+      locale: currentLocale,
+      consent_version: getConsent()?.version,
+    });
+    return activePostHog;
+  });
 }
 
 export async function initAnalytics(locale: SupportedLocale) {
+  currentLocale = locale;
+  installConsentListener();
   const properties = getSponsorAnalyticsContext();
   const posthog = await getPostHog();
   posthog?.register({ locale });
-  posthog?.capture("$pageview", properties);
+  if (hasAnalyticsConsent()) posthog?.capture("$pageview", properties);
 }
 
 export function trackAction(
@@ -213,7 +340,7 @@ function captureAction(
   component: TrackingComponent,
   properties: AnalyticsProperties,
 ) {
-  if (!posthog) return;
+  if (!posthog || !hasAnalyticsConsent()) return;
 
   const eventProperties = {
     ...properties,
@@ -233,10 +360,11 @@ function captureAction(
 
 export async function captureException(error: unknown) {
   const posthog = await getPostHog();
-  posthog?.captureException(error);
+  if (hasAnalyticsConsent()) posthog?.captureException(error);
 }
 
 export async function registerAnalyticsLocale(locale: SupportedLocale) {
+  currentLocale = locale;
   const posthog = await getPostHog();
   posthog?.register({ locale });
 }
@@ -246,7 +374,7 @@ export async function capturePageview() {
     window.dispatchEvent(new Event("unmarker:analytics-pageview"));
   const properties = getSponsorAnalyticsContext();
   const posthog = await getPostHog();
-  posthog?.capture("$pageview", properties);
+  if (hasAnalyticsConsent()) posthog?.capture("$pageview", properties);
 }
 
 export type SponsorEvent =
@@ -267,12 +395,16 @@ export function trackSponsorEvent(
     sponsor_tracking_version: 1,
     component: "sponsors",
   };
-  void getPostHog().then((posthog) => posthog?.capture(event, eventProperties));
+  void getPostHog().then((posthog) => {
+    if (hasAnalyticsConsent()) posthog?.capture(event, eventProperties);
+  });
 }
 
 export async function getSponsorAnalyticsId() {
   const posthog = await getPostHog();
-  return posthog && !posthog.has_opted_out_capturing() ? posthog.get_distinct_id() : null;
+  return hasAnalyticsConsent() && posthog && !posthog.has_opted_out_capturing()
+    ? posthog.get_distinct_id()
+    : null;
 }
 
 export async function trackLocaleAction(

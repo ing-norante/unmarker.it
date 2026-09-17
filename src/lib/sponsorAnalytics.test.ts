@@ -4,21 +4,40 @@ const { capture, init } = vi.hoisted(() => ({
   capture: vi.fn(),
   init: vi.fn(),
 }));
-vi.mock("posthog-js", () => ({
-  default: { capture, init, register: vi.fn() },
-}));
+vi.mock("posthog-js", () => {
+  const sdk = {
+    capture,
+    init,
+    register: vi.fn(),
+    has_opted_out_capturing: () => false,
+    opt_out_capturing: vi.fn(),
+    opt_in_capturing: vi.fn(),
+    stopSessionRecording: vi.fn(),
+    reset: vi.fn(),
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  };
+  init.mockReturnValue(sdk);
+  return { default: sdk };
+});
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.resetModules();
   capture.mockClear();
   init.mockClear();
   vi.stubEnv("VITE_PUBLIC_POSTHOG_KEY", "test-key-never-sent");
+  const values = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => values.get(k) ?? null,
+    setItem: (k: string, v: string) => values.set(k, v),
+  });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
   vi.stubGlobal(
     "window",
     Object.assign(new EventTarget(), {
       location: { hostname: "www.unmarker.it" },
     }),
   );
+  (await import("./cookieConsent")).saveConsent(true);
 });
 afterEach(() => {
   vi.unstubAllGlobals();

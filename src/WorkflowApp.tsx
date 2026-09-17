@@ -7,7 +7,7 @@ import { Header } from "@/components/Header";
 import { ActionBar } from "@/components/ActionBar";
 import { ImageComparison } from "@/components/ImageComparison";
 import { HomepageFacts } from "@/components/HomepageFacts";
-import { DeferredFooter } from "@/components/DeferredFooter";
+import { Footer } from "@/components/Footer";
 import {
   FilePolicyDetails,
   WorkflowSummary,
@@ -299,7 +299,7 @@ function WorkflowLayout({
           <HomepageFacts />
         </div>
         <div className="px-(--page-gutter) pb-6 lg:pb-8">
-          <DeferredFooter />
+          <Footer />
         </div>
         <div translate="no">
           <LocaleSuggestion />

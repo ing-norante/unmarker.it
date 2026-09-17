@@ -1,3 +1,4 @@
+import { parseConsent } from "../../src/lib/consentPolicy.ts";
 import {
   createHash,
   createHmac,
@@ -19,6 +20,7 @@ import {
   cancelPurchase,
   reconcilePurchases,
   flushAnalytics,
+  updateSponsorConsent,
   type Purchase,
 } from "./service.ts";
 
@@ -159,6 +161,9 @@ export async function handleSponsorRequest(
         });
       }
     }
+    // Choosing cookies must not create a buyer session or require a configured checkout backend.
+    if (action === "consent" && request.method === "POST" && !token(request))
+      return json({ synced: true });
     getConfig();
     if (action === "webhook" && request.method === "POST") {
       const secret = getConfig().webhookSecret;
@@ -217,6 +222,22 @@ export async function handleSponsorRequest(
       return json({ error: "method_not_allowed" }, 405, { Allow: "POST" });
     checkOrigin(request);
     if (action === "session") return await session(request);
+    if (action === "consent") {
+      let buyerId: string;
+      try {
+        buyerId = await buyer(request);
+      } catch (error) {
+        if (error instanceof SponsorError && error.status === 401)
+          return json({ synced: true });
+        throw error;
+      }
+      const choice = parseConsent(
+        JSON.parse((await boundedBody(request, 1024)).toString()),
+      );
+      if (!choice) throw new SponsorError("invalid_form");
+      await updateSponsorConsent(buyerId, choice);
+      return json({ synced: true });
+    }
     const buyerId = await buyer(request);
     if (action === "checkout") {
       const raw = await boundedBody(request);

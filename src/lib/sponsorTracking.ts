@@ -1,3 +1,4 @@
+import { hasAnalyticsConsent } from "@/lib/cookieConsent";
 import { trackSponsorEvent, type AnalyticsProperties } from "@/lib/analytics";
 import {
   markSponsorSeen,
@@ -73,6 +74,7 @@ export function trackSponsorClick(
   sponsor: Sponsor,
   placement: SponsorPlacement,
 ) {
+  if (!hasAnalyticsConsent()) return;
   const attribution = ledger.click(placementKey(sponsor, placement));
   trackSponsorEvent("sponsor_clicked", {
     ...properties(sponsor, placement),
@@ -169,6 +171,10 @@ export function observeSponsors(root: HTMLElement) {
   }
 
   const sample = () => {
+    if (!hasAnalyticsConsent()) {
+      ledger.resetContinuity();
+      return;
+    }
     const visible = new Map<string, HTMLElement>();
     for (const element of candidates) {
       if (isSponsorVisible(element))

@@ -47,3 +47,7 @@ CREATE TABLE IF NOT EXISTS sponsor_analytics_outbox (
   delivered_at timestamptz,
   UNIQUE (purchase_id, event)
 );
+
+-- Existing purchases have no recorded consent: they are ineligible for analytics.
+ALTER TABLE sponsor_buyers ADD COLUMN IF NOT EXISTS analytics_consent jsonb;
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS analytics_consent_at bigint;

@@ -7,11 +7,22 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useTranslation } from "react-i18next";
+import { useSyncExternalStore } from "react";
+
+const subscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 export function ThemeToggle() {
   const { t } = useTranslation("common");
   const { theme = "light", setTheme } = useTheme();
-  const isDark = theme === "dark";
+  // Match the pre-rendered label/icon until hydration reads the saved theme.
+  const hydrated = useSyncExternalStore(
+    subscribe,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
+  const isDark = hydrated && theme === "dark";
   const label = isDark ? t("theme.light") : t("theme.dark");
 
   return (

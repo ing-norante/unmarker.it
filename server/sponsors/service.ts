@@ -1,3 +1,7 @@
+import {
+  parseConsent,
+  type ConsentReceipt,
+} from "../../src/lib/consentPolicy.ts";
 import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import type Stripe from "stripe";
@@ -33,6 +37,7 @@ export interface Purchase {
   created_at: Date;
   paid_event_id: string | null;
   analytics_id: string | null;
+  analytics_consent_at: string | null;
 }
 
 export async function normalizeIcon(bytes: Buffer) {
@@ -94,6 +99,46 @@ export async function catalog() {
   };
 }
 
+async function updateConsentInTransaction(
+  db: PoolClient,
+  buyerId: string,
+  choice: ConsentReceipt,
+) {
+  const { rows } = await db.query<{ analytics_consent: ConsentReceipt | null }>(
+    "SELECT analytics_consent FROM sponsor_buyers WHERE id=$1 FOR UPDATE",
+    [buyerId],
+  );
+  if (!rows[0]) throw new SponsorError("session_expired", 401);
+  const previous = rows[0].analytics_consent;
+  // A slow, older acceptance must never overwrite a newer withdrawal.
+  if (
+    previous &&
+    (previous.updatedAt > choice.updatedAt ||
+      (previous.updatedAt === choice.updatedAt &&
+        !previous.analytics &&
+        choice.analytics))
+  )
+    return previous;
+  await db.query("UPDATE sponsor_buyers SET analytics_consent=$2 WHERE id=$1", [
+    buyerId,
+    choice,
+  ]);
+  if (!choice.analytics) {
+    await db.query(
+      "UPDATE sponsor_purchases SET analytics_id=NULL, analytics_consent_at=NULL WHERE buyer_id=$1",
+      [buyerId],
+    );
+  }
+  return choice;
+}
+
+export async function updateSponsorConsent(
+  buyerId: string,
+  choice: ConsentReceipt,
+) {
+  return transaction((db) => updateConsentInTransaction(db, buyerId, choice));
+}
+
 export async function reservePurchase(
   buyerId: string,
   form: FormData,
@@ -119,7 +164,20 @@ export async function reservePurchase(
     .min(1)
     .max(200)
     .safeParse(form.get("analyticsId"));
+  let choice: ConsentReceipt | null = null;
+  try {
+    choice = parseConsent(
+      JSON.parse(String(form.get("analyticsConsent") ?? "null")),
+    );
+  } catch {
+    /* Invalid consent never enables analytics. */
+  }
   return transaction(async (db) => {
+    const current = choice
+      ? await updateConsentInTransaction(db, buyerId, choice)
+      : null;
+    const consented =
+      current?.analytics === true && current.updatedAt === choice?.updatedAt;
     const { rows: existing } = await db.query<Purchase>(
       "SELECT * FROM sponsor_purchases WHERE buyer_id=$1 AND request_id=$2",
       [buyerId, requestId.data],
@@ -145,8 +203,8 @@ export async function reservePurchase(
     if ((await capacity(db)) === 0) throw new SponsorError("sold_out", 409);
     const { rows } = await db.query<Purchase>(
       `INSERT INTO sponsor_purchases
-      (id,buyer_id,request_id,request_hash,name,url,description,icon,status,checkout_expires_at,analytics_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'creating',now()+interval '40 minutes',$9) RETURNING *`,
+      (id,buyer_id,request_id,request_hash,name,url,description,icon,status,checkout_expires_at,analytics_id,analytics_consent_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'creating',now()+interval '40 minutes',$9,$10) RETURNING *`,
       [
         randomUUID(),
         buyerId,
@@ -156,7 +214,8 @@ export async function reservePurchase(
         creative.data.url,
         creative.data.description,
         icon,
-        attribution.success ? attribution.data : null,
+        consented && attribution.success ? attribution.data : null,
+        consented ? current.updatedAt : null,
       ],
     );
     return rows[0];
@@ -502,48 +561,67 @@ export async function reconcilePurchases() {
 
 export async function flushAnalytics() {
   const apiKey = process.env.POSTHOG_API_KEY;
-  // Keep Stripe test purchases out of production analytics.
   if (!apiKey || !getConfig().live) return;
-  const { rows } = await database().query<{
-    id: string;
-    event: string;
-    purchase_id: string;
-    analytics_id: string | null;
-    starts_at: Date;
-  }>(`SELECT o.*,p.analytics_id,p.starts_at FROM sponsor_analytics_outbox o
-    JOIN sponsor_purchases p ON p.id=o.purchase_id WHERE delivered_at IS NULL LIMIT 50`);
-  for (const row of rows) {
-    if (row.analytics_id) {
-      const response = await fetch(
-        `${process.env.POSTHOG_HOST || "https://eu.i.posthog.com"}/i/v0/e/`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: AbortSignal.timeout(5000),
-          body: JSON.stringify({
-            api_key: apiKey,
-            event: row.event,
-            uuid: row.id,
-            timestamp: row.starts_at.toISOString(),
-            properties: {
-              distinct_id: row.analytics_id,
-              purchase_id: row.purchase_id,
-              sponsor_id: row.purchase_id,
-              sponsor_kind: "paid",
-              price_eur: 500,
-              currency: "EUR",
-              duration_days: 30,
-              payment_model: "one_time",
-              $insert_id: row.id,
-            },
-          }),
-        },
+  for (let i = 0; i < 50; i++) {
+    // The same transaction lock serializes consent withdrawal and delivery.
+    // An already transmitted request cannot be recalled, but no later send can pass a completed withdrawal.
+    const processed = await transaction(async (db) => {
+      const { rows } = await db.query<{
+        id: string;
+        event: string;
+        purchase_id: string;
+        analytics_id: string | null;
+        analytics_consent_at: string | null;
+        analytics_consent: ConsentReceipt | null;
+        starts_at: Date;
+      }>(`SELECT o.*,p.analytics_id,p.analytics_consent_at,p.starts_at,b.analytics_consent
+        FROM sponsor_analytics_outbox o JOIN sponsor_purchases p ON p.id=o.purchase_id
+        JOIN sponsor_buyers b ON b.id=p.buyer_id
+        WHERE o.delivered_at IS NULL ORDER BY o.id LIMIT 1 FOR UPDATE OF o,b`);
+      const row = rows[0];
+      if (!row) return false;
+      const consent = parseConsent(row.analytics_consent);
+      if (
+        row.analytics_id &&
+        consent?.analytics &&
+        Number(row.analytics_consent_at) === consent.updatedAt
+      ) {
+        const response = await fetch(
+          `${process.env.POSTHOG_HOST || "https://eu.i.posthog.com"}/i/v0/e/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(5000),
+            body: JSON.stringify({
+              api_key: apiKey,
+              event: row.event,
+              uuid: row.id,
+              timestamp: row.starts_at.toISOString(),
+              properties: {
+                distinct_id: row.analytics_id,
+                purchase_id: row.purchase_id,
+                sponsor_id: row.purchase_id,
+                sponsor_kind: "paid",
+                price_eur: 500,
+                currency: "EUR",
+                duration_days: 30,
+                payment_model: "one_time",
+                $insert_id: row.id,
+                $process_person_profile: false,
+                consent_version: consent.version,
+              },
+            }),
+          },
+        );
+        if (!response.ok) throw new Error("Sponsor analytics delivery failed");
+      }
+      // Without valid consent, discard instead of replaying it after a future acceptance.
+      await db.query(
+        "UPDATE sponsor_analytics_outbox SET delivered_at=now() WHERE id=$1",
+        [row.id],
       );
-      if (!response.ok) throw new Error("Sponsor analytics delivery failed");
-    }
-    await database().query(
-      "UPDATE sponsor_analytics_outbox SET delivered_at=now() WHERE id=$1",
-      [row.id],
-    );
+      return true;
+    });
+    if (!processed) break;
   }
 }

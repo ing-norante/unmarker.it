@@ -1,5 +1,7 @@
+import { createConsent } from "../../src/lib/consentPolicy";
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -22,6 +24,8 @@ import {
   normalizeIcon,
   cancelPurchase,
   reconcilePurchases,
+  updateSponsorConsent,
+  flushAnalytics,
 } from "./service";
 import { handleSponsorRequest } from "./http";
 
@@ -30,6 +34,7 @@ const fake = vi.hoisted(() => ({
   events: [] as Stripe.Event[],
   creates: 0,
   failRetrieve: false,
+  analyticsLive: false,
   disputes: [] as Stripe.Dispute[],
 }));
 vi.mock("./config.ts", async (importOriginal) => {
@@ -37,6 +42,7 @@ vi.mock("./config.ts", async (importOriginal) => {
   const real = new Stripe("sk_test_mock");
   return {
     ...original,
+    getConfig: () => ({ ...original.getConfig(), live: fake.analyticsLive }),
     getStripe: () => ({
       customers: { create: async () => ({ id: `cus_${randomUUID()}` }) },
       prices: {
@@ -140,7 +146,11 @@ describe.skipIf(!connection)(
       fake.events = [];
       fake.creates = 0;
       fake.failRetrieve = false;
+      fake.analyticsLive = false;
       fake.disputes = [];
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
     });
     afterAll(async () => {
       await database().end();
@@ -253,6 +263,133 @@ describe.skipIf(!connection)(
         reservePurchase(owner.id, changed, randomUUID()),
       ).rejects.toMatchObject({ code: "request_changed" });
     });
+    async function analyticsOrder() {
+      const owner = await buyer();
+      const choice = createConsent(true, Date.now() - 1000);
+      const data = form();
+      data.set("analyticsId", "consenting-browser");
+      data.set("analyticsConsent", JSON.stringify(choice));
+      const purchase = await reservePurchase(owner.id, data, randomUUID());
+      await ensureCheckout(purchase.id, owner.id);
+      const ready = await database().query(
+        "SELECT stripe_session_id FROM sponsor_purchases WHERE id=$1",
+        [purchase.id],
+      );
+      await syncSponsorPurchase(
+        purchase.id,
+        pay(ready.rows[0].stripe_session_id),
+      );
+      vi.stubEnv("POSTHOG_API_KEY", "phc_mock");
+      const send = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal("fetch", send);
+      fake.analyticsLive = true;
+      return { owner, purchase, choice, send };
+    }
+    it("does not store attribution without explicit valid consent", async () => {
+      const owner = await buyer();
+      const data = form();
+      data.set("analyticsId", "unconsented-id");
+      const purchase = await reservePurchase(owner.id, data, randomUUID());
+      expect(purchase.analytics_id).toBeNull();
+      expect(purchase.analytics_consent_at).toBeNull();
+    });
+    it("delivers conversions only for a valid recorded consent", async () => {
+      const { send } = await analyticsOrder();
+      await flushAnalytics();
+      await flushAnalytics();
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(send.mock.calls[0][1].body).properties).toMatchObject({
+        distinct_id: "consenting-browser",
+        consent_version: "2026-09-17",
+      });
+    });
+    it("withdrawal stops pending and retried conversions without changing the campaign", async () => {
+      const { owner, purchase, send } = await analyticsOrder();
+      send.mockRejectedValueOnce(new Error("offline"));
+      await expect(flushAnalytics()).rejects.toThrow("offline");
+      await updateSponsorConsent(owner.id, createConsent(false));
+      send.mockClear();
+      await flushAnalytics();
+      expect(send).not.toHaveBeenCalled();
+      const stored = (
+        await database().query("SELECT * FROM sponsor_purchases WHERE id=$1", [
+          purchase.id,
+        ])
+      ).rows[0];
+      expect(stored.status).toBe("active");
+      expect(stored.analytics_id).toBeNull();
+      expect(
+        (
+          await database().query(
+            "SELECT * FROM sponsor_analytics_outbox WHERE delivered_at IS NULL",
+          )
+        ).rows,
+      ).toHaveLength(0);
+    });
+    it("does not restore old attribution after stale or renewed acceptance", async () => {
+      const { owner, choice, send } = await analyticsOrder();
+      const denial = createConsent(false);
+      await updateSponsorConsent(owner.id, denial);
+      await updateSponsorConsent(owner.id, choice);
+      expect(
+        (
+          await database().query(
+            "SELECT analytics_consent FROM sponsor_buyers WHERE id=$1",
+            [owner.id],
+          )
+        ).rows[0].analytics_consent.analytics,
+      ).toBe(false);
+      await updateSponsorConsent(
+        owner.id,
+        createConsent(true, denial.updatedAt + 1),
+      );
+      await flushAnalytics();
+      expect(send).not.toHaveBeenCalled();
+    });
+    it("discards conversions after consent expires", async () => {
+      const { owner, send } = await analyticsOrder();
+      await database().query(
+        "UPDATE sponsor_buyers SET analytics_consent=$2 WHERE id=$1",
+        [owner.id, createConsent(true, Date.now() - 366 * 86400000)],
+      );
+      await flushAnalytics();
+      expect(send).not.toHaveBeenCalled();
+    });
+    it("syncs consent without creating buyer cookies for ordinary visitors", async () => {
+      const response = await handleSponsorRequest(
+        new Request("http://localhost:5173/api/sponsors?action=consent", {
+          method: "POST",
+          headers: { origin: "http://localhost:5173", "x-sponsor-client": "1" },
+          body: JSON.stringify(createConsent(false)),
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("set-cookie")).toBeNull();
+      expect(
+        (await database().query("SELECT * FROM sponsor_buyers")).rows,
+      ).toHaveLength(0);
+    });
+    it("requires the buyer session and same origin for a server withdrawal", async () => {
+      const { owner, send } = await analyticsOrder();
+      const request = (origin: string) =>
+        new Request("http://localhost:5173/api/sponsors?action=consent", {
+          method: "POST",
+          headers: {
+            origin,
+            "x-sponsor-client": "1",
+            cookie: `unmarker_sponsor_session=${owner.token}`,
+          },
+          body: JSON.stringify(createConsent(false)),
+        });
+      expect(
+        (await handleSponsorRequest(request("https://other.example"))).status,
+      ).toBe(403);
+      expect(
+        (await handleSponsorRequest(request("http://localhost:5173"))).status,
+      ).toBe(200);
+      await flushAnalytics();
+      expect(send).not.toHaveBeenCalled();
+    });
     it("recovers a Stripe success whose database attachment was interrupted", async () => {
       const { owner, purchase } = await order();
       await database().query(
@@ -327,6 +464,7 @@ describe.skipIf(!connection)(
         (await database().query("SELECT * FROM sponsor_webhook_receipts")).rows,
       ).toHaveLength(0);
       fake.failRetrieve = false;
+      fake.analyticsLive = false;
       await processWebhook(event);
       expect((await catalog()).sponsors).toHaveLength(1);
     });

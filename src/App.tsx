@@ -1,8 +1,9 @@
+import { CookieConsent } from "@/components/CookieConsent";
 import { Suspense, useCallback, useState } from "react";
 import { ImageUploader } from "@/components/ImageUploader";
 import { Header } from "@/components/Header";
 import { HomepageFacts } from "@/components/HomepageFacts";
-import { DeferredFooter } from "@/components/DeferredFooter";
+import { Footer } from "@/components/Footer";
 import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
 import { ChunkReloadNotice } from "@/components/ChunkReloadNotice";
 import { lazyWithReload } from "@/lib/lazyWithReload";
@@ -30,9 +31,12 @@ const WorkflowApp = lazyWithReload(
 
 function App() {
   return (
-    <SponsorLayout>
-      <AppContent />
-    </SponsorLayout>
+    <>
+      <SponsorLayout>
+        <AppContent />
+      </SponsorLayout>
+      <CookieConsent />
+    </>
   );
 }
 
@@ -130,7 +134,7 @@ function AppContent() {
           <HomepageFacts />
         </div>
         <div className="px-(--page-gutter) pb-6 lg:pb-8">
-          <DeferredFooter />
+          <Footer />
         </div>
         <div translate="no">
           <LocaleSuggestion />

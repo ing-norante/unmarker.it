@@ -1,3 +1,6 @@
+import { getConsent } from "@/lib/cookieConsent";
+import { createConsent } from "@/lib/consentPolicy";
+import { getSponsorAnalyticsId } from "@/lib/analytics";
 import type { SponsorPurchaseStatus } from "@/lib/sponsorPurchase";
 
 export class SponsorApiError extends Error {}
@@ -37,6 +40,20 @@ export async function createSponsorCheckout(
   form: FormData,
 ): Promise<SponsorPurchaseStatus> {
   await ensureSession();
+  // Tie identity to the same consent period, even if consent changes while awaiting the SDK.
+  const startedWith = getConsent();
+  const analyticsId = startedWith?.analytics
+    ? await getSponsorAnalyticsId()
+    : null;
+  const current = getConsent() ?? createConsent(false);
+  form.set("analyticsConsent", JSON.stringify(current));
+  if (
+    analyticsId &&
+    current.analytics &&
+    current.updatedAt === startedWith?.updatedAt
+  ) {
+    form.set("analyticsId", analyticsId);
+  } else form.delete("analyticsId");
   return request("checkout", form);
 }
 export async function getSponsorPurchase(

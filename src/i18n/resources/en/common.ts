@@ -96,10 +96,51 @@ export const common = {
     light: "Switch to light mode",
     dark: "Switch to dark mode",
   },
+  consent: {
+    title: "Privacy & statistics",
+    summary:
+      "Necessary storage runs the site. With your consent, PostHog measures usage, sponsor results and errors. You can decline and use all features.",
+    accept: "Accept analytics",
+    reject: "Reject analytics",
+    preferences: "Cookie preferences",
+    save: "Save preferences",
+    closeReject: "Close and reject analytics",
+    closePreferences: "Close preferences without saving",
+    description:
+      "Choose whether to allow optional statistics. You can change your choice or withdraw consent here at any time.",
+    necessary: "Necessary · always active",
+    necessaryDescription:
+      "Theme, language, cookie choices and the secure sponsor checkout session. These keep your requested features working.",
+    analytics: "Statistics & diagnostics · PostHog",
+    analyticsDescription:
+      "Optional usage, sponsor views/clicks and purchase conversions, errors and performance metrics, using a pseudonymous browser identifier. No session recordings, image uploads or advertising profiles.",
+    retention:
+      "We remember your choice for six months on this browser when storage is available. Withdrawal stops future analytics; it does not delete accounting records or data already sent.",
+    drafts: "Italian drafts on GitHub; final policies pending.",
+    syncError:
+      "Your choice is saved on this device. We could not sync it with your sponsor purchases. Retry to finish updating server-side analytics.",
+    retry: "Retry sync",
+  },
   footer: {
-    builtWith: "Built with",
-    feedback: "Feedback",
-    craftedBy: "Crafted by",
+    legal: "Legal · drafts",
+    terms: "Sponsor terms",
+    privacy: "Privacy policy",
+    cookies: "Cookie policy",
+    refunds: "Cancellations & refunds",
+    draftNotice: "For review only.",
+    draftDescription:
+      "Not yet applicable to purchases. Italian drafts open on GitHub in a new tab.",
+    description:
+      "Analyze and process AI watermarks, directly in your browser. Your images stay on your device.",
+    research: "Research",
+    contact: "Contact & support",
+    registeredOffice: "Registered office",
+    italy: "Italy",
+    vatTaxId: "VAT / Tax ID (P. IVA / C.F.)",
+    businessRegister: "Business Register",
+    shareCapital: "Share capital",
+    paidCapital: "€100,000.00, fully paid",
+    pecLabel: "Certified email (PEC): info@pec.nomadesrl.it",
     arxivTitle: "UnMarker: A Universal Attack on Defensive Image Watermarking",
     waterlooTitle: "Watermarks offer no defense against deepfakes",
   },

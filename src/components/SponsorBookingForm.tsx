@@ -33,7 +33,7 @@ import {
   MAX_ICON_BYTES,
   type SponsorPurchaseStatus,
 } from "@/lib/sponsorPurchase";
-import { getSponsorAnalyticsId, trackSponsorEvent } from "@/lib/analytics";
+import { trackSponsorEvent } from "@/lib/analytics";
 import { sponsorship } from "@/lib/sponsors";
 
 export default function SponsorBookingForm({
@@ -126,8 +126,6 @@ export default function SponsorBookingForm({
           data.set(key, value[key]);
         data.set("icon", value.icon!);
         data.set("requestId", requestId);
-        const analyticsId = await getSponsorAnalyticsId();
-        if (analyticsId) data.set("analyticsId", analyticsId);
         const purchase = await createSponsorCheckout(data);
         if (!purchase.checkoutUrl) {
           setPending(purchase);

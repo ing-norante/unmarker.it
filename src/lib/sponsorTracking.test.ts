@@ -5,7 +5,13 @@ import {
   trackSponsorClick,
 } from "@/lib/sponsorTracking";
 
-const { capture } = vi.hoisted(() => ({ capture: vi.fn() }));
+const { capture, consent } = vi.hoisted(() => ({
+  capture: vi.fn(),
+  consent: { enabled: true },
+}));
+vi.mock("@/lib/cookieConsent", () => ({
+  hasAnalyticsConsent: () => consent.enabled,
+}));
 vi.mock("@/lib/analytics", () => ({ trackSponsorEvent: capture }));
 
 const sponsor = {
@@ -62,6 +68,7 @@ let styles: Map<unknown, object>;
 
 beforeEach(() => {
   capture.mockReset();
+  consent.enabled = true;
   page = Object.assign(new EventTarget(), {
     visibilityState: "visible",
     elementFromPoint: vi.fn(),
@@ -124,6 +131,30 @@ describe("actual sponsor visibility", () => {
 });
 
 describe("shared sponsor observer", () => {
+  it("counts only exposure after consent and stops again on withdrawal", () => {
+    vi.useFakeTimers();
+    consent.enabled = false;
+    const element = makeElement();
+    page.elementFromPoint.mockReturnValue(element);
+    const stop = observeSponsors({
+      querySelectorAll: () => [element],
+    } as unknown as HTMLElement);
+    vi.advanceTimersByTime(2000);
+    trackSponsorClick(sponsor, placement);
+    expect(capture).not.toHaveBeenCalled();
+    consent.enabled = true;
+    browser.dispatchEvent(new Event("unmarker:analytics-pageview"));
+    vi.advanceTimersByTime(500);
+    expect(capture).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    expect(capture).toHaveBeenCalledOnce();
+    consent.enabled = false;
+    browser.dispatchEvent(new Event("unmarker:analytics-pageview"));
+    trackSponsorClick(sponsor, placement);
+    vi.advanceTimersByTime(2000);
+    expect(capture).toHaveBeenCalledOnce();
+    stop();
+  });
   it("deduplicates rendered copies, resets per page view, and cleans up timers", () => {
     vi.useFakeTimers();
     const first = makeElement();
