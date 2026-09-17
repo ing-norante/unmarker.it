@@ -281,16 +281,17 @@ html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-d
 /* Sponsor rails reserve their own space, including the mobile safe areas. */
 .sponsor-layout {
   --sponsor-rail-width: clamp(12rem, 13vw, 13rem);
-  --sponsor-top-height: calc(2rem + env(safe-area-inset-top, 0px));
+  --sponsor-strip-height: 3.25rem;
+  --sponsor-top-height: 0px;
   padding-top: var(--sponsor-top-height);
 }
 
 .sponsor-layout-has-top {
-  --sponsor-top-height: calc(5rem + env(safe-area-inset-top, 0px));
+  --sponsor-top-height: calc(var(--sponsor-strip-height) + env(safe-area-inset-top, 0px));
 }
 
 .sponsor-layout-has-bottom {
-  padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--sponsor-strip-height) + env(safe-area-inset-bottom, 0px));
 }
 
 @media (max-width: 1439px) {
@@ -325,32 +326,58 @@ html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-d
   border-top: 1px solid var(--border);
 }
 
-.sponsor-mobile-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+.sponsor-mobile-controls {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem var(--page-gutter) 1rem;
+}
+
+/* Touch scroll belongs to the page, not to a second horizontal scrolling track. */
+.sponsor-mobile-scroll {
+  height: var(--sponsor-strip-height);
+  overflow: clip;
+  touch-action: pan-y;
+  scrollbar-width: none;
+}
 .sponsor-marquee {
   display: flex;
+  align-items: center;
   width: max-content;
-  padding-block: 0.25rem;
-  animation: sponsor-marquee 60s linear infinite;
+  height: 100%;
+  animation: sponsor-marquee var(--sponsor-marquee-duration, 60s) linear infinite;
+  will-change: transform;
 }
 .sponsor-marquee-reverse { animation-direction: reverse; }
 .sponsor-marquee-group {
   display: flex;
-  flex-shrink: 0;
-  min-width: 100vw;
-  justify-content: space-around;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0.5rem;
   padding-inline: 0.25rem;
 }
-
-/* Keyboard navigation uses a normal scrollable list with one copy of each link. */
-.sponsor-mobile-scroll:has(:focus-visible) .sponsor-marquee {
+.sponsor-mobile-scroll[data-overflow="false"] .sponsor-marquee {
+  width: 100%;
+  justify-content: center;
   animation: none;
-  transform: none;
+  will-change: auto;
+}
+.sponsor-mobile-scroll[data-overflow="false"] .sponsor-marquee-group[aria-hidden] { display: none; }
+
+/* Keyboard users browse one static copy. Pause the timeline rather than restarting it. */
+.sponsor-mobile-scroll:has(:focus-visible) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.sponsor-mobile-scroll:has(:focus-visible) .sponsor-marquee {
+  animation-play-state: paused;
+  transform: none !important;
 }
 .sponsor-mobile-scroll:has(:focus-visible) .sponsor-marquee-group[aria-hidden] { display: none; }
 
-@keyframes sponsor-marquee { to { transform: translateX(-50%); } }
+@keyframes sponsor-marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
 
 .sponsor-flip { perspective: 1000px; }
 .sponsor-flip-rotor {
@@ -411,7 +438,7 @@ html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-d
     padding-block: 0;
     padding-inline: var(--sponsor-rail-width);
   }
-  .sponsor-mobile-bar { display: none; }
+  .sponsor-mobile-bar, .sponsor-mobile-controls { display: none; }
   .sponsor-sidebar {
     position: fixed;
     top: 0;
@@ -459,7 +486,8 @@ html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-d
     transform: none;
     visibility: visible;
   }
-  .sponsor-marquee { animation: none; transform: none; }
+  .sponsor-mobile-scroll { overflow-x: auto; overflow-y: hidden; touch-action: auto; }
+  .sponsor-marquee { animation: none; transform: none; will-change: auto; }
   .sponsor-marquee-group[aria-hidden], .sponsor-motion-control { display: none; }
   .sponsor-sidebar-cards { grid-auto-rows: auto; }
 }

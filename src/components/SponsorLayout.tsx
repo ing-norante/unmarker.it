@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { PauseIcon } from "@phosphor-icons/react/dist/ssr/Pause";
 import { PlayIcon } from "@phosphor-icons/react/dist/ssr/Play";
 import { AdvertiseDialog } from "@/components/AdvertiseDialog";
-import { MobileSponsorChip } from "@/components/MobileSponsorChip";
+import { MobileSponsorMarquee } from "@/components/MobileSponsorMarquee";
 import { SponsorAdvertiseCard } from "@/components/SponsorAdvertiseCard";
 import { SponsorFlipCard } from "@/components/SponsorFlipCard";
 import { SponsorSingleCard } from "@/components/SponsorSingleCard";
@@ -13,7 +13,6 @@ import {
   getMobileBottomSponsors,
   getMobileTopSponsors,
   type SidebarCard,
-  type Sponsor,
 } from "@/lib/sponsors";
 import { cn } from "@/lib/utils";
 import { observeSponsors, type SponsorPlacement } from "@/lib/sponsorTracking";
@@ -101,26 +100,23 @@ export function SponsorLayout({ children }: { children: ReactNode }) {
         </div>
         {controls}
       </aside>
-      <aside
-        className="sponsor-mobile-bar sponsor-mobile-top"
-        aria-label={t("sponsors.topLabel")}
-      >
-        <div className="flex items-center justify-between gap-2 px-3">
-          <p className="text-muted-foreground text-xs font-semibold">
-            {t("sponsors.label")}
-          </p>
-          {controls}
-        </div>
-        {topSponsors.length > 0 && <MobileSponsors sponsors={topSponsors} />}
-      </aside>
+      {topSponsors.length > 0 && (
+        <aside
+          className="sponsor-mobile-bar sponsor-mobile-top"
+          aria-label={t("sponsors.topLabel")}
+        >
+          <MobileSponsorMarquee sponsors={topSponsors} />
+        </aside>
+      )}
       <div className="sponsor-content">{children}</div>
+      <div className="sponsor-mobile-controls">{controls}</div>
       <SponsorPurchaseReturn />
       {bottomSponsors.length > 0 && (
         <aside
           className="sponsor-mobile-bar sponsor-mobile-bottom"
           aria-label={t("sponsors.bottomLabel")}
         >
-          <MobileSponsors sponsors={bottomSponsors} reverse />
+          <MobileSponsorMarquee sponsors={bottomSponsors} reverse />
         </aside>
       )}
     </div>
@@ -168,41 +164,4 @@ function SidebarCards({
         );
     }
   });
-}
-
-function MobileSponsors({
-  sponsors,
-  reverse = false,
-}: {
-  sponsors: Sponsor[];
-  reverse?: boolean;
-}) {
-  return (
-    <div className="sponsor-mobile-scroll">
-      <div
-        className={cn("sponsor-marquee", reverse && "sponsor-marquee-reverse")}
-      >
-        {[0, 1, 2, 3].map((copy) => (
-          <div
-            key={copy}
-            className="sponsor-marquee-group"
-            aria-hidden={copy > 0 ? true : undefined}
-          >
-            {sponsors.map((sponsor, index) => (
-              <MobileSponsorChip
-                key={sponsor.id}
-                sponsor={sponsor}
-                tabIndex={copy > 0 ? -1 : undefined}
-                placement={{
-                  location: reverse ? "mobile_bottom" : "mobile_top",
-                  position: index + 1,
-                  face: "chip",
-                }}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
