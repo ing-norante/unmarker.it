@@ -191,7 +191,7 @@ function WorkflowLayout({
                   <Separator className="flex-1" />
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-auto lg:overscroll-contain">
+                <div className="min-h-0 flex-1">
                   <div className="flex flex-col gap-4">
                     <WorkflowSummary
                       phase={state.phase}
@@ -280,7 +280,7 @@ function WorkflowLayout({
                     className="shrink-0"
                   />
 
-                  <div className="lg:min-h-0 lg:flex-1 lg:overflow-auto lg:overscroll-contain">
+                  <div className="lg:min-h-0 lg:flex-1">
                     <ImageComparison
                       originalImageUrl={originalImageUrl}
                       processedImageUrl={processedImageUrl}
