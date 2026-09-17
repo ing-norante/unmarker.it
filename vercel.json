@@ -65,6 +65,14 @@
   ],
   "rewrites": [
     {
+      "source": "/sponsorship",
+      "destination": "/sponsorship/index.html"
+    },
+    {
+      "source": "/zh-hans/sponsorship",
+      "destination": "/zh-hans/sponsorship/index.html"
+    },
+    {
       "source": "/legal/sponsorship-terms",
       "destination": "/legal/sponsorship-terms/index.html"
     },

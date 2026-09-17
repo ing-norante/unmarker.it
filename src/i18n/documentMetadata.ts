@@ -1,10 +1,18 @@
 import type { i18n } from "i18next";
-import { localeConfigs, type SupportedLocale } from "@/i18n/locales";
+import {
+  localeConfigs,
+  pagePath,
+  type AppPage,
+  type SupportedLocale,
+} from "@/i18n/locales";
 
 export interface DocumentMetadata {
   locale: SupportedLocale;
   canonical: string;
-  alternates: readonly { hreflang: "en" | "zh-Hans" | "x-default"; href: string }[];
+  alternates: readonly {
+    hreflang: "en" | "zh-Hans" | "x-default";
+    href: string;
+  }[];
   title: string;
   description: string;
   keywords: string;
@@ -23,7 +31,38 @@ export interface DocumentMetadata {
 export function createDocumentMetadata(
   locale: SupportedLocale,
   instance: i18n,
+  page: AppPage = "home",
 ): DocumentMetadata {
+  if (page === "sponsorship") {
+    const base = createDocumentMetadata(locale, instance);
+    const t = instance.getFixedT(locale, "common");
+    const title = t("sponsors.dialogTitle");
+    const description = t("sponsors.dialogDescription");
+    const canonical = `https://www.unmarker.it${pagePath(locale, page)}`;
+    return {
+      ...base,
+      canonical,
+      title,
+      description,
+      keywords: "",
+      ogTitle: title,
+      ogDescription: description,
+      twitterTitle: title,
+      twitterDescription: description,
+      alternates: base.alternates.map((alternate) => ({
+        ...alternate,
+        href: `https://www.unmarker.it${pagePath(alternate.hreflang === "zh-Hans" ? "zh-Hans" : "en", page)}`,
+      })),
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        url: canonical,
+        name: title,
+        description,
+        inLanguage: locale,
+      },
+    };
+  }
   const config = localeConfigs[locale];
   const t = instance.getFixedT(locale, "seo");
   const pageId = `${config.canonical}#webpage`;

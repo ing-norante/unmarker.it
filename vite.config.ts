@@ -38,6 +38,10 @@ export default defineConfig({
       configurePreviewServer(server) {
         server.middlewares.use((req, _res, next) => {
           const url = new URL(req.url || "/", "http://localhost");
+          if (/^\/(?:zh-hans\/)?sponsorship\/?$/.test(url.pathname)) {
+            req.url = `${url.pathname.replace(/\/$/, "")}/index.html${url.search}`;
+            return next();
+          }
           const page = legalPages.find((page) =>
             [`/legal/${page.slug}`, `/legal/${page.slug}/`].includes(
               url.pathname,

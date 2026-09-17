@@ -7,7 +7,12 @@ import {
   subscribeConsent,
   syncSponsorConsent,
 } from "@/lib/cookieConsent";
-import type { SupportedLocale } from "@/i18n/locales";
+import {
+  pagePath,
+  resolvePageFromPathname,
+  type SupportedLocale,
+} from "@/i18n/locales";
+import { sponsorship } from "@/lib/sponsors";
 import { getSponsorAnalyticsContext } from "@/lib/sponsorAnalyticsContext";
 
 // Errors that browser extensions and in-app browsers inject, not our bundle.
@@ -143,6 +148,7 @@ let sdkInstanceNumber = 0;
 let analyticsRequests: AbortController | null = null;
 let consentListenerInstalled = false;
 let currentLocale: SupportedLocale = "en";
+let lastSponsorshipPageview: string | null = null;
 
 const consentBeforeSend: BeforeSendFn = (event) => {
   if (!hasAnalyticsConsent()) return null;
@@ -318,7 +324,10 @@ export async function initAnalytics(locale: SupportedLocale) {
   const properties = getSponsorAnalyticsContext();
   const posthog = await getPostHog();
   posthog?.register({ locale });
-  if (hasAnalyticsConsent()) posthog?.capture("$pageview", properties);
+  if (hasAnalyticsConsent() && posthog) {
+    posthog.capture("$pageview", properties);
+    captureSponsorshipPageview(posthog);
+  }
 }
 
 export function trackAction(
@@ -374,14 +383,19 @@ export async function capturePageview() {
     window.dispatchEvent(new Event("unmarker:analytics-pageview"));
   const properties = getSponsorAnalyticsContext();
   const posthog = await getPostHog();
-  if (hasAnalyticsConsent()) posthog?.capture("$pageview", properties);
+  if (hasAnalyticsConsent() && posthog) {
+    posthog.capture("$pageview", properties);
+    captureSponsorshipPageview(posthog);
+  }
 }
 
 export type SponsorEvent =
   | "sponsor_impression"
   | "sponsor_clicked"
   | "sponsor_advertise_opened"
-  | "sponsor_checkout_clicked";
+  | "sponsor_checkout_clicked"
+  | "sponsorship_link_clicked"
+  | "sponsorship_page_viewed";
 
 /** New sponsor events do not use the legacy action_clicked envelope. */
 export function trackSponsorEvent(
@@ -395,9 +409,13 @@ export function trackSponsorEvent(
     sponsor_tracking_version: 1,
     component: "sponsors",
   };
-  void getPostHog().then((posthog) => {
+  const capture = (posthog: typeof activePostHog) => {
     if (hasAnalyticsConsent()) posthog?.capture(event, eventProperties);
-  });
+  };
+  // Dispatch navigation clicks before leaving the document when the SDK is ready.
+  // Its unbatched fetch transport already uses keepalive; consent can still abort it.
+  if (activePostHog) capture(activePostHog);
+  else void getPostHog().then(capture);
 }
 
 export async function getSponsorAnalyticsId() {
@@ -418,4 +436,76 @@ export async function trackLocaleAction(
 ) {
   const posthog = await getPostHog();
   captureAction(posthog, action, component, properties);
+}
+
+export type SponsorshipLinkLocation =
+  | "desktop_left_card"
+  | "desktop_right_card"
+  | "desktop_controls"
+  | "mobile_controls"
+  | "language_switcher";
+
+/** Only bounded UI metadata: never form values, URLs with queries or billing data. */
+export function trackSponsorshipLink(
+  location: SponsorshipLinkLocation,
+  locale: SupportedLocale,
+  interaction: {
+    button: number;
+    metaKey: boolean;
+    ctrlKey: boolean;
+    shiftKey: boolean;
+  },
+  availableSpots?: number,
+) {
+  if (typeof window === "undefined" || interaction.button > 1) return;
+  const properties: AnalyticsProperties = {
+    link_location: location,
+    source_path: pagePath(
+      currentLocale,
+      resolvePageFromPathname(window.location.pathname),
+    ),
+    destination_path: pagePath(locale, "sponsorship"),
+    destination_locale: locale,
+    activation:
+      interaction.button === 1
+        ? "middle_click"
+        : interaction.metaKey || interaction.ctrlKey || interaction.shiftKey
+          ? "modified_click"
+          : "click",
+    ...(availableSpots === undefined
+      ? {}
+      : { available_spots: availableSpots }),
+  };
+  trackSponsorEvent("sponsorship_link_clicked", properties);
+  // Preserve existing Advertise insights; language changes aren't new Advertise clicks.
+  if (location !== "language_switcher") {
+    trackSponsorEvent("sponsor_advertise_opened", {
+      ...properties,
+      price_eur: sponsorship.priceEur,
+      duration_days: sponsorship.durationDays,
+      legacy_compatibility_event: true,
+    });
+  }
+}
+
+function captureSponsorshipPageview(
+  posthog: NonNullable<typeof activePostHog>,
+) {
+  const page = resolvePageFromPathname(window.location.pathname);
+  if (page !== "sponsorship") {
+    lastSponsorshipPageview = null;
+    return;
+  }
+  const path = pagePath(currentLocale, page);
+  // Analytics bootstrap, consent acceptance and repeated effects can coincide.
+  if (lastSponsorshipPageview === path) return;
+  lastSponsorshipPageview = path;
+  posthog.capture("sponsorship_page_viewed", {
+    ...getSponsorAnalyticsContext(),
+    page_path: path,
+    locale: currentLocale,
+    analytics_schema_version: ANALYTICS_SCHEMA_VERSION,
+    sponsor_tracking_version: 1,
+    component: "sponsorship_page",
+  });
 }

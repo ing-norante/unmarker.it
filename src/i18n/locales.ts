@@ -35,7 +35,9 @@ export const localeConfigs: Record<SupportedLocale, LocaleConfig> = {
 
 export function resolveLocaleFromPathname(pathname: string): SupportedLocale {
   const normalized = pathname.toLowerCase().replace(/\/+$/, "");
-  return normalized === "/zh-hans" ? "zh-Hans" : "en";
+  return normalized === "/zh-hans" || normalized.startsWith("/zh-hans/")
+    ? "zh-Hans"
+    : "en";
 }
 
 export function isSupportedLocale(value: string): value is SupportedLocale {
@@ -61,4 +63,16 @@ export function prefersSimplifiedChinese(languages: readonly string[]) {
   } catch {
     return false;
   }
+}
+
+export type AppPage = "home" | "sponsorship";
+
+export function resolvePageFromPathname(pathname: string): AppPage {
+  return /^\/(?:zh-hans\/)?sponsorship\/?$/i.test(pathname)
+    ? "sponsorship"
+    : "home";
+}
+
+export function pagePath(locale: SupportedLocale, page: AppPage): string {
+  return `${localeConfigs[locale].path}${page === "sponsorship" ? "sponsorship" : ""}`;
 }

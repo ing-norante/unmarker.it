@@ -84,7 +84,7 @@ the production Content Security Policy allows local images, not remote favicons.
 - Paired cards use a 20-second cycle, with equal 10-second front/back phases.
   Negative animation offsets stagger the cards without adding an initial delay.
   Animations can be paused, stop while interacting, and respect reduced motion.
-- The advertisement dialog shows availability and €500 per slot for 30 days,
+- The `/sponsorship` page shows availability and €500 per slot for 30 days,
   starting at confirmed purchase. It requests a name, icon, URL and short description.
   TanStack Form and shadcn validate the creative and open hosted Stripe Checkout.
   This is one payment, without automatic renewal. Booking requires the sponsor
@@ -93,7 +93,7 @@ the production Content Security Policy allows local images, not remote favicons.
   Verified payments publish campaigns automatically; they disappear after 30 days.
 
 For local QA, check desktop/mobile layouts in dark mode, both locales,
-upload/reset, the advertisement dialog, and keyboard navigation. Temporarily
+upload/reset, the sponsorship page, and keyboard navigation. Temporarily
 use 12 or 20 uniquely identified sponsors to check both flip columns and the
 bottom mobile bar; enable reduced motion to check the static alternative.
 
@@ -166,7 +166,24 @@ and a historical baseline with a fixed cutoff before deployment.
 - `sponsor_clicked`: every link activation (also keyboard and middle click),
   with sponsor, location, one-based position, face and optional impression ID.
   Fast clicks remain counted without fabricating a qualifying impression.
-- `sponsor_advertise_opened` and `sponsor_checkout_clicked`: interest in booking.
+- `sponsorship_link_clicked`: every sponsorship link activation, including keyboard,
+  modified clicks and middle clicks. `link_location` distinguishes `desktop_left_card`,
+  `desktop_right_card`, `desktop_controls`, `mobile_controls`, and `language_switcher`;
+  `source_path`, `destination_path`, `destination_locale`, and `activation` describe
+  the navigation without recording query strings or form data.
+- `sponsorship_page_viewed`: arrival on the sponsorship page after analytics can
+  initialize with consent, including direct visits. Deduplicated for the current
+  page/language; language navigation creates another view. Clicking the already
+  selected language does not create another view.
+  Use **unique users** for visitor counts, **total events** for click counts, and
+  an ordered `sponsorship_link_clicked` → `sponsorship_page_viewed` funnel to measure
+  arrivals after a click. Exclude `link_location = language_switcher` when measuring
+  acquisition into the sponsorship flow. Direct visits can have no preceding click.
+  These metrics cover consenting visitors only; rejected/pre-consent clicks are
+  never replayed, and browser/network blocking can prevent delivery.
+- `sponsor_advertise_opened` remains a compatibility event for Advertise clicks
+  (`legacy_compatibility_event: true`); do not sum it with `sponsorship_link_clicked`.
+  `sponsor_checkout_clicked` records the transition to Stripe.
   Checkout clicks do not imply payment. The server separately emits
   `sponsor_purchase_confirmed` and `sponsor_campaign_activated` through a durable
   outbox, excluding Stripe test payments.

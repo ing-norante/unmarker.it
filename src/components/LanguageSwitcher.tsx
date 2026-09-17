@@ -1,12 +1,14 @@
 import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { localeConfigs, type SupportedLocale } from "@/i18n/locales";
+import { pagePath, type AppPage, type SupportedLocale } from "@/i18n/locales";
 import { useLocale } from "@/i18n/LocaleProvider";
+
+import { trackSponsorshipLink } from "@/lib/analytics";
 
 const localeOrder: SupportedLocale[] = ["en", "zh-Hans"];
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({ page = "home" }: { page?: AppPage }) {
   const { t } = useTranslation("common");
   const { locale, selectLocale, recordPreference } = useLocale();
 
@@ -14,6 +16,8 @@ export function LanguageSwitcher() {
     event: MouseEvent<HTMLAnchorElement>,
     nextLocale: SupportedLocale,
   ) => {
+    if (page === "sponsorship")
+      trackSponsorshipLink("language_switcher", nextLocale, event);
     if (
       event.button !== 0 ||
       event.metaKey ||
@@ -42,11 +46,15 @@ export function LanguageSwitcher() {
           className="rounded-none border-0 px-3 font-black"
         >
           <a
-            href={localeConfigs[nextLocale].path}
+            href={pagePath(nextLocale, page)}
             hrefLang={nextLocale}
             lang={nextLocale}
             aria-current={locale === nextLocale ? "page" : undefined}
             onClick={(event) => handleClick(event, nextLocale)}
+            onAuxClick={(event) => {
+              if (page === "sponsorship" && event.button === 1)
+                trackSponsorshipLink("language_switcher", nextLocale, event);
+            }}
           >
             {nextLocale === "en"
               ? t("language.english")

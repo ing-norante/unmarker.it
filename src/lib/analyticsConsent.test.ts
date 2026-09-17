@@ -26,7 +26,7 @@ beforeEach(() => {
   vi.stubGlobal(
     "window",
     Object.assign(new EventTarget(), {
-      location: { hostname: "www.unmarker.it" },
+      location: { hostname: "www.unmarker.it", pathname: "/" },
     }),
   );
   vi.stubGlobal("document", { cookie: "" });
@@ -151,5 +151,111 @@ describe("analytics consent gate", () => {
       expect(sdk.capture).toHaveBeenCalledWith("$pageview", expect.any(Object)),
     );
     expect(sdk.init).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("sponsorship navigation", () => {
+  const click = { button: 0, metaKey: false, ctrlKey: false, shiftKey: false };
+
+  it("captures each placement immediately before navigation and preserves legacy insights", async () => {
+    const api = await import("./analytics");
+    (await import("./cookieConsent")).saveConsent(true);
+    await api.initAnalytics("en");
+    sdk.capture.mockClear();
+    for (const location of [
+      "desktop_left_card",
+      "desktop_right_card",
+      "desktop_controls",
+      "mobile_controls",
+      "language_switcher",
+    ] as const) {
+      api.trackSponsorshipLink(location, "zh-Hans", click, 17);
+      // No await: leaving the document must not defer a ready SDK capture.
+      expect(sdk.capture).toHaveBeenCalledWith(
+        "sponsorship_link_clicked",
+        expect.objectContaining({
+          link_location: location,
+          source_path: "/",
+          destination_path: "/zh-hans/sponsorship",
+          destination_locale: "zh-Hans",
+          available_spots: 17,
+          activation: "click",
+        }),
+      );
+    }
+    expect(
+      sdk.capture.mock.calls.filter(
+        ([event]) => event === "sponsorship_link_clicked",
+      ),
+    ).toHaveLength(5);
+    expect(
+      sdk.capture.mock.calls.filter(
+        ([event]) => event === "sponsor_advertise_opened",
+      ),
+    ).toHaveLength(4);
+    sdk.capture.mockClear();
+    api.trackSponsorshipLink("mobile_controls", "en", { ...click, button: 1 });
+    api.trackSponsorshipLink("mobile_controls", "en", {
+      ...click,
+      ctrlKey: true,
+    });
+    api.trackSponsorshipLink("mobile_controls", "en", { ...click, button: 2 });
+    expect(
+      sdk.capture.mock.calls
+        .filter(([event]) => event === "sponsorship_link_clicked")
+        .map(([, props]) => props.activation),
+    ).toEqual(["middle_click", "modified_click"]);
+  });
+
+  it("never captures rejected clicks or replays pre-consent clicks", async () => {
+    const api = await import("./analytics");
+    const consent = await import("./cookieConsent");
+    await api.initAnalytics("en");
+    api.trackSponsorshipLink("mobile_controls", "en", click);
+    consent.saveConsent(true);
+    await api.capturePageview();
+    expect(
+      sdk.capture.mock.calls.some(
+        ([event]) => event === "sponsorship_link_clicked",
+      ),
+    ).toBe(false);
+    consent.saveConsent(false);
+    sdk.capture.mockClear();
+    api.trackSponsorshipLink("mobile_controls", "en", click);
+    await api.capturePageview();
+    expect(sdk.capture).not.toHaveBeenCalled();
+  });
+
+  it("counts a loaded page once, supports late consent and distinguishes language navigation", async () => {
+    window.location.pathname = "/sponsorship";
+    const api = await import("./analytics");
+    const consent = await import("./cookieConsent");
+    await api.initAnalytics("en");
+    expect(sdk.capture).not.toHaveBeenCalled();
+    consent.saveConsent(true);
+    await api.capturePageview();
+    await api.capturePageview();
+    await api.initAnalytics("en");
+    const views = () =>
+      sdk.capture.mock.calls.filter(
+        ([event]) => event === "sponsorship_page_viewed",
+      );
+    expect(views()).toHaveLength(1);
+    expect(views()[0][1]).toMatchObject({
+      page_path: "/sponsorship",
+      locale: "en",
+    });
+    window.location.pathname = "/zh-hans/sponsorship";
+    await api.registerAnalyticsLocale("zh-Hans");
+    await api.capturePageview();
+    expect(views()).toHaveLength(2);
+    expect(views()[1][1]).toMatchObject({
+      page_path: "/zh-hans/sponsorship",
+      locale: "zh-Hans",
+    });
+    consent.saveConsent(false);
+    sdk.capture.mockClear();
+    await api.capturePageview();
+    expect(sdk.capture).not.toHaveBeenCalled();
   });
 });

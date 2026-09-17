@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { PauseIcon } from "@phosphor-icons/react/dist/ssr/Pause";
 import { PlayIcon } from "@phosphor-icons/react/dist/ssr/Play";
-import { AdvertiseDialog } from "@/components/AdvertiseDialog";
+import { AdvertiseLink } from "@/components/AdvertiseLink";
 import { MobileSponsorMarquee } from "@/components/MobileSponsorMarquee";
 import { SponsorAdvertiseCard } from "@/components/SponsorAdvertiseCard";
 import { SponsorFlipCard } from "@/components/SponsorFlipCard";
@@ -25,7 +25,7 @@ import { SponsorPurchaseReturn } from "@/components/SponsorPurchaseReturn";
 /** Shared by the homepage, loading shell and image workflow. */
 export function SponsorLayout({ children }: { children: ReactNode }) {
   const catalog = useSponsorCatalog();
-  const { sponsors, availableSpots, checkoutEnabled, testMode } = catalog;
+  const { sponsors, availableSpots } = catalog;
   const cards = buildAllSidebarCards(sponsors);
   const topSponsors = getMobileTopSponsors(sponsors);
   const bottomSponsors = getMobileBottomSponsors(sponsors);
@@ -37,12 +37,11 @@ export function SponsorLayout({ children }: { children: ReactNode }) {
     if (rootRef.current) return observeSponsors(rootRef.current);
   }, [catalogKey]);
   const MotionIcon = paused ? PlayIcon : PauseIcon;
-  const controls = (
+  const controls = (location: "desktop_controls" | "mobile_controls") => (
     <div className="flex items-center justify-center gap-1">
-      <AdvertiseDialog
+      <AdvertiseLink
         availableSpots={availableSpots}
-        checkoutEnabled={checkoutEnabled}
-        testMode={testMode}
+        location={location}
         compact
       />
       {sponsors.length > 0 && (
@@ -98,7 +97,7 @@ export function SponsorLayout({ children }: { children: ReactNode }) {
             catalog={catalog}
           />
         </div>
-        {controls}
+        {controls("desktop_controls")}
       </aside>
       {topSponsors.length > 0 && (
         <aside
@@ -109,7 +108,9 @@ export function SponsorLayout({ children }: { children: ReactNode }) {
         </aside>
       )}
       <div className="sponsor-content">{children}</div>
-      <div className="sponsor-mobile-controls">{controls}</div>
+      <div className="sponsor-mobile-controls">
+        {controls("mobile_controls")}
+      </div>
       <SponsorPurchaseReturn />
       {bottomSponsors.length > 0 && (
         <aside
@@ -157,9 +158,12 @@ function SidebarCards({
         return (
           <SponsorAdvertiseCard
             key="advertise"
+            location={
+              location === "desktop_left"
+                ? "desktop_left_card"
+                : "desktop_right_card"
+            }
             availableSpots={catalog.availableSpots}
-            checkoutEnabled={catalog.checkoutEnabled}
-            testMode={catalog.testMode}
           />
         );
     }

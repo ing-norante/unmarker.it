@@ -18,25 +18,30 @@ const [{ render, applyDocumentMetadataToHtml }, template] = await Promise.all([
 ]);
 
 for (const locale of ["en", "zh-Hans"]) {
-  const { appHtml, documentMetadata } = await render(locale);
-  let prerendered = template.replace(
-    '<div id="root"></div>',
-    `<div id="root">${appHtml}</div>`,
-  );
-  prerendered = applyDocumentMetadataToHtml(prerendered, documentMetadata);
+  for (const page of ["home", "sponsorship"]) {
+    const { appHtml, documentMetadata } = await render(locale, page);
+    let prerendered = template.replace(
+      '<div id="root"></div>',
+      `<div id="root">${appHtml}</div>`,
+    );
+    prerendered = applyDocumentMetadataToHtml(prerendered, documentMetadata);
 
-  if (!prerendered.includes('<meta name="color-scheme" content="dark"')) {
-    throw new Error(`Dark color scheme was lost for ${locale}`);
-  }
-  if (/(?:src|href)=["'](?:\.\/)?assets\//i.test(prerendered)) {
-    throw new Error(`Relative asset URL found in prerendered ${locale} HTML`);
-  }
+    if (!prerendered.includes('<meta name="color-scheme" content="dark"')) {
+      throw new Error(`Dark color scheme was lost for ${locale}`);
+    }
+    if (/(?:src|href)=["'](?:\.\/)?assets\//i.test(prerendered)) {
+      throw new Error(`Relative asset URL found in prerendered ${locale} HTML`);
+    }
 
-  const outputPath = locale === "en"
-    ? indexPath
-    : path.join(distDir, "zh-hans", "index.html");
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, prerendered);
+    const outputPath = path.join(
+      distDir,
+      locale === "en" ? "" : "zh-hans",
+      page === "home" ? "" : "sponsorship",
+      "index.html",
+    );
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, prerendered);
+  }
 }
 await writeLegalPages(distDir, template);
 await rm(serverDir, { recursive: true, force: true });
