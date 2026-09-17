@@ -54,8 +54,9 @@ indirizzo dedicato o un DPO non comunicato.
 3. Privacy: audit delle impostazioni PostHog live, durate di conservazione,
    replay, fornitori, regioni e garanzie per trasferimenti. Nessun valore mancante
    viene presentato come verificato.
-4. Sviluppo: B2B/IVA, numerazione coordinata, export amministrativo, cancellazione
-   di campagne pagate senza rimborso e rimborsi downtime senza revoca automatica.
+4. Sviluppo: B2B/IVA, numerazione coordinata, export amministrativo e cancellazione
+   di campagne pagate senza rimborso. La sincronizzazione dei rimborsi parziali
+   senza revoca è implementata; calcolo downtime e note di credito restano da fare.
 5. Prima della pubblicazione: rimuovere le note redazionali soltanto dopo aver
    risolto i punti, aggiungere data di efficacia e traduzioni coerenti con le
    lingue del checkout. Conservare la versione dei termini accettata dall'acquirente.

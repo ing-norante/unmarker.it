@@ -22,7 +22,11 @@ and local PostgreSQL. No live payments or production deployment were made.
   remotely created Checkout. An uncertain response does not free the place.
 - A new purchase after expiry is a new explicit payment. Multiple paid campaigns
   per buyer are supported, with one unfinished Checkout at a time.
-- Any refund removes the placement. A dispute pauses it, retaining its slot until
+- Partial refunds (including downtime compensation) keep the placement active
+  until its original expiry and retain its slot. A full cumulative refund removes
+  the placement. This policy applies to all partial refunds, including those made
+  in the Stripe Dashboard; it does not infer a refund reason or calculate downtime.
+  A dispute pauses the placement, retaining its slot until
   the original end date so winning the dispute can safely restore it. Neither a
   refund nor a dispute changes the original start date.
 - The implemented Checkout charges a fixed total of €500 in EUR, with adaptive

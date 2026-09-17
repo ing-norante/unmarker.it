@@ -37,7 +37,7 @@ describe("sponsor analytics integration", () => {
         component: "sponsors",
         sponsor_layout_version: "sponsors_v1",
         sponsor_tracking_version: 1,
-        sponsor_count: 4,
+        sponsor_count: 3,
       }),
     );
   });

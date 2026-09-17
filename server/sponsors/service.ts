@@ -365,7 +365,9 @@ async function syncLocked(
     const charge =
       typeof pi.latest_charge === "object" ? pi.latest_charge : null;
     if (!charge?.paid) throw new SponsorError("payment_pending", 503);
-    if (charge.amount_refunded > 0) status = "refunded";
+    // Partial refunds compensate downtime without ending or extending the campaign.
+    // Stripe's cumulative total also covers multiple refunds that repay the full payment.
+    if (charge.amount_refunded >= pi.amount_received) status = "refunded";
     if (charge.disputed) {
       const disputes = await stripe.disputes.list({
         payment_intent: pi.id,

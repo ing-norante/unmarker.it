@@ -148,5 +148,6 @@ accettata al momento dell'acquisto.
   di escludere qualunque rimedio.
 - Il calcolo sulle frazioni di giornata è una proposta attuativa del pro-rata
   richiesto, da confermare insieme alla misurazione dei disservizi.
-- Implementare conferma conservabile, dati fiscali, rimozione su richiesta e
-  rimborsi parziali senza revoca prima di dichiarare queste funzioni operative.
+- Implementare conferma conservabile, dati fiscali e rimozione su richiesta.
+  La sincronizzazione mantiene attive le campagne con rimborso parziale;
+  calcolo del downtime ed emissione delle note di credito restano da implementare.

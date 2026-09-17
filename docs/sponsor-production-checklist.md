@@ -37,7 +37,7 @@ da NoMaDe; la corretta classificazione dei documenti resta al commercialista.
 | Documenti legali | Nessun collegamento a condizioni/privacy nel footer esaminato; nessuna accettazione contrattuale registrata    |
 | Analytics        | Inizializzazione PostHog senza controllo del consenso in `src/lib/analytics.ts`                                |
 | Cron             | Endpoint autenticato disponibile; nessuna pianificazione in `vercel.json`                                      |
-| Rimborsi         | Anche un rimborso parziale rimuove lo sponsor                                                                  |
+| Rimborsi         | I parziali mantengono la campagna fino alla scadenza; il totale cumulativo integrale la rimuove                |
 | Pausa vendite    | Manca un interruttore dedicato ai nuovi acquisti; il blocco live attuale agisce sulla configurazione condivisa |
 
 Riferimenti implementativi: `server/sponsors/service.ts`,
@@ -170,10 +170,11 @@ considerare la campagna di 30 giorni interamente eseguita al primo clic.
 
 ### Rimborsi B2B per downtime — necessario già al lancio
 
-- [ ] Distinguere cancellazione volontaria senza rimborso da compensazione per
-      disservizi. Oggi qualunque rimborso, anche parziale, rimuove lo sponsor:
-      correggere questo comportamento prima del live affinché il rimborso downtime
-      non interrompa la campagna ripristinata.
+- [x] Correggere la sincronizzazione affinché un rimborso parziale non interrompa
+      la campagna né ne cambi la scadenza. La regola usa gli importi Stripe e vale
+      per tutti i rimborsi parziali; non classifica il motivo del rimborso.
+- [ ] Implementare separatamente la cancellazione volontaria della campagna pagata
+      senza rimborso e la registrazione amministrativa dei disservizi.
 - [ ] Applicare calcolo e nota di credito secondo la
       [specifica fatturazione e rimborsi](./legal/billing-and-refunds.md), con
       intervalli documentati, idempotenza e scadenza originale invariata.

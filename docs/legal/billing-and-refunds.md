@@ -80,13 +80,18 @@ Esempio: 72 ore di downtime su 720 → 50 € imponibili. Con IVA 22% originaria
 applicata: rimborso complessivo 61 € e corrispondente nota di credito. Per una
 vendita senza IVA addebitata non aggiungere IVA al rimborso.
 
-**Modifica bloccante prima del live:** attualmente `syncSponsorPurchase` revoca
-la campagna per qualsiasi importo rimborsato. Occorre distinguere la compensazione
-parziale per downtime da rimborso integrale, risoluzione e contestazione.
-Persistenza del motivo, importo, intervalli e identificativo Stripe con idempotenza;
-webhook e riconciliazione devono convergere alla stessa decisione, anche se il
-rimborso parte dal pannello Stripe. I casi non classificabili richiedono revisione,
-senza inventare il motivo in base al solo importo.
+**Correzione implementata:** `syncSponsorPurchase` mantiene attiva la campagna
+quando il totale rimborsato è inferiore all'importo incassato. Un rimborso integrale,
+anche raggiunto sommando più rimborsi, la rimuove. Contestazioni e scadenza
+conservano le rispettive regole. Webhook, ritorno dal checkout e riconciliazione
+leggono lo stesso stato aggiornato da Stripe; inizio e scadenza non cambiano.
+
+La regola vale per **tutti i rimborsi parziali**, anche eseguiti nel pannello Stripe:
+il codice non attribuisce automaticamente il motivo downtime. Non usare un
+rimborso parziale per richiedere la chiusura della campagna. Restano da implementare
+il registro amministrativo di motivi/intervalli, il calcolo dei rimborsi, la
+chiusura volontaria senza rimborso e le note di credito. Questa correzione non
+esegue rimborsi: sincronizza quelli già effettuati su Stripe.
 
 L'export per le note di credito deve riferirsi alla fattura originaria e mantenere
 la sequenza concordata con FIC. Nessun secondo addebito per una fattura già pagata.
@@ -98,8 +103,10 @@ la sequenza concordata con FIC. Nessun secondo addebito per una fattura già pag
   separati in imponibile, imposta e totale verificati lato server.
 - Export e re-export idempotenti; import ripetuto non crea una seconda fattura.
 - Numerazione condivisa con un'emissione manuale concorrente in FIC.
-- Rimborso downtime parziale lascia attiva la campagna; ripetizione del webhook
-  non rimborsa due volte e non cambia la scadenza.
+- Verificato: rimborsi parziali da 1 centesimo fino a 499,99 € sul totale attuale
+  di 500 € lasciano attiva la campagna; webhook firmati duplicati, riconciliazione,
+  rimborsi cumulativi integrali, eventi fuori ordine, campagne scadute e
+  contestazioni non cambiano le date né duplicano gli eventi di attivazione.
 - Intervalli sovrapposti, frazioni di giorno, cambio ora legale, campagne già
   scadute e rimborsi precedenti.
 - Cancellazione pagata senza rimborso rimane rimossa dopo riconciliazione.

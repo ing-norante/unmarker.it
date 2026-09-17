@@ -21,6 +21,7 @@ import {
   catalog,
   normalizeIcon,
   cancelPurchase,
+  reconcilePurchases,
 } from "./service";
 import { handleSponsorRequest } from "./http";
 
@@ -373,12 +374,126 @@ describe.skipIf(!connection)(
       expect((await syncSponsorPurchase(purchase.id)).status).toBe("refunded");
       expect((await catalog()).sponsors).toHaveLength(0);
     });
+    it.each([1, 5000, 49999])(
+      "keeps a campaign and its slot after a partial refund of %i cents",
+      async (amountRefunded) => {
+        const { purchase } = await order();
+        const payment = pay(purchase.stripe_session_id!);
+        await processWebhook(payment);
+        const before = await syncSponsorPurchase(purchase.id);
+        const session = fake.sessions.get(purchase.stripe_session_id!)!;
+        const pi = session.payment_intent as Stripe.PaymentIntent;
+        const charge = pi.latest_charge as Stripe.Charge;
+        charge.amount_refunded = amountRefunded;
+        const refund = {
+          ...payment,
+          id: `evt_refund_${randomUUID()}`,
+          type: "charge.refunded",
+          data: { object: { ...charge, payment_intent: pi.id } },
+        } as Stripe.Event;
+
+        // Exercise the signed webhook entry point, including duplicate delivery.
+        const stripe = new Stripe("sk_test_mock");
+        const body = JSON.stringify(refund);
+        const signature = stripe.webhooks.generateTestHeaderString({
+          payload: body,
+          secret: "whsec_mock",
+        });
+        for (let delivery = 0; delivery < 2; delivery++) {
+          const response = await handleSponsorRequest(
+            new Request("http://localhost:5173/api/sponsors?action=webhook", {
+              method: "POST",
+              headers: { "stripe-signature": signature },
+              body,
+            }),
+          );
+          expect(response.status).toBe(200);
+        }
+        expect(await reconcilePurchases()).toEqual({ synced: 1, failures: [] });
+        const after = await syncSponsorPurchase(purchase.id);
+        expect(after.status).toBe("active");
+        expect(after.starts_at).toEqual(before.starts_at);
+        expect(after.expires_at).toEqual(before.expires_at);
+        const listing = await catalog();
+        expect(listing.sponsors.map((s) => s.id)).toEqual([purchase.id]);
+        expect(listing.availableSpots).toBe(16);
+        expect(
+          (
+            await database().query(
+              "SELECT * FROM sponsor_analytics_outbox WHERE purchase_id=$1",
+              [purchase.id],
+            )
+          ).rowCount,
+        ).toBe(2);
+        expect(
+          (
+            await database().query(
+              "SELECT * FROM sponsor_webhook_receipts WHERE id=$1",
+              [refund.id],
+            )
+          ).rowCount,
+        ).toBe(1);
+      },
+    );
+    it("removes a campaign when cumulative partial refunds reach the full payment despite stale events", async () => {
+      const { purchase } = await order();
+      const payment = pay(purchase.stripe_session_id!);
+      await processWebhook(payment);
+      const before = await syncSponsorPurchase(purchase.id);
+      const session = fake.sessions.get(purchase.stripe_session_id!)!;
+      const pi = session.payment_intent as Stripe.PaymentIntent;
+      const charge = pi.latest_charge as Stripe.Charge;
+      charge.amount_refunded = 25000;
+      const partialEvent = {
+        ...payment,
+        id: "evt_partial_refund",
+        type: "charge.refunded",
+        data: { object: { ...charge, payment_intent: pi.id } },
+      } as Stripe.Event;
+      await processWebhook(partialEvent);
+      expect((await syncSponsorPurchase(purchase.id)).status).toBe("active");
+
+      charge.amount_refunded = 50000;
+      // A missed full-refund webhook is recovered by reconciliation.
+      expect(await reconcilePurchases()).toEqual({ synced: 1, failures: [] });
+      await processWebhook(partialEvent);
+      await processWebhook({
+        ...partialEvent,
+        id: "evt_delayed_partial_refund",
+      });
+      const after = await syncSponsorPurchase(purchase.id);
+      expect(after.status).toBe("refunded");
+      expect(after.starts_at).toEqual(before.starts_at);
+      expect(after.expires_at).toEqual(before.expires_at);
+      expect((await catalog()).sponsors).toHaveLength(0);
+      expect((await catalog()).availableSpots).toBe(17);
+    });
+    it("does not reactivate or extend an expired campaign after a partial refund", async () => {
+      const { purchase } = await order();
+      const payment = pay(
+        purchase.stripe_session_id!,
+        Math.floor(Date.now() / 1000) - 31 * 86400,
+      );
+      await processWebhook(payment);
+      const before = await syncSponsorPurchase(purchase.id);
+      const pi = fake.sessions.get(purchase.stripe_session_id!)!
+        .payment_intent as Stripe.PaymentIntent;
+      (pi.latest_charge as Stripe.Charge).amount_refunded = 5000;
+      const after = await syncSponsorPurchase(purchase.id);
+      expect(after.status).toBe("expired");
+      expect(after.starts_at).toEqual(before.starts_at);
+      expect(after.expires_at).toEqual(before.expires_at);
+      expect((await catalog()).sponsors).toHaveLength(0);
+      expect((await catalog()).availableSpots).toBe(17);
+    });
     it("keeps a disputed slot reserved so winning the dispute cannot oversell inventory", async () => {
       const { purchase } = await order();
       const event = pay(purchase.stripe_session_id!);
       await processWebhook(event);
       const session = fake.sessions.get(purchase.stripe_session_id!)!;
       const pi = session.payment_intent as Stripe.PaymentIntent;
+      // A partial compensation must neither bypass an open dispute nor prevent restoration.
+      (pi.latest_charge as Stripe.Charge).amount_refunded = 5000;
       (pi.latest_charge as Stripe.Charge).disputed = true;
       fake.disputes = [{ status: "needs_response" } as Stripe.Dispute];
       expect((await syncSponsorPurchase(purchase.id)).status).toBe("disputed");
@@ -388,16 +503,26 @@ describe.skipIf(!connection)(
       const restored = await syncSponsorPurchase(purchase.id);
       expect(restored.status).toBe("active");
       expect(restored.starts_at!.getTime()).toBe(event.created * 1000);
+      expect(restored.expires_at!.getTime()).toBe(
+        (event.created + 30 * 86400) * 1000,
+      );
       expect((await catalog()).availableSpots).toBe(16);
     });
     it("returns a safe JSON error if session creation loses its database connection", async () => {
-      const connect = vi.spyOn(database(), "connect").mockRejectedValueOnce(new Error("Database unavailable"));
+      const connect = vi
+        .spyOn(database(), "connect")
+        .mockRejectedValueOnce(new Error("Database unavailable"));
       const log = vi.spyOn(console, "error").mockImplementation(() => {});
       try {
-        const response = await handleSponsorRequest(new Request("http://localhost:5173/api/sponsors?action=session", {
-          method: "POST",
-          headers: { origin: "http://localhost:5173", "x-sponsor-client": "1" },
-        }));
+        const response = await handleSponsorRequest(
+          new Request("http://localhost:5173/api/sponsors?action=session", {
+            method: "POST",
+            headers: {
+              origin: "http://localhost:5173",
+              "x-sponsor-client": "1",
+            },
+          }),
+        );
         expect(response.status).toBe(503);
         expect(await response.json()).toEqual({ error: "temporary_error" });
       } finally {
