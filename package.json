@@ -45,7 +45,9 @@
     "sponsors:reconcile": "node --env-file=.env --import tsx scripts/sponsors-reconcile.ts",
     "sponsors:stripe:setup": "node --env-file=.env --import tsx scripts/sponsors-stripe-setup.ts",
     "sponsors:stripe:listen": "node --env-file=.env scripts/sponsors-stripe-listen.mjs",
-    "sponsors:test": "node --env-file=.env scripts/sponsors-test.mjs"
+    "sponsors:test": "node --env-file=.env scripts/sponsors-test.mjs",
+    "sponsors:stop": "node --env-file=.env --import tsx scripts/sponsors-stop.ts",
+    "sponsors:confirmation": "node --env-file=.env --import tsx scripts/sponsors-confirmation.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist-mono": "^5.3.0",

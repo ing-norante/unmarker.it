@@ -124,7 +124,10 @@ export const common = {
       payment_pending: "Stripe 尚未完成付款确认，请稍后再次检查。",
       payment_mismatch: "此付款需要验证，广告尚未激活。",
     },
+    publicationStoppedAt: "提前停止展示时间：{{date}}",
     purchaseStatus: {
+      stopped:
+        "已根据您的请求停止展示。原始购买记录保留；停止展示不会自动退款。",
       creating: "正在准备付款页面，尚未确认付款。",
       pending: "付款尚未确认，您可以继续或取消付款。",
       active: "付款已确认。您的项目将展示 30 天，不自动续费。",

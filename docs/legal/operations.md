@@ -15,9 +15,11 @@ sono approvate dal titolare. Questo registro interno non è una pagina pubblica.
 - Art. 4: inviare, anche manualmente, conferma con riferimento, campagna, importi,
   inizio/fine e copia delle condizioni accettate (snapshot dell'ordine). La ricevuta
   Stripe può accompagnarla. Il backend non invia ancora questa conferma.
-- Art. 6: la richiesta arriva via email. La cessazione di una campagna pagata deve
-  sopravvivere alla riconciliazione Stripe: una modifica estemporanea dello stato
-  non basta. Preparare l'operazione persistente prima di promettere il flusso live.
+  `pnpm sponsors:confirmation` prepara testo e termini accettati per l'invio manuale.
+- Art. 6: la richiesta arriva via email. `pnpm sponsors:stop` registra una cessazione
+  persistente, indipendente dallo stato Stripe, che sopravvive a riconciliazione e
+  webhook. Seguire la [procedura amministrativa](./manual-sponsor-administration.md).
+  Migrare prima il database dell'ambiente su cui si distribuisce la nuova API.
 - FIC, numerazione `_info`, note di credito e calcolo downtime restano manuali per
   scelta del titolare; non sono richiesti nuovi automatismi per pubblicare le pagine.
 - `SPONSOR_TERMS_PUBLISHED` resta false fino a verifica della pubblicazione effettiva

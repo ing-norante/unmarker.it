@@ -36,6 +36,7 @@ export type PurchaseStatus =
   | "active"
   | "expired"
   | "cancelled"
+  | "stopped"
   | "refunded"
   | "disputed"
   | "attention";
@@ -45,5 +46,6 @@ export interface SponsorPurchaseStatus {
   name: string;
   startsAt: string | null;
   expiresAt: string | null;
+  stoppedAt: string | null;
   checkoutUrl: string | null;
 }

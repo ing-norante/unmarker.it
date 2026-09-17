@@ -50,14 +50,7 @@ export function useSponsorCatalog(): SponsorCatalog {
         if (!response.ok) return;
         const data = await response.json();
         if (stopped || !Array.isArray(data.sponsors)) return;
-        if (data.checkoutEnabled !== true) {
-          setCatalog((previous) => ({
-            ...previous,
-            checkoutEnabled: false,
-            availableSpots: 0,
-          }));
-          return;
-        }
+        // Publication removals still apply while new purchases are disabled.
         active = (data.sponsors as Sponsor[]).filter(
           (s) =>
             s.kind === "paid" &&
@@ -68,7 +61,8 @@ export function useSponsorCatalog(): SponsorCatalog {
         setSponsorCount(all.length);
         setCatalog({
           sponsors: all,
-          availableSpots: data.availableSpots,
+          availableSpots:
+            data.checkoutEnabled === true ? data.availableSpots : 0,
           checkoutEnabled: data.checkoutEnabled === true,
           testMode: data.testMode === true,
         });

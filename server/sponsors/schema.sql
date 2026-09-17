@@ -58,3 +58,9 @@ ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS terms_accepted_at timesta
 ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS stripe_customer_id text;
 ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS billing_snapshot jsonb;
 ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS stripe_price_id text;
+
+-- Publication is independent of Stripe's payment state: reconciliation must never
+-- undo an administrator's action on a customer's voluntary cancellation request.
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS publication_stopped_at timestamptz;
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS publication_stopped_by text;
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS publication_stop_reference text;

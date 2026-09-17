@@ -29,6 +29,9 @@ import {
   flushAnalytics,
 } from "./service";
 import { handleSponsorRequest } from "./http";
+import { stopSponsorPublication } from "./administration";
+import { purchaseConfirmation } from "./confirmation";
+import { publicPurchase } from "./service";
 
 const fake = vi.hoisted(() => ({
   customers: new Map<string, Stripe.CustomerCreateParams>(),
@@ -688,6 +691,154 @@ describe.skipIf(!connection)(
         "cancelled",
       );
       expect((await catalog()).availableSpots).toBe(17);
+    });
+    it("stops publication without Stripe access and keeps it stopped through retries and reconciliation", async () => {
+      const { owner, purchase } = await order();
+      const event = pay(purchase.stripe_session_id!);
+      const paid = await syncSponsorPurchase(purchase.id);
+      // The public checkout cancellation action does not stop a paid campaign.
+      expect(
+        (await cancelPurchase(purchase.id, owner.id)).publication_stopped_at,
+      ).toBeNull();
+      fake.failRetrieve = true;
+      const stopped = await stopSponsorPublication({
+        id: purchase.id,
+        operator: "admin",
+        reference: "request-001",
+      });
+      expect(stopped.status).toBe("active"); // Payment state is retained separately.
+      expect(stopped.publication_stopped_at).toBeInstanceOf(Date);
+      expect(stopped.starts_at).toEqual(paid.starts_at);
+      expect(stopped.expires_at).toEqual(paid.expires_at);
+      expect(stopped.billing_snapshot).toEqual(paid.billing_snapshot);
+      expect((await catalog()).sponsors).toHaveLength(0);
+      expect((await catalog()).availableSpots).toBe(17);
+      const repeated = await stopSponsorPublication({
+        id: purchase.id,
+        operator: "another-admin",
+        reference: "retry",
+      });
+      expect(repeated.publication_stopped_at).toEqual(
+        stopped.publication_stopped_at,
+      );
+      expect(repeated.publication_stopped_by).toBe("admin");
+      expect(repeated.publication_stop_reference).toBe("request-001");
+      fake.failRetrieve = false;
+      await processWebhook(event);
+      await reconcilePurchases();
+      const after = await syncSponsorPurchase(purchase.id);
+      expect(publicPurchase(after)).toMatchObject({
+        status: "stopped",
+        stoppedAt: stopped.publication_stopped_at!.toISOString(),
+      });
+      expect(JSON.stringify(publicPurchase(after))).not.toContain(
+        "request-001",
+      );
+      expect((await catalog()).sponsors).toHaveLength(0);
+      expect((await catalog()).availableSpots).toBe(17);
+      const icon = await handleSponsorRequest(
+        new Request(
+          `http://localhost:5173/api/sponsors?action=icon&id=${purchase.id}`,
+        ),
+      );
+      expect(icon.status).toBe(404);
+      expect(
+        (
+          await handleSponsorRequest(
+            request("stop", owner.token, { id: purchase.id }),
+          )
+        ).status,
+      ).toBe(404);
+    });
+    it("preserves a stop across partial/full refunds and a won dispute", async () => {
+      const { purchase } = await order();
+      pay(purchase.stripe_session_id!);
+      const paid = await syncSponsorPurchase(purchase.id);
+      await stopSponsorPublication({
+        id: purchase.id,
+        operator: "admin",
+        reference: "request-002",
+      });
+      const pi = fake.sessions.get(purchase.stripe_session_id!)!
+        .payment_intent as Stripe.PaymentIntent;
+      const charge = pi.latest_charge as Stripe.Charge;
+      charge.amount_refunded = 5000;
+      charge.disputed = true;
+      fake.disputes = [{ status: "needs_response" } as Stripe.Dispute];
+      expect((await syncSponsorPurchase(purchase.id)).status).toBe("disputed");
+      expect((await catalog()).availableSpots).toBe(17);
+      fake.disputes = [{ status: "won" } as Stripe.Dispute];
+      const won = await syncSponsorPurchase(purchase.id);
+      expect(publicPurchase(won).status).toBe("stopped");
+      expect(won.expires_at).toEqual(paid.expires_at);
+      charge.amount_refunded = 61000;
+      const refunded = await syncSponsorPurchase(purchase.id);
+      expect(refunded.status).toBe("refunded");
+      expect(refunded.publication_stopped_at).toEqual(
+        won.publication_stopped_at,
+      );
+      expect((await catalog()).sponsors).toHaveLength(0);
+    });
+    it("serializes a stop with payment synchronization and rejects unpaid/expired campaigns", async () => {
+      const { purchase } = await order();
+      const input = {
+        id: purchase.id,
+        operator: "admin",
+        reference: "request-003",
+      };
+      await expect(stopSponsorPublication(input)).rejects.toMatchObject({
+        code: "campaign_not_running",
+      });
+      await expect(
+        stopSponsorPublication({ ...input, operator: " " }),
+      ).rejects.toThrow();
+      const event = pay(purchase.stripe_session_id!);
+      await syncSponsorPurchase(purchase.id);
+      await Promise.all([
+        processWebhook(event),
+        stopSponsorPublication(input),
+        syncSponsorPurchase(purchase.id),
+      ]);
+      expect(
+        publicPurchase(await syncSponsorPurchase(purchase.id)).status,
+      ).toBe("stopped");
+      expect((await catalog()).sponsors).toHaveLength(0);
+      const expired = await order();
+      pay(
+        expired.purchase.stripe_session_id!,
+        Math.floor(Date.now() / 1000) - 31 * 86400,
+      );
+      await syncSponsorPurchase(expired.purchase.id);
+      await expect(
+        stopSponsorPublication({ ...input, id: expired.purchase.id }),
+      ).rejects.toMatchObject({ code: "campaign_not_running" });
+    });
+    it("prepares manual confirmation from the accepted snapshot and checks its integrity", async () => {
+      const { purchase } = await order();
+      expect(() => purchaseConfirmation(purchase)).toThrow(
+        "No confirmed payment",
+      );
+      pay(purchase.stripe_session_id!);
+      const paid = await syncSponsorPurchase(purchase.id);
+      const confirmation = purchaseConfirmation(paid);
+      const terms = paid.billing_snapshot!.terms as {
+        text: string;
+        sha256: string;
+      };
+      expect(confirmation.recipient).toBe("billing@example.com");
+      expect(confirmation.terms).toBe(terms.text);
+      expect(confirmation.body).toContain("610,00");
+      expect(confirmation.body).toContain(paid.starts_at!.toISOString());
+      expect(confirmation.body).toContain(paid.expires_at!.toISOString());
+      expect(purchaseConfirmation(paid, "en").body).toContain(
+        "no automatic renewal",
+      );
+      expect(confirmation.body).not.toContain(paid.stripe_payment_intent_id);
+      const modified = structuredClone(paid);
+      modified.billing_snapshot!.terms = { ...terms, text: "different terms" };
+      expect(() => purchaseConfirmation(modified)).toThrow(
+        "Purchase evidence mismatch",
+      );
     });
     it("uses current Stripe state for out-of-order events, including refunds", async () => {
       const { purchase } = await order();

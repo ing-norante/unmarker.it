@@ -48,6 +48,7 @@ try {
       startsAt: p.starts_at,
       expiresAt: p.expires_at,
       status: p.status,
+      publicationStoppedAt: p.publication_stopped_at,
     },
     payment: {
       paidCents: payment.amount_received,

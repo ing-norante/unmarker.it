@@ -56,6 +56,9 @@ export interface Purchase {
   stripe_customer_id: string | null;
   stripe_price_id: string | null;
   billing_snapshot: Record<string, unknown> | null;
+  publication_stopped_at: Date | null;
+  publication_stopped_by: string | null;
+  publication_stop_reference: string | null;
 }
 
 export async function normalizeIcon(bytes: Buffer) {
@@ -90,14 +93,16 @@ async function capacity(db: PoolClient) {
   const { rows } = await db.query<{
     count: number;
   }>(`SELECT count(*)::int AS count FROM sponsor_purchases
-    WHERE status IN ('creating','pending','attention') OR (status IN ('active','disputed') AND expires_at > now())`);
+    WHERE publication_stopped_at IS NULL AND
+    (status IN ('creating','pending','attention') OR (status IN ('active','disputed') AND expires_at > now()))`);
   return Math.max(0, TOTAL_SPONSOR_SLOTS - sponsors.length - rows[0].count);
 }
 
 export async function catalog() {
   const { rows } = await database()
     .query<Purchase>(`SELECT id, name, url, description, starts_at, expires_at
-    FROM sponsor_purchases WHERE status='active' AND starts_at <= now() AND expires_at > now() ORDER BY starts_at, id`);
+    FROM sponsor_purchases WHERE status='active' AND publication_stopped_at IS NULL
+    AND starts_at <= now() AND expires_at > now() ORDER BY starts_at, id`);
   const available = await transaction(capacity);
   return {
     sponsors: rows.map((p) => ({
@@ -427,12 +432,15 @@ export function publicPurchase(p: Purchase) {
   return {
     id: p.id,
     status:
-      p.status === "active" && p.expires_at!.getTime() <= Date.now()
-        ? "expired"
-        : p.status,
+      p.publication_stopped_at && p.status !== "refunded"
+        ? "stopped"
+        : p.status === "active" && p.expires_at!.getTime() <= Date.now()
+          ? "expired"
+          : p.status,
     name: p.name,
     startsAt: p.starts_at?.toISOString() ?? null,
     expiresAt: p.expires_at?.toISOString() ?? null,
+    stoppedAt: p.publication_stopped_at?.toISOString() ?? null,
     checkoutUrl: p.status === "pending" ? p.checkout_url : null,
   };
 }
@@ -565,7 +573,10 @@ async function syncLocked(
       "sponsor_purchase_confirmed",
       "sponsor_campaign_activated",
     ]) {
-      if (name === "sponsor_campaign_activated" && status !== "active")
+      if (
+        name === "sponsor_campaign_activated" &&
+        (status !== "active" || purchase.publication_stopped_at)
+      )
         continue;
       await db.query(
         `INSERT INTO sponsor_analytics_outbox(id,purchase_id,event) VALUES($1,$2,$3) ON CONFLICT(purchase_id,event) DO NOTHING`,

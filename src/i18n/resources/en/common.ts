@@ -138,7 +138,10 @@ export const common = {
       payment_mismatch:
         "The payment needs verification. Your placement has not been activated.",
     },
+    publicationStoppedAt: "Publication ended early: {{date}}",
     purchaseStatus: {
+      stopped:
+        "Publication ended at your request. The original purchase remains recorded; stopping publication does not issue a refund.",
       creating:
         "We are preparing your checkout. No payment has been confirmed yet.",
       pending:

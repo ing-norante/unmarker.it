@@ -98,6 +98,13 @@ export function SponsorPurchaseReturn() {
                 })}
               </p>
             )}
+            {purchase.stoppedAt && (
+              <p className="text-muted-foreground text-sm">
+                {t("sponsors.publicationStoppedAt", {
+                  date: date(purchase.stoppedAt),
+                })}
+              </p>
+            )}
             {purchase.checkoutUrl && (
               <>
                 <Button asChild>

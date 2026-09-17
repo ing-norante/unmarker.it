@@ -97,6 +97,61 @@ upload/reset, the advertisement dialog, and keyboard navigation. Temporarily
 use 12 or 20 uniquely identified sponsors to check both flip columns and the
 bottom mobile bar; enable reduced motion to check the static alternative.
 
+### Conferma manuale degli acquisti sponsor
+
+**Quando:** dopo ogni acquisto sponsor con pagamento riuscito, appena il webhook
+o la riconciliazione lo hanno registrato nel database. Inviare la conferma senza
+ritardo, senza aspettare la scadenza della campagna o l'emissione della fattura.
+Non inviarla per checkout aperti, abbandonati o pagamenti ancora in attesa/falliti.
+La ricevuta Stripe e la pubblicazione automatica dello sponsor non eseguono questa
+procedura: la conferma completa viene preparata dal comando e inviata manualmente
+dall'amministratore.
+
+1. **Selezionare l'ambiente corretto.** Dalla directory del progetto, verificare
+   che `.env` punti al database dell'acquisto: locale, Preview o produzione.
+   Per un ordine live serve il database di produzione, non quello dei test locali.
+   Per la configurazione consultare la
+   [guida Stripe](docs/stripe-sponsorship-plan.md) e la
+   [guida Preview](docs/sponsor-preview.md); mantenere private le credenziali.
+2. **Recuperare il riferimento dell'ordine in Stripe.** Aprire la Checkout Session
+   del pagamento riuscito e leggere `client_reference_id` oppure il metadato
+   `unmarker_purchase_id`. Questo UUID identifica l'acquisto nel database;
+   non usare l'identificativo Stripe `cs_…` o `pi_…`.
+3. **Generare la bozza e l'allegato**, sostituendo entrambe le occorrenze di
+   `UUID_ACQUISTO` con il riferimento recuperato:
+
+   ```sh
+   pnpm sponsors:confirmation UUID_ACQUISTO .sponsor-data/conferma-UUID_ACQUISTO it
+   ```
+
+   Usare `en` al posto di `it` per una mail in inglese. Il comando crea
+   `email.txt` e `condizioni-accettate.txt` in una cartella privata esclusa da Git.
+   Non invia email, non modifica l'ordine e non emette fatture.
+4. **Controllare `email.txt`.** Verificare ambiente TEST/LIVE, stato del pagamento,
+   destinatario, sponsor, imponibile, IVA, totale e date di inizio/fine in UTC.
+   Gli importi rappresentano il pagamento originario: se nel frattempo sono
+   intervenuti rimborsi, cessazione o contestazioni, adeguare il testo prima
+   dell'invio.
+5. **Inviare da Aruba.** Comporre una mail da **help@nomadesrl.it** al destinatario
+   indicato nel file. Copiare solo oggetto e corpo, escludendo le righe di controllo
+   ambiente/stato. Allegare **`condizioni-accettate.txt`**: contiene la versione
+   originale accettata dal cliente, verificata tramite hash. Non sostituire
+   l'allegato con il solo link ai termini correnti sul sito.
+6. **Registrare l'invio.** Conservare mail e allegato nel fascicolo dell'ordine,
+   annotando data e riferimento del messaggio per evitare duplicati. Eliminare
+   le copie locali di lavoro non necessarie. La fatturazione resta separata e
+   segue il processo amministrativo in Fatture in Cloud.
+
+Se il comando non trova il pagamento confermato, verificare prima l'ambiente e
+la ricezione del webhook; se necessario eseguire `pnpm sponsors:reconcile`
+nell'ambiente corretto e riprovare. Non aggirare eventuali errori di integrità
+delle evidenze. Il comando rifiuta una cartella di destinazione già esistente:
+usare la bozza già verificata oppure una nuova cartella per rigenerarla.
+La generazione dei file **non registra né sostituisce l'invio della mail**.
+
+La [guida amministrativa](docs/legal/manual-sponsor-administration.md) include
+anche la procedura per interrompere una campagna su richiesta del cliente.
+
 ### Sponsor analytics
 
 [PostHog dashboard](https://eu.posthog.com/project/104940/dashboard/955480)

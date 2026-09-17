@@ -206,7 +206,7 @@ export async function handleSponsorRequest(
       const id = z.uuid().safeParse(url.searchParams.get("id"));
       if (!id.success) throw new SponsorError("not_found", 404);
       const { rows } = await database().query<{ icon: Buffer }>(
-        "SELECT icon FROM sponsor_purchases WHERE id=$1 AND status='active' AND expires_at>now()",
+        "SELECT icon FROM sponsor_purchases WHERE id=$1 AND status='active' AND publication_stopped_at IS NULL AND expires_at>now()",
         [id.data],
       );
       if (!rows[0]) throw new SponsorError("not_found", 404);
