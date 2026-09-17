@@ -1,7 +1,6 @@
 import { lazy, Suspense } from "react";
 import { MegaphoneIcon } from "@phosphor-icons/react/dist/ssr/Megaphone";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
@@ -56,31 +55,42 @@ export function AdvertiseDialog({
         </Button>
       </DialogTrigger>
       <DialogContent
-        className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"
+        className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
         closeLabel={t("sponsors.close")}
       >
-        <DialogHeader>
+        <DialogHeader className="pr-6">
           <DialogTitle>{t("sponsors.dialogTitle")}</DialogTitle>
           <DialogDescription>
             {t("sponsors.dialogDescription")}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge>
-            {t("sponsors.monthlyPrice", {
-              price,
-              days: sponsorship.durationDays,
-            })}
-          </Badge>
-          <Badge variant="secondary">{t("sponsors.onePayment")}</Badge>
-          <Badge variant="outline">
-            {t("sponsors.spotsLeft", {
-              available: availableSpots,
-              total: totalSpots,
-            })}
-          </Badge>
+        <div className="space-y-2 border-b pb-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="font-semibold">
+              {t("sponsors.monthlyPrice", {
+                price,
+                days: sponsorship.durationDays,
+              })}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {t("sponsors.spotsLeft", {
+                available: availableSpots,
+                total: totalSpots,
+              })}
+            </p>
+          </div>
+          <div className="text-muted-foreground space-y-1 text-xs leading-relaxed">
+            <p>{t("sponsors.onePayment")}</p>
+            <p>
+              {t("sponsors.durationDescription", {
+                days: sponsorship.durationDays,
+              })}
+            </p>
+          </div>
           {testMode && (
-            <Badge variant="outline">{t("sponsors.testMode")}</Badge>
+            <p className="text-primary-text text-xs font-semibold">
+              {t("sponsors.testMode")}
+            </p>
           )}
         </div>
         <Suspense

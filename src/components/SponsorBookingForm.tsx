@@ -16,14 +16,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import {
   createSponsorCheckout,
   getSponsorPurchases,
   cancelSponsorPurchase,
@@ -151,8 +143,8 @@ export default function SponsorBookingForm({
         void form.handleSubmit();
       }}
     >
-      <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_13rem]">
-        <FieldGroup className="gap-4">
+      <div className="space-y-4">
+        <FieldGroup className="grid gap-4 sm:grid-cols-2">
           {(["name", "url", "description"] as const).map((name) => (
             <form.Field key={name} name={name}>
               {(field) => {
@@ -174,7 +166,12 @@ export default function SponsorBookingForm({
                   maxLength: name === "name" ? 32 : name === "url" ? 500 : 120,
                 };
                 return (
-                  <Field data-invalid={invalid}>
+                  <Field
+                    data-invalid={invalid}
+                    className={
+                      name === "description" ? "sm:col-span-2" : undefined
+                    }
+                  >
                     <FieldLabel htmlFor={props.id}>
                       {t(`sponsors.form.${name}`)}
                     </FieldLabel>
@@ -215,7 +212,7 @@ export default function SponsorBookingForm({
               const invalid =
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
-                <Field data-invalid={invalid}>
+                <Field data-invalid={invalid} className="sm:col-span-2">
                   <FieldLabel htmlFor={`${id}-icon`}>
                     {t("sponsors.form.icon")}
                   </FieldLabel>
@@ -255,47 +252,37 @@ export default function SponsorBookingForm({
             }}
           </form.Field>
         </FieldGroup>
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <CardDescription>{t("sponsors.form.preview")}</CardDescription>
-              <CardTitle>{t("sponsors.label")}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-3 text-center">
-              {preview && (
-                <img src={preview} alt="" className="size-10 object-contain" />
+        <details className="text-sm">
+          <summary className="focus-visible:outline-ring cursor-pointer font-medium focus-visible:outline-2 focus-visible:outline-offset-4">
+            {t("sponsors.form.preview")}
+          </summary>
+          <div className="mt-3 flex items-start gap-3">
+            {preview && (
+              <img
+                src={preview}
+                alt=""
+                className="size-10 shrink-0 object-contain"
+              />
+            )}
+            <form.Subscribe
+              selector={(s) => [s.values.name, s.values.description]}
+            >
+              {([name, description]) => (
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-bold wrap-anywhere">
+                    {name || t("sponsors.form.namePlaceholder")}
+                  </p>
+                  <p className="text-muted-foreground text-xs wrap-anywhere">
+                    {description || t("sponsors.form.descriptionPlaceholder")}
+                  </p>
+                </div>
               )}
-              <form.Subscribe
-                selector={(s) => [s.values.name, s.values.description]}
-              >
-                {([name, description]) => (
-                  <>
-                    <p className="text-sm font-bold wrap-anywhere">
-                      {name || t("sponsors.form.namePlaceholder")}
-                    </p>
-                    <p className="text-muted-foreground text-xs wrap-anywhere">
-                      {description || t("sponsors.form.descriptionPlaceholder")}
-                    </p>
-                  </>
-                )}
-              </form.Subscribe>
-            </CardContent>
-            <CardFooter>
-              <p className="text-muted-foreground text-xs">
-                {t("sponsors.form.previewHint")}
-              </p>
-            </CardFooter>
-          </Card>
-          <div className="flex flex-col gap-2">
-            <p className="text-xl font-bold">{price}</p>
-            <p className="text-sm">
-              {t("sponsors.paymentSummary", { days: 30 })}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              {t("sponsors.durationDescription", { days: 30 })}
-            </p>
+            </form.Subscribe>
           </div>
-        </div>
+          <p className="text-muted-foreground mt-3 text-xs">
+            {t("sponsors.form.previewHint")}
+          </p>
+        </details>
       </div>
       <div className="mt-5 flex flex-col gap-3">
         {pending && (
