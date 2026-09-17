@@ -83,7 +83,7 @@ export function openCookiePreferences() {
   window.dispatchEvent(new Event("unmarker:cookie-preferences"));
 }
 
-/** Only removes this project's analytics identifiers; never purchase or theme preferences. */
+/** Only removes this project's analytics identifiers; never purchase or language preferences. */
 export function clearAnalyticsStorage() {
   if (typeof window === "undefined") return;
   const key = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;

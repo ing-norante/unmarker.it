@@ -92,7 +92,7 @@ the production Content Security Policy allows local images, not remote favicons.
 - Sponsor URLs automatically receive referral UTM parameters for `unmarker.it`.
   Verified payments publish campaigns automatically; they disappear after 30 days.
 
-For local QA, check desktop/mobile layouts, light/dark themes, both locales,
+For local QA, check desktop/mobile layouts in dark mode, both locales,
 upload/reset, the advertisement dialog, and keyboard navigation. Temporarily
 use 12 or 20 uniquely identified sponsors to check both flip columns and the
 bottom mobile bar; enable reduced motion to check the static alternative.
@@ -188,7 +188,7 @@ src/
     PipelineSteps.tsx     # Step state + progress UI
     ImageComparison.tsx   # Analysis, before/after preview, verification diff
     VerificationDiff.tsx  # Postflight before/after verification summary
-    Footer.tsx            # Links + theme toggle + analytics events
+    Footer.tsx            # Links + company details + analytics events
 ```
 
 ## Limitations

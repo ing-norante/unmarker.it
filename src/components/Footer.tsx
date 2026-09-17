@@ -1,12 +1,9 @@
 import type { ReactNode } from "react";
 import { openCookiePreferences } from "@/lib/cookieConsent";
 import { legalDocuments } from "@/lib/legalDocuments";
-import { ThemeProvider } from "next-themes";
 import { GithubLogoIcon } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { trackAction } from "@/lib/analytics";
-import { ThemeToggle } from "./ThemeToggle";
 
 const linkClassName =
   "inline-flex min-h-11 items-center gap-2 py-2 text-sm leading-6 text-muted-foreground underline-offset-4 hover:text-primary-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
@@ -40,16 +37,6 @@ export function Footer() {
               <GithubLogoIcon aria-hidden="true" className="size-5" />
               GitHub
             </a>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="light"
-              enableSystem={false}
-              storageKey="theme"
-            >
-              <TooltipProvider>
-                <ThemeToggle />
-              </TooltipProvider>
-            </ThemeProvider>
           </div>
         </div>
 

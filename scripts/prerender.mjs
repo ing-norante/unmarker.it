@@ -24,8 +24,8 @@ for (const locale of ["en", "zh-Hans"]) {
   );
   prerendered = applyDocumentMetadataToHtml(prerendered, documentMetadata);
 
-  if (!prerendered.includes("Dark mode initialization")) {
-    throw new Error(`Theme initialization script was lost for ${locale}`);
+  if (!prerendered.includes('<meta name="color-scheme" content="dark"')) {
+    throw new Error(`Dark color scheme was lost for ${locale}`);
   }
   if (/(?:src|href)=["'](?:\.\/)?assets\//i.test(prerendered)) {
     throw new Error(`Relative asset URL found in prerendered ${locale} HTML`);

@@ -31,7 +31,6 @@ L'icona pubblica caricata per una campagna sponsor è un trattamento separato.
 | Strumento | Scopo | Durata |
 | --- | --- | --- |
 | `unmarker_sponsor_session`, cookie HttpOnly, SameSite=Lax, percorso `/api/sponsors` | Sessione d'acquisto e accesso agli ordini dal medesimo browser; non viene creata scegliendo i cookie | 120 giorni; durata dei record server distinta |
-| `theme`, localStorage | Preferenza chiaro/scuro | Fino a cancellazione del browser |
 | `unmarker.locale.preference`, localStorage | Lingua scelta | Fino a cancellazione del browser |
 | `unmarker.localeSuggestion.zh-Hans`, localStorage | Ricorda la risposta al suggerimento lingua | Fino a cancellazione del browser |
 | `chunk-reload:*`, sessionStorage | Evita ricaricamenti ripetuti dopo un errore di caricamento | Sessione della scheda o rimozione dopo caricamento riuscito |

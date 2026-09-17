@@ -94,13 +94,13 @@ describe("cookie choices", () => {
     vi.stubEnv("VITE_PUBLIC_POSTHOG_KEY", "our-project");
     storage.set("ph_our-project_posthog", "visitor");
     storage.set("ph_other-project_posthog", "other");
-    storage.set("theme", "dark");
+    storage.set("unmarker.locale.preference", "en");
     storage.set(CONSENT_STORAGE_KEY, "choice");
     (await import("./cookieConsent")).clearAnalyticsStorage();
     expect(storage.has("ph_our-project_posthog")).toBe(false);
     expect([...storage.keys()]).toEqual([
       "ph_other-project_posthog",
-      "theme",
+      "unmarker.locale.preference",
       CONSENT_STORAGE_KEY,
     ]);
   });

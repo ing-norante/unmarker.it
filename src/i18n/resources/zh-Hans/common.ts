@@ -154,10 +154,6 @@ export const common = {
     cleanMetadata: "清理元数据并下载",
     chooseImage: "选择图片",
   },
-  theme: {
-    light: "切换到浅色模式",
-    dark: "切换到深色模式",
-  },
   consent: {
     title: "隐私与统计",
     summary:

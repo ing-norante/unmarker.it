@@ -176,10 +176,6 @@ export const common = {
     cleanMetadata: "Clean metadata & download",
     chooseImage: "Choose image",
   },
-  theme: {
-    light: "Switch to light mode",
-    dark: "Switch to dark mode",
-  },
   consent: {
     title: "Privacy & statistics",
     summary:

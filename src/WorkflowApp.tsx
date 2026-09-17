@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { ThemeProvider } from "next-themes";
 import { ImageUploader } from "@/components/ImageUploader";
 import { CrushQualityControl } from "@/components/CrushQualityControl";
 import { PipelineSteps } from "@/components/PipelineSteps";
@@ -91,12 +90,7 @@ function WorkflowApp({ initialFile, onResetToShell }: WorkflowAppProps) {
   };
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="light"
-      enableSystem={false}
-      storageKey="theme"
-    >
+    <>
       <WorkflowLayout
         statusMessage={statusMessage}
         originalImage={originalImage}
@@ -124,7 +118,7 @@ function WorkflowApp({ initialFile, onResetToShell }: WorkflowAppProps) {
       <div translate="no">
         <Toaster />
       </div>
-    </ThemeProvider>
+    </>
   );
 }
 
@@ -202,7 +196,9 @@ function WorkflowLayout({
                     <WorkflowSummary
                       phase={state.phase}
                       hasWarnings={workflowWarnings.length > 0}
-                      verificationFailed={state.phase === "complete" && !state.postflightAudit}
+                      verificationFailed={
+                        state.phase === "complete" && !state.postflightAudit
+                      }
                     />
                     {state.phase !== "analysis-only" && (
                       <PipelineSteps steps={steps} />
@@ -217,7 +213,11 @@ function WorkflowLayout({
 
                     {workflowBusy && (
                       <div className="bg-card text-card-foreground flex flex-col gap-2 border p-3 text-sm sm:p-4 sm:text-base">
-                        <span>{t(`workflow:busy.${state.phase}`, { defaultValue: t("workflow:busy.fallback") })}</span>
+                        <span>
+                          {t(`workflow:busy.${state.phase}`, {
+                            defaultValue: t("workflow:busy.fallback"),
+                          })}
+                        </span>
                         <Skeleton className="h-1 w-full" />
                       </div>
                     )}
@@ -241,7 +241,9 @@ function WorkflowLayout({
                     <span>{translateMessage(t, statusMessage.title)}</span>
                   </AlertTitle>
                   <AlertDescription>
-                    <span>{translateMessage(t, statusMessage.description)}</span>
+                    <span>
+                      {translateMessage(t, statusMessage.description)}
+                    </span>
                   </AlertDescription>
                 </Alert>
               )}

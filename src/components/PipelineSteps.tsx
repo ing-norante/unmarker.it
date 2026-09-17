@@ -49,7 +49,7 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
                     </span>
                     {step.status === "done" && (
                       <CheckIcon
-                        className="text-completion-text size-4 shrink-0"
+                        className="text-primary-text size-4 shrink-0"
                         weight="bold"
                       />
                     )}
@@ -109,8 +109,8 @@ function StatusBadge({ status, label }: { status: PipelineStepState["status"]; l
   switch (status) {
     case "done":
       return (
-        <Badge className="border-chart-2/20 bg-chart-2/10 text-completion-text text-ui-caption shrink-0 font-bold uppercase">
-          <span className="bg-chart-2 size-1.5" />
+        <Badge className="border-primary/30 bg-primary/10 text-primary-text text-ui-caption shrink-0 font-bold uppercase">
+          <span className="bg-primary size-1.5" />
           {label}
         </Badge>
       );

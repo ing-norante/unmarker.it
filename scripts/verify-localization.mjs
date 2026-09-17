@@ -30,9 +30,8 @@ if (/(?:src|href)=["'](?:\.\/)?assets\//i.test(zh)) {
   throw new Error("Chinese HTML contains a relative asset URL");
 }
 
-const themePattern = /<script>\s*\/\/ Dark mode initialization[\s\S]*?<\/script>/;
-if (template.match(themePattern)?.[0] !== zh.match(themePattern)?.[0]) {
-  throw new Error("Theme initialization script changed during prerender");
+for (const html of [template, en, zh]) {
+  assertIncludes(html, '<meta name="color-scheme" content="dark"');
 }
 
 assertIncludes(sitemap, 'xmlns:xhtml="http://www.w3.org/1999/xhtml"');
