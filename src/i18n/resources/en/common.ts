@@ -94,7 +94,7 @@ export const common = {
       urlError: "Enter a complete http:// or https:// website URL.",
       description: "Short description",
       descriptionPlaceholder: "What makes your project worth a visit?",
-      descriptionError: "Use 10–120 characters for your description.",
+      descriptionError: "Use 10–90 characters for your description.",
       icon: "Favicon or icon",
       iconHint:
         "This icon will be uploaded for your ad. PNG, JPEG or WebP · up to 256 KB and 1024×1024 pixels.",

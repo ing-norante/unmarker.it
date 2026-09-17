@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const SPONSOR_PRICE_CENTS = 50_000;
 export const SPONSOR_DURATION_DAYS = 30;
+export const MAX_SPONSOR_DESCRIPTION_LENGTH = 90;
 export const MAX_ICON_BYTES = 256 * 1024;
 
 export const sponsorCreativeSchema = z.object({
@@ -25,7 +26,7 @@ export const sponsorCreativeSchema = z.object({
         return false;
       }
     }),
-  description: z.string().trim().min(10).max(120),
+  description: z.string().trim().min(10).max(MAX_SPONSOR_DESCRIPTION_LENGTH),
 });
 
 export type SponsorCreative = z.infer<typeof sponsorCreativeSchema>;

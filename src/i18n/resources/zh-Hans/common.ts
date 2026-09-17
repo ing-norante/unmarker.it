@@ -87,7 +87,7 @@ export const common = {
       urlError: "请输入以 http:// 或 https:// 开头的完整网址。",
       description: "简短描述",
       descriptionPlaceholder: "您的项目有什么值得关注？",
-      descriptionError: "描述需包含 10–120 个字符。",
+      descriptionError: "描述需包含 10–90 个字符。",
       icon: "网站图标",
       iconHint:
         "此图标将上传并用于您的广告。PNG、JPEG 或 WebP，最大 256 KB、1024×1024 像素。",

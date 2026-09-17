@@ -24,6 +24,7 @@ import {
 import {
   sponsorCreativeSchema,
   MAX_ICON_BYTES,
+  MAX_SPONSOR_DESCRIPTION_LENGTH,
   type SponsorPurchaseStatus,
 } from "@/lib/sponsorPurchase";
 import { trackSponsorEvent } from "@/lib/analytics";
@@ -193,7 +194,12 @@ export default function SponsorBookingForm({
                   "aria-invalid": invalid,
                   "aria-describedby": `${id}-${name}-help`,
                   required: true,
-                  maxLength: name === "name" ? 32 : name === "url" ? 500 : 120,
+                  maxLength:
+                    name === "name"
+                      ? 32
+                      : name === "url"
+                        ? 500
+                        : MAX_SPONSOR_DESCRIPTION_LENGTH,
                 };
                 return (
                   <Field
@@ -226,7 +232,7 @@ export default function SponsorBookingForm({
                     )}
                     <FieldDescription id={`${id}-${name}-help`}>
                       {name === "description"
-                        ? `${field.state.value.length}/120`
+                        ? `${field.state.value.length}/${MAX_SPONSOR_DESCRIPTION_LENGTH}`
                         : t(`sponsors.form.${name}Hint`)}
                     </FieldDescription>
                     {invalid && (
