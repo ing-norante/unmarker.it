@@ -8,7 +8,7 @@ export function SponsorFormProgress({ step }: { step: 1 | 2 }) {
     <div className="mb-6 flex flex-col gap-3">
       <ol
         aria-label={t("sponsors.form.stepsLabel")}
-        className="grid grid-cols-3 gap-3 text-xs"
+        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,5rem),1fr))] gap-3 text-sm leading-normal wrap-anywhere tabular-nums"
       >
         {(["creative", "billing", "payment"] as const).map((key, index) => (
           <li

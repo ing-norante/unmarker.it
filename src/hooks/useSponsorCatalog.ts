@@ -1,22 +1,28 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   sponsors as houseSponsors,
   TOTAL_SPONSOR_SLOTS,
   type Sponsor,
 } from "@/lib/sponsors";
+import { fetchSponsorCatalog } from "@/lib/sponsorCatalog";
 import { setSponsorCount } from "@/lib/sponsorAnalyticsContext";
 
 export interface SponsorCatalog {
   sponsors: Sponsor[];
-  availableSpots: number;
+  availableSpots?: number;
+  status: "loading" | "ready" | "error";
+  refreshing: boolean;
   checkoutEnabled: boolean;
   testMode: boolean;
 }
 
-export function useSponsorCatalog(): SponsorCatalog {
+export function useSponsorCatalog() {
+  const refreshRef = useRef<() => void>(() => {});
+  const retry = useCallback(() => refreshRef.current(), []);
   const [catalog, setCatalog] = useState<SponsorCatalog>({
     sponsors: houseSponsors,
-    availableSpots: TOTAL_SPONSOR_SLOTS - houseSponsors.length,
+    status: "loading",
+    refreshing: true,
     checkoutEnabled: false,
     testMode: false,
   });
@@ -40,16 +46,12 @@ export function useSponsorCatalog(): SponsorCatalog {
     const refresh = async () => {
       filterExpired();
       if (document.visibilityState !== "visible") return;
-      abort?.abort();
+      if (abort) return; // Coalesce polling, visibility changes and repeated retries.
       abort = new AbortController();
+      setCatalog((previous) => ({ ...previous, refreshing: true }));
       try {
-        const response = await fetch("/api/sponsors", {
-          signal: abort.signal,
-          cache: "no-store",
-        });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (stopped || !Array.isArray(data.sponsors)) return;
+        const data = await fetchSponsorCatalog(abort.signal);
+        if (stopped) return;
         // Publication removals still apply while new purchases are disabled.
         active = (data.sponsors as Sponsor[]).filter(
           (s) =>
@@ -61,14 +63,28 @@ export function useSponsorCatalog(): SponsorCatalog {
         setSponsorCount(all.length);
         setCatalog({
           sponsors: all,
-          availableSpots:
-            data.checkoutEnabled === true ? data.availableSpots : 0,
+          availableSpots: data.availableSpots,
+          status: "ready",
+          refreshing: false,
           checkoutEnabled: data.checkoutEnabled === true,
           testMode: data.testMode === true,
         });
       } catch {
-        /* Existing cards remain until their own expiration during network failures. */
+        // Keep published cards until expiry, but never present stale capacity as current.
+        if (!stopped)
+          setCatalog((previous) => ({
+            ...previous,
+            availableSpots: undefined,
+            checkoutEnabled: false,
+            status: "error",
+            refreshing: false,
+          }));
+      } finally {
+        abort = undefined;
       }
+    };
+    refreshRef.current = () => {
+      void refresh();
     };
     void refresh();
     const timer = setInterval(() => {
@@ -79,6 +95,7 @@ export function useSponsorCatalog(): SponsorCatalog {
     window.addEventListener("unmarker:sponsors-refresh", refresh);
     return () => {
       stopped = true;
+      refreshRef.current = () => {};
       abort?.abort();
       clearInterval(timer);
       clearInterval(expiryTimer);
@@ -86,5 +103,5 @@ export function useSponsorCatalog(): SponsorCatalog {
       window.removeEventListener("unmarker:sponsors-refresh", refresh);
     };
   }, []);
-  return catalog;
+  return { ...catalog, retry };
 }

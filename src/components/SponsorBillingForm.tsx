@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
 import { useTranslation } from "react-i18next";
+import { CaretRightIcon } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,11 +54,13 @@ import { legalDocuments } from "@/lib/legalDocuments";
 
 export default function SponsorBillingForm({
   initial,
+  checkoutEnabled,
   onBack,
   onSubmit,
   error,
 }: {
   initial: typeof billingDefaults;
+  checkoutEnabled: boolean;
   onBack: (draft: typeof billingDefaults) => void;
   onSubmit: (billing: SponsorBilling) => Promise<void>;
   error: string | null;
@@ -244,7 +247,7 @@ export default function SponsorBillingForm({
                             aria-describedby={`${id}-country-help${invalid ? ` ${id}-country-error` : ""}`}
                             placeholder={t("sponsors.billing.searchCountry")}
                           />
-                          <ComboboxContent>
+                          <ComboboxContent className="sponsorship-options sponsorship-country-options">
                             <ComboboxEmpty>
                               {t("sponsors.billing.noCountries")}
                             </ComboboxEmpty>
@@ -312,7 +315,7 @@ export default function SponsorBillingForm({
                                     >
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="sponsorship-options">
                                       <SelectGroup>
                                         {types.map((type) => (
                                           <SelectItem
@@ -375,8 +378,16 @@ export default function SponsorBillingForm({
                 country === "IT" && (
                   <Collapsible open={routingOpen} onOpenChange={setRoutingOpen}>
                     <CollapsibleTrigger asChild>
-                      <Button type="button" variant="ghost">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="justify-start px-0"
+                      >
                         {t("sponsors.billing.routingTitle")}
+                        <CaretRightIcon
+                          aria-hidden="true"
+                          className="shrink-0 group-data-[state=open]/button:rotate-90"
+                        />
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent forceMount hidden={!routingOpen}>
@@ -488,7 +499,7 @@ export default function SponsorBillingForm({
               <p className="text-muted-foreground text-sm">
                 {t("sponsors.billing.totalHint")}
               </p>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Button
                   variant="outline"
                   type="button"
@@ -497,7 +508,11 @@ export default function SponsorBillingForm({
                 >
                   {t("sponsors.billing.back")}
                 </Button>
-                <Button type="submit" disabled={busy} className="flex-1">
+                <Button
+                  type="submit"
+                  disabled={busy || !checkoutEnabled}
+                  className="flex-1"
+                >
                   {busy && <Spinner data-icon="inline-start" />}
                   {t(
                     busy

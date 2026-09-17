@@ -23,6 +23,11 @@ export const common = {
     materials: "所需材料",
     materialsDescription:
       "项目名称、网站图标或其他图标、网站 URL，以及简短描述。",
+    catalogLoading: "正在查询剩余名额…",
+    catalogUnknown: "剩余名额尚未确认",
+    catalogError:
+      "无法查询赞助名额。请检查网络连接并重试。只要不关闭此页面，已填写的信息就会保留。",
+    catalogRetry: "重新查询名额",
     bookingUnavailable: "在线预订暂时不可用。",
     soldOut: "所有赞助广告位目前均已预订。",
     book: "预订广告位",
@@ -32,6 +37,7 @@ export const common = {
     paymentSummary: "展示 {{days}} 天，不自动续费。",
     payWithStripe: "通过 Stripe 支付 {{price}}",
     preparingCheckout: "正在准备付款…",
+    loadingBilling: "正在加载账单信息…",
     secureCheckout: "在 Stripe 安全付款。Unmarker.it 不会接收您的银行卡信息。",
     pendingCheckout: "您有一笔尚未完成的付款",
     resumeCheckout: "继续付款",
@@ -159,6 +165,8 @@ export const common = {
       tax_verification_failed:
         "无法验证此欧盟增值税号。请返回取消结账并更正信息，或联系 help@nomadesrl.it。尚未扣款。",
 
+      billing_load_failed:
+        "无法加载账单信息。您填写的赞助内容仍在此页面。请先复制这些内容，再刷新页面重试；刷新后需要重新选择图标。",
       temporary_error: "未能完成请求，请重试。已有的付款页面将被复用。",
       unavailable: "预订暂时不可用，请稍后再试。",
       invalid_form: "请检查项目名称、网站链接和描述。",

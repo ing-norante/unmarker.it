@@ -14,7 +14,7 @@ export const common = {
       "Put your project in front of thousands of people worldwide using Unmarker.it to work with AI images.",
     howItWorks: "How it works",
     howItWorksDescription:
-      "Your website appears in desktop sidebars and mobile sponsor bars throughout the app. Paired cards share the rotation equally: each sponsor gets 10 seconds per cycle. One price for every position. Visitors can pause animations.",
+      "Your website appears in desktop sidebars and mobile sponsor bars throughout the app. Paired cards share the rotation equally: each sponsor gets 10 seconds per cycle.",
     availability: "Availability",
     availabilityDescription:
       "There are {{total}} sponsor slots, filled on a first-come, first-served basis.",
@@ -25,6 +25,11 @@ export const common = {
     materials: "All you need",
     materialsDescription:
       "Your project name, a favicon or icon, your website URL, and a short description.",
+    catalogLoading: "Checking availability…",
+    catalogUnknown: "Availability not verified",
+    catalogError:
+      "We could not check sponsor availability. Check your connection and try again. Your form details are kept while this page stays open.",
+    catalogRetry: "Check availability again",
     bookingUnavailable: "Online booking is temporarily unavailable.",
     soldOut: "All sponsor slots are currently booked.",
     book: "Lock your spot",
@@ -34,6 +39,7 @@ export const common = {
     paymentSummary: "{{days}} days. No automatic renewal.",
     payWithStripe: "Pay {{price}} with Stripe",
     preparingCheckout: "Preparing checkout…",
+    loadingBilling: "Loading billing details…",
     secureCheckout:
       "Secure payment on Stripe. Your card details never reach Unmarker.it.",
     pendingCheckout: "You already have a checkout in progress",
@@ -170,6 +176,8 @@ export const common = {
       tax_verification_failed:
         "We could not verify this EU VAT number. Go back and cancel this checkout to correct your details, or contact help@nomadesrl.it. No payment has been taken.",
 
+      billing_load_failed:
+        "Billing details could not load. Your sponsor details are still here. Copy them before reloading this page to try again; you will need to select your icon again.",
       temporary_error:
         "We could not complete this request. Please retry; an existing checkout will be reused.",
       unavailable:

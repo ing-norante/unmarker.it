@@ -80,11 +80,7 @@ export function Footer() {
               </a>
             </li>
             <li>
-              <a
-                className={linkClassName}
-                href="mailto:info@pec.nomadesrl.it"
-                aria-label={t("footer.pecLabel")}
-              >
+              <a className={linkClassName} href="mailto:info@pec.nomadesrl.it">
                 <span className="break-all">info@pec.nomadesrl.it</span>
                 <span className="shrink-0 text-xs">PEC</span>
               </a>

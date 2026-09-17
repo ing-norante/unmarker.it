@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { revalidateLogic, useForm } from "@tanstack/react-form";
 import { useTranslation } from "react-i18next";
 import { ArrowRightIcon } from "@phosphor-icons/react/dist/ssr/ArrowRight";
+import { CaretRightIcon } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,6 +44,7 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldTitle,
   FieldSet,
   FieldLegend,
 } from "@/components/ui/field";
@@ -60,15 +62,17 @@ import {
 } from "@/lib/sponsorPurchase";
 import { trackSponsorEvent } from "@/lib/analytics";
 import { sponsorship } from "@/lib/sponsors";
-import SponsorBillingForm from "./SponsorBillingForm";
+import type SponsorBillingForm from "./SponsorBillingForm";
 import { billingDefaults, type SponsorBilling } from "@/lib/sponsorBilling";
 
 export default function SponsorBookingForm({
   checkoutEnabled,
   availableSpots,
+  catalogStatus,
 }: {
   checkoutEnabled: boolean;
-  availableSpots: number;
+  availableSpots?: number;
+  catalogStatus: "loading" | "ready" | "error";
 }) {
   const { t, i18n } = useTranslation("common");
   const id = useId();
@@ -81,6 +85,9 @@ export default function SponsorBookingForm({
       step?.scrollIntoView({ block: "start" });
     });
   const [billingStep, setBillingStep] = useState(false);
+  const [BillingForm, setBillingForm] = useState<
+    typeof SponsorBillingForm | null
+  >(null);
   const [billingDraft, setBillingDraft] = useState(billingDefaults);
   const billingRef = useRef<SponsorBilling | null>(null);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
@@ -156,15 +163,22 @@ export default function SponsorBookingForm({
         setError(
           pending
             ? "existing_checkout"
-            : availableSpots === 0
-              ? "sold_out"
-              : "unavailable",
+            : !checkoutEnabled
+              ? "unavailable"
+              : "sold_out",
         );
         return;
       }
       if (!billingStep) {
-        setBillingStep(true);
-        focusStep();
+        try {
+          // Keep the filled creative mounted if the next step cannot load.
+          const module = await import("./SponsorBillingForm");
+          setBillingForm(() => module.default);
+          setBillingStep(true);
+          focusStep();
+        } catch {
+          setError("billing_load_failed");
+        }
         return;
       }
       if (!billingRef.current) return;
@@ -194,15 +208,16 @@ export default function SponsorBookingForm({
       }
     },
   });
-  if (billingStep)
+  if (billingStep && BillingForm)
     return (
       <section
         id={`${id}-step`}
         tabIndex={-1}
         aria-label={t("sponsors.form.steps.billing")}
       >
-        <SponsorBillingForm
+        <BillingForm
           initial={billingDraft}
+          checkoutEnabled={checkoutEnabled && availableSpots !== 0}
           error={error}
           onBack={(draft) => {
             setBillingDraft(draft);
@@ -236,7 +251,7 @@ export default function SponsorBookingForm({
         <FieldDescription>
           {t("sponsors.form.creativeHint")} {t("sponsors.form.requiredHint")}
         </FieldDescription>
-        <FieldGroup className="grid gap-5 sm:grid-cols-2">
+        <FieldGroup className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           {(["name", "url", "description"] as const).map((name) => (
             <form.Field key={name} name={name}>
               {(field) => {
@@ -328,9 +343,7 @@ export default function SponsorBookingForm({
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={invalid} className="sm:col-span-2">
-                  <FieldLabel htmlFor={`${id}-icon`}>
-                    {t("sponsors.form.icon")}
-                  </FieldLabel>
+                  <FieldTitle>{t("sponsors.form.icon")}</FieldTitle>
                   <Button
                     id={`${id}-icon`}
                     type="button"
@@ -432,11 +445,21 @@ export default function SponsorBookingForm({
         </FieldGroup>
       </FieldSet>
       <Collapsible defaultOpen className="mt-6">
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" type="button">
-            {t("sponsors.form.preview")}
-          </Button>
-        </CollapsibleTrigger>
+        <h2>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              type="button"
+              className="justify-start px-0"
+            >
+              {t("sponsors.form.preview")}
+              <CaretRightIcon
+                aria-hidden="true"
+                className="shrink-0 group-data-[state=open]/button:rotate-90"
+              />
+            </Button>
+          </CollapsibleTrigger>
+        </h2>
         <CollapsibleContent>
           <form.Subscribe selector={(s) => s.values}>
             {(values) => {
@@ -451,21 +474,23 @@ export default function SponsorBookingForm({
                 mobileShowUrl: values.mobileShowUrl,
               };
               return (
-                <div className="mt-4 grid gap-6 sm:grid-cols-[auto_minmax(0,1fr)]">
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-muted-foreground text-xs font-semibold">
+                <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-[auto_minmax(0,1fr)]">
+                  <div className="flex min-w-0 flex-col gap-3">
+                    <p className="text-muted-foreground text-xs font-semibold">
                       {t("sponsors.form.desktopPreview")}
-                    </h3>
-                    <SponsorSingleCard
-                      sponsor={sponsor}
-                      preview
-                      className="sponsor-card-preview"
-                    />
+                    </p>
+                    <div className="overflow-x-auto pb-1">
+                      <SponsorSingleCard
+                        sponsor={sponsor}
+                        preview
+                        className="sponsor-card-preview"
+                      />
+                    </div>
                   </div>
                   <div className="flex min-w-0 flex-col gap-3">
-                    <h3 className="text-muted-foreground text-xs font-semibold">
+                    <p className="text-muted-foreground text-xs font-semibold">
                       {t("sponsors.form.mobilePreview")}
-                    </h3>
+                    </p>
                     <div className="flex overflow-x-auto pb-1">
                       <MobileSponsorChip sponsor={sponsor} preview />
                     </div>
@@ -581,15 +606,16 @@ export default function SponsorBookingForm({
             <AlertDescription>{message(error)}</AlertDescription>
           </Alert>
         )}
-        {(!checkoutEnabled || availableSpots === 0) && (
-          <p className="text-muted-foreground text-sm">
-            {t(
-              availableSpots === 0 && checkoutEnabled
-                ? "sponsors.soldOut"
-                : "sponsors.bookingUnavailable",
-            )}
-          </p>
-        )}
+        {catalogStatus === "ready" &&
+          (!checkoutEnabled || availableSpots === 0) && (
+            <p className="text-muted-foreground text-sm">
+              {t(
+                availableSpots === 0 && checkoutEnabled
+                  ? "sponsors.soldOut"
+                  : "sponsors.bookingUnavailable",
+              )}
+            </p>
+          )}
         <form.Subscribe
           selector={(s) => [s.isSubmitting, s.isValidating] as const}
         >
@@ -597,6 +623,7 @@ export default function SponsorBookingForm({
             <Button
               className="w-full"
               type="submit"
+              aria-busy={submitting || validating}
               disabled={
                 submitting ||
                 validating ||
@@ -614,7 +641,7 @@ export default function SponsorBookingForm({
                 validating
                   ? "sponsors.form.checkingIcon"
                   : submitting
-                    ? "sponsors.preparingCheckout"
+                    ? "sponsors.loadingBilling"
                     : "sponsors.billing.next",
                 { price },
               )}

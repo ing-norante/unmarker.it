@@ -12,6 +12,7 @@ const emptyNodeModule = path.resolve(
 // https://vite.dev/config/
 export default defineConfig({
   base: "/",
+  build: { manifest: true },
   plugins: [
     react(),
     tailwindcss(),

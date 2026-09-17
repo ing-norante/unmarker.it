@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { hydrateRoot, createRoot, render, initAnalytics } = vi.hoisted(() => {
   const render = vi.fn();
@@ -21,6 +21,13 @@ vi.mock("@/i18n/documentMetadata", () => ({
   createDocumentMetadata: vi.fn(),
 }));
 
+beforeEach(() => {
+  vi.stubGlobal("window", {
+    location: { pathname: "/" },
+    sessionStorage: { removeItem: vi.fn() },
+  });
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
@@ -30,28 +37,33 @@ afterEach(() => {
 
 describe("app startup", () => {
   it("keeps the app available when analytics initialization fails", async () => {
-    vi.stubGlobal("window", { location: { pathname: "/" } });
-    vi.stubGlobal("document", { getElementById: () => ({ hasChildNodes: () => true }) });
+    vi.stubGlobal("document", {
+      getElementById: () => ({ hasChildNodes: () => true }),
+    });
     const error = new Error("Analytics unavailable");
     initAnalytics.mockRejectedValueOnce(error);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await import("./main");
 
-    expect(hydrateRoot).toHaveBeenCalledOnce();
-    expect(warn).toHaveBeenCalledWith("Analytics initialization failed", error);
+    await vi.waitFor(() => {
+      expect(hydrateRoot).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(
+        "Analytics initialization failed",
+        error,
+      );
+    });
   });
 
   it.each([true, false])(
     "renders without waiting for analytics (prerendered: %s)",
     async (prerendered) => {
       const root = { hasChildNodes: () => prerendered };
-      vi.stubGlobal("window", { location: { pathname: "/" } });
       vi.stubGlobal("document", { getElementById: () => root });
 
       await import("./main");
 
-      expect(initAnalytics).toHaveBeenCalledWith("en");
+      await vi.waitFor(() => expect(initAnalytics).toHaveBeenCalledWith("en"));
       if (prerendered) {
         expect(hydrateRoot).toHaveBeenCalledWith(root, expect.anything());
         expect(createRoot).not.toHaveBeenCalled();

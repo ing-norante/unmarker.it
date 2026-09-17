@@ -13,7 +13,7 @@ export function AdvertiseLink({
   location,
   compact = false,
 }: {
-  availableSpots: number;
+  availableSpots?: number;
   location: SponsorshipLinkLocation;
   compact?: boolean;
 }) {

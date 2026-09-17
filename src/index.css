@@ -39,6 +39,7 @@
   --color-destructive-text: var(--destructive-text);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-control-border: var(--control-border);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -86,6 +87,7 @@
   --destructive-text: oklch(0.82 0.12 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
+  --control-border: oklch(0.56 0.016 107.4);
   --ring: oklch(0.76 0.1 224.283);
   --chart-1: oklch(0.81 0.117 11.638);
   --chart-2: oklch(0.645 0.246 16.439);
@@ -210,6 +212,190 @@ html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-d
     width: 44px;
     height: 44px;
     transform: translate(-50%, -50%);
+  }
+}
+
+/* Sponsorship keeps its compact mouse layout, with reachable controls on touch. */
+.sponsorship-page {
+  --sponsorship-type-section: 1.25rem;
+  --sponsorship-type-body: 1rem;
+  --sponsorship-type-detail: 0.875rem;
+  padding-inline-start: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-inline-end: max(var(--page-gutter), env(safe-area-inset-right, 0px));
+}
+
+/* Page roles stay separate from the live sponsor card/chip typography. */
+.sponsorship-title {
+  font-size: clamp(1.75rem, 1.5rem + 1vw, 2rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.sponsorship-copy {
+  max-inline-size: 60ch;
+  font-size: var(--sponsorship-type-body);
+  line-height: 1.65;
+}
+.sponsorship-price {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.sponsorship-page main [data-slot="field-legend"]:not(.sr-only) {
+  margin-bottom: 0.5rem;
+  font-size: var(--sponsorship-type-section);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.sponsorship-page main [data-slot="field-label"] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--sponsorship-type-detail);
+  font-weight: 600;
+  line-height: 1.5;
+}
+.sponsorship-page main :is([data-slot="field-description"], [data-slot="field-error"]) {
+  max-inline-size: 65ch;
+  overflow-wrap: anywhere;
+  font-size: var(--sponsorship-type-detail);
+  line-height: 1.6;
+}
+.sponsorship-page main [data-slot="field-set"] > [data-slot="field-description"],
+.sponsorship-page main [data-slot="checkbox-group"] [data-slot="field-label"] {
+  font-size: var(--sponsorship-type-body);
+  line-height: 1.65;
+  font-weight: 400;
+}
+.sponsorship-page main [data-slot="field-legend"]:not(.sr-only) + [data-slot="field-description"] {
+  margin-top: 0;
+}
+.sponsorship-page main [data-slot="checkbox-group"] [data-slot="field"][data-orientation="horizontal"] {
+  align-items: flex-start;
+}
+.sponsorship-page main [data-slot="checkbox-group"] [data-slot="checkbox"] {
+  margin-top: 0.3em;
+}
+.sponsorship-page main [data-slot="input-group-text"] {
+  font-variant-numeric: tabular-nums;
+}
+html[data-locale="zh-Hans"] .sponsorship-title {
+  letter-spacing: normal;
+  line-height: 1.35;
+}
+
+.sponsorship-page form :is(input, textarea, button) {
+  scroll-margin-block: 1.25rem;
+}
+
+.sponsorship-page :is([data-slot="field-set"], [data-slot="field"], [data-slot="attachment"]) {
+  min-width: 0;
+}
+
+.sponsorship-page :is(header, h1) {
+  overflow-wrap: anywhere;
+}
+.sponsorship-page [data-slot="attachment-content"] {
+  min-width: min(100%, 8rem);
+}
+
+.sponsorship-page
+  :where(form)
+  :is([data-slot="button"], [data-slot="collapsible-trigger"]) {
+  height: auto;
+  min-height: 2rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.sponsorship-page footer {
+  overflow-wrap: anywhere;
+}
+.sponsorship-page footer :is(a, button) {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.sponsorship-page [data-slot="select-trigger"] {
+  height: auto;
+  min-height: 2rem;
+  white-space: normal;
+}
+
+.sponsorship-page [data-slot="select-value"] {
+  -webkit-line-clamp: unset;
+  overflow-wrap: anywhere;
+}
+
+/* These popups are portalled outside the page. Keep long options inside the viewport. */
+.sponsorship-options {
+  max-width: calc(100vw - 2 * var(--page-gutter));
+}
+.sponsorship-country-options {
+  min-width: 0;
+  width: var(--anchor-width);
+  max-width: min(var(--available-width), calc(100vw - 2 * var(--page-gutter)));
+}
+.sponsorship-options
+  :is([data-slot="combobox-item"], [data-slot="select-item"]) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (any-pointer: coarse), (max-width: 767px) {
+  .sponsorship-page {
+    --sponsorship-touch-size: max(44px, 2.75rem);
+  }
+  .sponsorship-page
+    :is(
+      [data-slot="input"],
+      [data-slot="input-group-control"],
+      [data-slot="select-trigger"]
+    ) {
+    min-height: var(--sponsorship-touch-size);
+    font-size: max(16px, 1rem);
+  }
+  .sponsorship-page [data-slot="input-group"] {
+    height: auto;
+    min-height: calc(var(--sponsorship-touch-size) + 2px);
+  }
+  .sponsorship-page
+    :is(
+      [data-slot="button"],
+      [data-slot="input-group-button"],
+      [data-slot="attachment-action"],
+      [data-slot="collapsible-trigger"],
+      [data-slot="combobox-trigger"]
+    ) {
+    min-width: var(--sponsorship-touch-size);
+    min-height: var(--sponsorship-touch-size);
+  }
+  .sponsorship-page [data-slot="checkbox"]::after {
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: var(--sponsorship-touch-size);
+    height: var(--sponsorship-touch-size);
+    transform: translate(-50%, -50%);
+  }
+  .sponsorship-page [data-slot="field"][data-orientation="horizontal"] {
+    min-height: var(--sponsorship-touch-size);
+  }
+  .sponsorship-page header > a,
+  .sponsorship-page summary {
+    display: flex;
+    align-items: center;
+    min-height: var(--sponsorship-touch-size);
+  }
+  .sponsorship-page summary {
+    display: list-item;
+    align-content: center;
+  }
+  .sponsorship-options
+    :is([data-slot="combobox-item"], [data-slot="select-item"]) {
+    min-height: max(44px, 2.75rem);
+    font-size: max(16px, 1rem);
   }
 }
 

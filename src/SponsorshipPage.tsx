@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 import SponsorBookingForm from "@/components/SponsorBookingForm";
 import { CookieConsent } from "@/components/CookieConsent";
 import { Footer } from "@/components/Footer";
@@ -11,7 +12,14 @@ import { sponsorship, TOTAL_SPONSOR_SLOTS } from "@/lib/sponsors";
 export default function SponsorshipPage() {
   const { t, i18n } = useTranslation("common");
   const { locale } = useLocale();
-  const { availableSpots, checkoutEnabled, testMode } = useSponsorCatalog();
+  const {
+    availableSpots,
+    checkoutEnabled,
+    testMode,
+    status,
+    refreshing,
+    retry,
+  } = useSponsorCatalog();
   const totalSpots = TOTAL_SPONSOR_SLOTS;
   const price = new Intl.NumberFormat(i18n.resolvedLanguage ?? "en", {
     style: "currency",
@@ -20,7 +28,7 @@ export default function SponsorshipPage() {
   }).format(sponsorship.priceEur);
 
   return (
-    <div className="bg-background text-foreground min-h-dvh px-(--page-gutter) py-6 font-sans sm:py-10">
+    <div className="sponsorship-page bg-background text-foreground min-h-dvh px-(--page-gutter) py-6 font-sans sm:py-10">
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
         <a
           href={localeConfigs[locale].path}
@@ -32,27 +40,37 @@ export default function SponsorshipPage() {
       </header>
       <main className="mx-auto my-10 w-full max-w-xl space-y-6 sm:my-16">
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold">{t("sponsors.dialogTitle")}</h1>
-          <p className="text-muted-foreground text-sm">
+          <h1 className="sponsorship-title">{t("sponsors.dialogTitle")}</h1>
+          <p className="sponsorship-copy text-muted-foreground">
             {t("sponsors.dialogDescription")}
           </p>
         </div>
         <div className="space-y-2 border-b pb-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <p className="font-semibold">
+            <p className="sponsorship-price">
               {t("sponsors.monthlyPrice", {
                 price,
                 days: sponsorship.durationDays,
               })}
             </p>
-            <p className="text-muted-foreground text-xs">
-              {t("sponsors.spotsLeft", {
-                available: availableSpots,
-                total: totalSpots,
-              })}
+            <p
+              className="text-muted-foreground text-sm leading-relaxed tabular-nums"
+              role="status"
+              aria-atomic="true"
+            >
+              {status === "ready" && availableSpots !== undefined
+                ? t("sponsors.spotsLeft", {
+                    available: availableSpots,
+                    total: totalSpots,
+                  })
+                : t(
+                    status === "loading"
+                      ? "sponsors.catalogLoading"
+                      : "sponsors.catalogUnknown",
+                  )}
             </p>
           </div>
-          <div className="text-muted-foreground space-y-1 text-xs leading-relaxed">
+          <div className="text-muted-foreground space-y-1 text-sm leading-relaxed">
             <p>{t("sponsors.onePayment")}</p>
             <p>
               {t("sponsors.durationDescription", {
@@ -60,6 +78,26 @@ export default function SponsorshipPage() {
               })}
             </p>
           </div>
+          {status === "error" && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <p className="text-muted-foreground text-sm" role="alert">
+                {t("sponsors.catalogError")}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={retry}
+                disabled={refreshing}
+              >
+                {t(
+                  refreshing
+                    ? "sponsors.catalogLoading"
+                    : "sponsors.catalogRetry",
+                )}
+              </Button>
+            </div>
+          )}
           {testMode && (
             <p className="text-primary-text text-xs font-semibold">
               {t("sponsors.testMode")}
@@ -69,12 +107,15 @@ export default function SponsorshipPage() {
         <SponsorBookingForm
           checkoutEnabled={checkoutEnabled}
           availableSpots={availableSpots}
+          catalogStatus={status}
         />
-        <details className="text-muted-foreground text-xs">
+        <details className="text-muted-foreground text-sm leading-relaxed">
           <summary className="cursor-pointer font-semibold">
             {t("sponsors.howItWorks")}
           </summary>
-          <p className="mt-2">{t("sponsors.howItWorksDescription")}</p>
+          <p className="sponsorship-copy mt-2">
+            {t("sponsors.howItWorksDescription")}
+          </p>
         </details>
       </main>
       <div className="mx-auto max-w-6xl">
