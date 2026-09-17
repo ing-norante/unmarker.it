@@ -26,19 +26,19 @@ prima dell'assegnazione. Non è stato emesso alcun documento fiscale.
 Per le commissioni Stripe Giuseppe intende usare il processo TD17 già adottato
 da NoMaDe; la corretta classificazione dei documenti resta al commercialista.
 
-| Area             | Situazione nel codice                                                                                          |
-| ---------------- | -------------------------------------------------------------------------------------------------------------- |
-| Acquisto         | Pagamento unico, totale fisso di 500 €, 720 ore dal pagamento confermato                                       |
-| Rinnovo          | Nessun abbonamento o rinnovo automatico                                                                        |
-| Managed Payments | Disabilitato esplicitamente nelle Checkout Session                                                             |
-| IVA              | Nessuna integrazione di calcolo automatico; totale atteso rigidamente pari a 50000 centesimi                   |
-| Fatturazione     | Nessun flusso XML/SdI o registro delle fatture implementato                                                    |
-| Dati fiscali     | Il form raccoglie la creatività; Checkout non richiede esplicitamente tutti i dati necessari alla fattura      |
+| Area             | Situazione nel codice                                                                                                      |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Acquisto         | Pagamento unico, totale fisso di 500 €, 720 ore dal pagamento confermato                                                   |
+| Rinnovo          | Nessun abbonamento o rinnovo automatico                                                                                    |
+| Managed Payments | Disabilitato esplicitamente nelle Checkout Session                                                                         |
+| IVA              | Nessuna integrazione di calcolo automatico; totale atteso rigidamente pari a 50000 centesimi                               |
+| Fatturazione     | Nessun flusso XML/SdI o registro delle fatture implementato                                                                |
+| Dati fiscali     | Il form raccoglie la creatività; Checkout non richiede esplicitamente tutti i dati necessari alla fattura                  |
 | Documenti legali | Footer con dati societari e link alle bozze su GitHub, chiaramente segnalate; nessuna accettazione contrattuale registrata |
-| Analytics        | Consenso preventivo browser/server, revoca e preferenze; replay disabilitato                                |
-| Cron             | Endpoint autenticato disponibile; nessuna pianificazione in `vercel.json`                                      |
-| Rimborsi         | I parziali mantengono la campagna fino alla scadenza; il totale cumulativo integrale la rimuove                |
-| Pausa vendite    | Manca un interruttore dedicato ai nuovi acquisti; il blocco live attuale agisce sulla configurazione condivisa |
+| Analytics        | Consenso preventivo browser/server, revoca e preferenze; replay disabilitato                                               |
+| Cron             | Endpoint autenticato disponibile; nessuna pianificazione in `vercel.json`                                                  |
+| Rimborsi         | I parziali mantengono la campagna fino alla scadenza; il totale cumulativo integrale la rimuove                            |
+| Pausa vendite    | Manca un interruttore dedicato ai nuovi acquisti; il blocco live attuale agisce sulla configurazione condivisa             |
 
 Riferimenti implementativi: `server/sponsors/service.ts`,
 `server/sponsors/config.ts`, `server/sponsors/schema.sql`,
@@ -298,8 +298,7 @@ supporta proprio la conversione XML → documento tramite API JSON, con anteprim
 Ricevuti da Giuseppe:
 
 - Visura estratta il 1 settembre 2026: anagrafica e capitale verificati.
-- Assistenza `help@nomadesrl.it`, PEC `info@pec.nomadesrl.it`, telefono
-  `+39 339 8608631`. Si propone assistenza anche come recapito privacy.
+- Assistenza `help@nomadesrl.it`, PEC `info@pec.nomadesrl.it`. Si propone assistenza anche come recapito privacy.
 - XML TD01/RF01/FPR12 della fattura `3_info`; dati del destinatario non copiati
   nelle bozze. Numerazione successiva coordinata con FIC.
 - Mercati Italia/UE/extra UE, aziende e professionisti.

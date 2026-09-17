@@ -10,7 +10,6 @@
 Il titolare è NOMADE - S.R.L., Via Luigi Salvatore Cherubini 10, 50121 Firenze
 (FI), Italia, P. IVA e CF 07505480488. Per assistenza e richieste relative ai
 dati personali: help@nomadesrl.it; PEC info@pec.nomadesrl.it;
-telefono +39 339 8608631.
 
 ## Dati, finalità e basi giuridiche
 

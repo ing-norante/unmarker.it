@@ -29,7 +29,6 @@ i dati del cliente, dei soci o i documenti integrali.
 | Capitale sociale         | 100.000,00 €, interamente versato                                             |
 | Assistenza               | help@nomadesrl.it                                                             |
 | PEC                      | info@pec.nomadesrl.it                                                         |
-| Telefono                 | +39 339 8608631                                                               |
 | Clienti ammessi          | Aziende e liberi professionisti, per finalità professionali                   |
 | Mercati richiesti        | Italia, UE, extra UE, nei limiti delle restrizioni applicabili                |
 | Prezzo                   | 500 € imponibili per 30 giorni, più IVA ove dovuta                            |

@@ -79,11 +79,6 @@ export function Footer() {
               </a>
             </li>
             <li>
-              <a className={linkClassName} href="tel:+393398608631">
-                +39 339 8608631
-              </a>
-            </li>
-            <li>
               <a
                 className={linkClassName}
                 href="mailto:info@pec.nomadesrl.it"

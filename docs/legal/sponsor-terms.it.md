@@ -11,7 +11,6 @@ partita IVA e iscrizione al Registro Imprese di Firenze 07505480488; REA
 FI - 708292; capitale sociale 100.000,00 € interamente versato.
 
 Assistenza e reclami: help@nomadesrl.it. PEC: info@pec.nomadesrl.it.
-Telefono: +39 339 8608631.
 
 ## 2. Acquisti professionali
 
