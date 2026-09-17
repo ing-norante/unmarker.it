@@ -16,6 +16,7 @@ export const sponsorIconSchema = z
   );
 
 export const sponsorBookingSchema = sponsorCreativeSchema.extend({
+  mobileShowUrl: sponsorCreativeSchema.shape.mobileShowUrl.unwrap(),
   icon: sponsorIconSchema,
 });
 

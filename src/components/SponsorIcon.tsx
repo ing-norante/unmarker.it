@@ -9,7 +9,7 @@ export function SponsorIcon({
   size?: number;
 }) {
   const [failedIcon, setFailedIcon] = useState<string | null>(null);
-  const isImage = /^(https?:\/\/|\/)/.test(sponsor.icon);
+  const isImage = /^(https?:\/\/|blob:|\/)/.test(sponsor.icon);
 
   if (!isImage || failedIcon === sponsor.icon) {
     return (

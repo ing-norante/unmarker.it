@@ -1,32 +1,21 @@
 import { SponsorIcon } from "@/components/SponsorIcon";
-import { getSponsorUrl, type Sponsor } from "@/lib/sponsors";
+import { type Sponsor } from "@/lib/sponsors";
 import { cn } from "@/lib/utils";
-import {
-  sponsorTrackingAttributes,
-  trackSponsorClick,
-  type SponsorPlacement,
-} from "@/lib/sponsorTracking";
+import { SponsorLink, type SponsorDisplayMode } from "./SponsorLink";
 
 export function SponsorSingleCard({
   sponsor,
   className,
-  placement,
+  ...mode
 }: {
   sponsor: Sponsor;
   className?: string;
-  placement: SponsorPlacement;
-}) {
+} & SponsorDisplayMode) {
   return (
-    <a
-      {...sponsorTrackingAttributes(sponsor, placement)}
-      onClick={() => trackSponsorClick(sponsor, placement)}
-      onAuxClick={(event) => {
-        if (event.button === 1) trackSponsorClick(sponsor, placement);
-      }}
-      href={getSponsorUrl(sponsor, "sponsor_card")}
-      target="_blank"
-      rel="sponsored noopener noreferrer"
-      translate="no"
+    <SponsorLink
+      {...mode}
+      sponsor={sponsor}
+      campaign="sponsor_card"
       className={cn(
         "sponsor-card bg-card text-card-foreground hover:border-primary focus-visible:ring-ring flex h-68 min-w-0 flex-col items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2.5 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
         className,
@@ -39,6 +28,6 @@ export function SponsorSingleCard({
       <p className="text-muted-foreground min-h-0 overflow-y-auto text-xs leading-4 wrap-anywhere">
         {sponsor.claim}
       </p>
-    </a>
+    </SponsorLink>
   );
 }

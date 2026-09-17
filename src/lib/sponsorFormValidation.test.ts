@@ -16,6 +16,7 @@ describe("sponsor creative validation", () => {
     const icon = new File(["image"], "icon.png", { type: "image/png" });
     const creative = {
       name: "Example",
+      mobileShowUrl: false,
       url: "https://example.com",
       description: "A short description.",
       icon,

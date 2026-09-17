@@ -153,7 +153,11 @@ export const common = {
         "This icon will be uploaded for your ad. PNG, JPEG or WebP · up to 256 KB and 1024×1024 pixels.",
       iconError: "Choose a PNG, JPEG or WebP image up to 256 KB.",
       preview: "Your preview",
-      previewHint: "Your placement adapts to desktop and mobile.",
+      desktopPreview: "Desktop card",
+      mobilePreview: "Mobile chip",
+      mobileShowUrl: "Show website domain on mobile",
+      mobileShowUrlHint:
+        "Unchecked: project name. Checked: domain only, without paths or parameters.",
       errorTitle: "Checkout could not be completed",
     },
     errors: {

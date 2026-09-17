@@ -64,3 +64,6 @@ ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS stripe_price_id text;
 ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS publication_stopped_at timestamptz;
 ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS publication_stopped_by text;
 ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS publication_stop_reference text;
+
+-- Existing campaigns keep the project name on mobile.
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS mobile_show_url boolean NOT NULL DEFAULT false;

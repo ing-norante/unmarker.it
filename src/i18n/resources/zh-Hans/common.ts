@@ -142,7 +142,11 @@ export const common = {
         "此图标将上传并用于您的广告。PNG、JPEG 或 WebP，最大 256 KB、1024×1024 像素。",
       iconError: "请选择不超过 256 KB 的 PNG、JPEG 或 WebP 图片。",
       preview: "广告预览",
-      previewHint: "您的广告将适配桌面和移动设备。",
+      desktopPreview: "桌面卡片",
+      mobilePreview: "移动端标签",
+      mobileShowUrl: "在移动端显示网站域名",
+      mobileShowUrlHint:
+        "未勾选时显示项目名称；勾选后仅显示域名，不含路径或参数。",
       errorTitle: "未能完成付款",
     },
     errors: {

@@ -2,6 +2,8 @@ export interface Sponsor {
   id: string;
   name: string;
   claim: string;
+  /** Mobile chip displays the website hostname instead of the project name. */
+  mobileShowUrl?: boolean;
   url: string;
   /** URL of an icon, or an emoji. */
   icon: string;
@@ -112,4 +114,18 @@ export function getSponsorUrl(
   url.searchParams.set("utm_medium", "referral");
   url.searchParams.set("utm_campaign", campaign);
   return url.toString();
+}
+
+/** Use the destination hostname, without paths, tracking parameters or fragments. */
+export function getMobileSponsorLabel(sponsor: Sponsor): string {
+  if (sponsor.mobileShowUrl) {
+    try {
+      const url = new URL(sponsor.url);
+      if (["https:", "http:"].includes(url.protocol) && url.hostname)
+        return url.hostname;
+    } catch {
+      // Draft URLs can be incomplete while the preview is being edited.
+    }
+  }
+  return sponsor.name;
 }

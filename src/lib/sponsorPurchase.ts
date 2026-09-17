@@ -6,6 +6,7 @@ export const MAX_SPONSOR_DESCRIPTION_LENGTH = 90;
 export const MAX_ICON_BYTES = 256 * 1024;
 
 export const sponsorCreativeSchema = z.object({
+  mobileShowUrl: z.boolean().default(false),
   name: z.string().trim().min(2, "name_length").max(32, "name_length"),
   url: z
     .string()

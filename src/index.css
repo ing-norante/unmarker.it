@@ -321,8 +321,17 @@ html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-d
 }
 
 /* Sponsor rails reserve their own space, including the mobile safe areas. */
-.sponsor-layout {
+:root {
   --sponsor-rail-width: clamp(12rem, 13vw, 13rem);
+  --sponsor-rail-padding: 0.75rem;
+}
+
+/* Same width as a live card inside a rail, including the rail border. */
+.sponsor-card-preview {
+  width: calc(var(--sponsor-rail-width) - 2 * var(--sponsor-rail-padding) - 1px);
+}
+
+.sponsor-layout {
   --sponsor-strip-height: 3.25rem;
   --sponsor-top-height: 0px;
   padding-top: var(--sponsor-top-height);
@@ -491,7 +500,7 @@ html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-d
     gap: 0.75rem;
     overflow-y: auto;
     overscroll-behavior-y: contain;
-    padding: 1rem 0.75rem;
+    padding: 1rem var(--sponsor-rail-padding);
     background: var(--sidebar);
   }
   .sponsor-sidebar-left { left: 0; border-right: 1px solid var(--border); }

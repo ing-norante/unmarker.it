@@ -232,7 +232,7 @@ describe.skipIf(!connection)(
       );
       return { id, token };
     }
-    function form(requestId = randomUUID()) {
+    function form(requestId: string = randomUUID()) {
       const data = new FormData();
       data.set("name", "Sponsor Test");
       data.set("url", "https://example.com");
@@ -458,6 +458,39 @@ describe.skipIf(!connection)(
       await expect(
         reservePurchase(owner.id, changed, randomUUID()),
       ).rejects.toMatchObject({ code: "request_changed" });
+    });
+    it.each([undefined, "false", "true"])(
+      "persists the mobile label choice through payment and catalog (%s)",
+      async (choice) => {
+        const owner = await buyer();
+        const data = form();
+        if (choice !== undefined) data.set("mobileShowUrl", choice);
+        const reserved = await reservePurchase(owner.id, data, randomUUID());
+        expect(reserved.mobile_show_url).toBe(choice === "true");
+        expect((await reservePurchase(owner.id, data, randomUUID())).id).toBe(
+          reserved.id,
+        );
+        const changed = form(reserved.request_id);
+        changed.set("mobileShowUrl", choice === "true" ? "false" : "true");
+        await expect(
+          reservePurchase(owner.id, changed, randomUUID()),
+        ).rejects.toMatchObject({ code: "request_changed" });
+        const checkout = await ensureCheckout(reserved.id, owner.id);
+        pay(checkout.stripe_session_id!);
+        await syncSponsorPurchase(checkout.id);
+        expect((await catalog()).sponsors[0]).toMatchObject({
+          id: reserved.id,
+          mobileShowUrl: choice === "true",
+        });
+      },
+    );
+    it("rejects malformed mobile label preferences before reserving a slot", async () => {
+      const owner = await buyer();
+      const data = form();
+      data.set("mobileShowUrl", "yes");
+      await expect(
+        reservePurchase(owner.id, data, randomUUID()),
+      ).rejects.toMatchObject({ code: "invalid_form" });
     });
     async function analyticsOrder() {
       const owner = await buyer();

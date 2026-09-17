@@ -39,6 +39,7 @@ export interface Purchase {
   name: string;
   url: string;
   description: string;
+  mobile_show_url: boolean;
   icon: Buffer;
   status: PurchaseStatus;
   stripe_session_id: string | null;
@@ -100,7 +101,7 @@ async function capacity(db: PoolClient) {
 
 export async function catalog() {
   const { rows } = await database()
-    .query<Purchase>(`SELECT id, name, url, description, starts_at, expires_at
+    .query<Purchase>(`SELECT id, name, url, description, mobile_show_url, starts_at, expires_at
     FROM sponsor_purchases WHERE status='active' AND publication_stopped_at IS NULL
     AND starts_at <= now() AND expires_at > now() ORDER BY starts_at, id`);
   const available = await transaction(capacity);
@@ -110,6 +111,7 @@ export async function catalog() {
       name: p.name,
       url: p.url,
       claim: p.description,
+      mobileShowUrl: p.mobile_show_url,
       kind: "paid" as const,
       icon: `/api/sponsors?action=icon&id=${p.id}`,
       expiresAt: p.expires_at!.toISOString(),
@@ -180,19 +182,33 @@ export async function reservePurchase(
   }
   assertLiveBillingReady(billing.country);
   const terms = await termsEvidence();
-  const creative = sponsorCreativeSchema.safeParse(
-    Object.fromEntries(
+  const creative = sponsorCreativeSchema.safeParse({
+    ...Object.fromEntries(
       ["name", "url", "description"].map((k) => [k, form.get(k)]),
     ),
-  );
+    // Do not coerce arbitrary strings (including "false") to true.
+    mobileShowUrl: form.has("mobileShowUrl")
+      ? form.get("mobileShowUrl") === "true"
+        ? true
+        : form.get("mobileShowUrl") === "false"
+          ? false
+          : form.get("mobileShowUrl")
+      : false,
+  });
   const requestId = z.uuid().safeParse(form.get("requestId"));
   const iconFile = form.get("icon");
   if (!creative.success || !requestId.success)
     throw new SponsorError("invalid_form");
   if (!(iconFile instanceof File)) throw new SponsorError("invalid_icon");
   const icon = await normalizeIcon(Buffer.from(await iconFile.arrayBuffer()));
+  const { mobileShowUrl, ...legacyCreative } = creative.data;
+  // Preserve retries of pre-existing name-mode checkout requests.
   const hash = createHash("sha256")
-    .update(JSON.stringify(creative.data))
+    .update(
+      JSON.stringify(
+        mobileShowUrl ? { ...legacyCreative, mobileShowUrl } : legacyCreative,
+      ),
+    )
     .update(JSON.stringify(billing))
     .update(icon)
     .digest("hex");
@@ -240,8 +256,8 @@ export async function reservePurchase(
     if ((await capacity(db)) === 0) throw new SponsorError("sold_out", 409);
     const { rows } = await db.query<Purchase>(
       `INSERT INTO sponsor_purchases
-      (id,buyer_id,request_id,request_hash,name,url,description,icon,status,checkout_expires_at,analytics_id,analytics_consent_at,billing_details,terms_accepted_at,billing_snapshot,stripe_price_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'creating',now()+interval '40 minutes',$9,$10,$11,now(),$12,$13) RETURNING *`,
+      (id,buyer_id,request_id,request_hash,name,url,description,icon,status,checkout_expires_at,analytics_id,analytics_consent_at,billing_details,terms_accepted_at,billing_snapshot,stripe_price_id,mobile_show_url)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'creating',now()+interval '40 minutes',$9,$10,$11,now(),$12,$13,$14) RETURNING *`,
       [
         randomUUID(),
         buyerId,
@@ -260,6 +276,7 @@ export async function reservePurchase(
           specificallyApprovedClauses: [6, 7],
         },
         getConfig().priceId,
+        creative.data.mobileShowUrl,
       ],
     );
     return rows[0];

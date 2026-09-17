@@ -25,6 +25,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SponsorSingleCard } from "@/components/SponsorSingleCard";
+import { MobileSponsorChip } from "@/components/MobileSponsorChip";
 import { SponsorFormProgress } from "@/components/SponsorFormProgress";
 import {
   sponsorBookingSchema,
@@ -36,6 +39,7 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldContent,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -137,6 +141,7 @@ export default function SponsorBookingForm({
       name: "",
       url: "",
       description: "",
+      mobileShowUrl: false,
       icon: null as File | null,
     },
     validationLogic: revalidateLogic({
@@ -167,6 +172,7 @@ export default function SponsorBookingForm({
         const data = new FormData();
         for (const key of ["name", "url", "description"] as const)
           data.set(key, value[key]);
+        data.set("mobileShowUrl", String(value.mobileShowUrl));
         data.set("icon", value.icon!);
         data.set("requestId", requestId);
         data.set("billing", JSON.stringify(billingRef.current));
@@ -432,32 +438,66 @@ export default function SponsorBookingForm({
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="mt-3 flex items-start gap-3 border p-4">
-            {preview && (
-              <img
-                src={preview}
-                alt=""
-                className="size-10 shrink-0 object-contain"
-              />
-            )}
-            <form.Subscribe
-              selector={(s) => [s.values.name, s.values.description]}
-            >
-              {([name, description]) => (
-                <div className="flex min-w-0 flex-col gap-1">
-                  <p className="text-sm font-bold wrap-anywhere">
-                    {name || t("sponsors.form.namePlaceholder")}
-                  </p>
-                  <p className="text-muted-foreground text-xs wrap-anywhere">
-                    {description || t("sponsors.form.descriptionPlaceholder")}
-                  </p>
+          <form.Subscribe selector={(s) => s.values}>
+            {(values) => {
+              const sponsor = {
+                id: "preview",
+                name: values.name.trim() || t("sponsors.form.namePlaceholder"),
+                url: values.url.trim() || "https://example.com",
+                claim:
+                  values.description.trim() ||
+                  t("sponsors.form.descriptionPlaceholder"),
+                icon: preview || "◇",
+                mobileShowUrl: values.mobileShowUrl,
+              };
+              return (
+                <div className="mt-4 grid gap-6 sm:grid-cols-[auto_minmax(0,1fr)]">
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-muted-foreground text-xs font-semibold">
+                      {t("sponsors.form.desktopPreview")}
+                    </h3>
+                    <SponsorSingleCard
+                      sponsor={sponsor}
+                      preview
+                      className="sponsor-card-preview"
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-3">
+                    <h3 className="text-muted-foreground text-xs font-semibold">
+                      {t("sponsors.form.mobilePreview")}
+                    </h3>
+                    <div className="flex overflow-x-auto pb-1">
+                      <MobileSponsorChip sponsor={sponsor} preview />
+                    </div>
+                    <form.Field name="mobileShowUrl">
+                      {(field) => (
+                        <Field orientation="horizontal">
+                          <Checkbox
+                            id={`${id}-mobile-show-url`}
+                            name={field.name}
+                            checked={field.state.value}
+                            onCheckedChange={(checked) =>
+                              field.handleChange(checked === true)
+                            }
+                            onBlur={field.handleBlur}
+                            aria-describedby={`${id}-mobile-show-url-help`}
+                          />
+                          <FieldContent>
+                            <FieldLabel htmlFor={`${id}-mobile-show-url`}>
+                              {t("sponsors.form.mobileShowUrl")}
+                            </FieldLabel>
+                            <FieldDescription id={`${id}-mobile-show-url-help`}>
+                              {t("sponsors.form.mobileShowUrlHint")}
+                            </FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      )}
+                    </form.Field>
+                  </div>
                 </div>
-              )}
-            </form.Subscribe>
-          </div>
-          <p className="text-muted-foreground mt-3 text-xs">
-            {t("sponsors.form.previewHint")}
-          </p>
+              );
+            }}
+          </form.Subscribe>
         </CollapsibleContent>
       </Collapsible>
       <div className="mt-6 flex flex-col gap-3">
