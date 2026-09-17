@@ -441,9 +441,12 @@ export default function SponsorBillingForm({
                               name={name}
                               checked={field.state.value}
                               disabled={busy}
-                              onCheckedChange={(v) =>
-                                field.handleChange(v === true)
-                              }
+                              onCheckedChange={(v) => {
+                                field.handleChange(v === true);
+                                // A checkbox choice is complete immediately;
+                                // refresh blur-mode errors without moving focus.
+                                void field.validate("blur");
+                              }}
                               onBlur={field.handleBlur}
                               aria-invalid={invalid}
                               aria-required="true"
