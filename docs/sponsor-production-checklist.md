@@ -34,8 +34,8 @@ da NoMaDe; la corretta classificazione dei documenti resta al commercialista.
 | IVA              | Nessuna integrazione di calcolo automatico; totale atteso rigidamente pari a 50000 centesimi                   |
 | Fatturazione     | Nessun flusso XML/SdI o registro delle fatture implementato                                                    |
 | Dati fiscali     | Il form raccoglie la creatività; Checkout non richiede esplicitamente tutti i dati necessari alla fattura      |
-| Documenti legali | Nessun collegamento a condizioni/privacy nel footer esaminato; nessuna accettazione contrattuale registrata    |
-| Analytics        | Inizializzazione PostHog senza controllo del consenso in `src/lib/analytics.ts`                                |
+| Documenti legali | Footer con dati societari e link alle bozze su GitHub, chiaramente segnalate; nessuna accettazione contrattuale registrata |
+| Analytics        | Consenso preventivo browser/server, revoca e preferenze; replay disabilitato                                |
 | Cron             | Endpoint autenticato disponibile; nessuna pianificazione in `vercel.json`                                      |
 | Rimborsi         | I parziali mantengono la campagna fino alla scadenza; il totale cumulativo integrale la rimuove                |
 | Pausa vendite    | Manca un interruttore dedicato ai nuovi acquisti; il blocco live attuale agisce sulla configurazione condivisa |
@@ -137,6 +137,14 @@ saldo. [Stripe: riconciliazione dei payout](https://docs.stripe.com/reports/payo
 
 ## 4. Condizioni, recesso e assistenza
 
+- [x] **Sviluppo:** footer responsive con denominazione, sede, P. IVA/CF,
+      Registro Imprese, REA, capitale versato e contatti, presenti nell'HTML iniziale.
+      Link a condizioni sponsor, privacy, cookie e cancellazioni/rimborsi:
+      per ora aprono le bozze italiane su GitHub, con avviso che non sono applicabili.
+- [ ] **Prima del lancio:** completare, validare e pubblicare i documenti definitivi
+      su pagine del sito, aggiornare i link del footer e rimuovere gli avvisi di bozza.
+      Le condizioni B2B usano «Cancellazioni e rimborsi», senza promettere il
+      recesso consumer di 14 giorni. Non considerare le bozze informative definitive.
 - [ ] **Giuseppe + legale:** pubblicare condizioni di vendita per la sponsorizzazione,
       indicando NoMaDe S.r.l., dati societari obbligatori, sede, P. IVA e contatti.
 - [ ] Descrivere pagamento unico, durata dal pagamento, pubblicazione automatica,
@@ -181,13 +189,20 @@ considerare la campagna di 30 giorni interamente eseguita al primo clic.
 
 ## 5. Privacy e analytics
 
+Audit delle impostazioni e collaudo locale documentati nel
+[report PostHog e consenso](../posthog-audit-session-replay-report.md).
+
+- [x] **Sviluppo:** aggiunto al footer «Preferenze cookie», collegato a un
+      controllo reale di consenso e revoca per PostHog, anche per gli eventi server.
+      Il collegamento alla cookie policy da solo non svolge questa funzione.
+      [Garante: modifica delle scelte dal footer](https://www.gpdp.it/home/docweb/-/docweb-display/docweb/9677876).
 - [ ] **Giuseppe + consulente privacy:** pubblicare informativa con titolare,
       finalità, basi giuridiche, destinatari, conservazione, trasferimenti e diritti.
 - [ ] Descrivere separatamente immagini elaborate localmente, icone sponsor
       caricate sul server, dati d'acquisto e telemetria.
 - [ ] **Sviluppo:** verificare cookie, storage, autocapture, replay e payload reali;
       impedire l'invio di dati fiscali, campi del form e credenziali nei tracciamenti.
-- [ ] Stabilire quali tracciamenti necessitano consenso e bloccarli fino alla
+- [x] Una categoria facoltativa statistiche/diagnostica PostHog, bloccata fino alla
       scelta, con rifiuto e revoca. L'esenzione per analytics richiede condizioni
       precise di aggregazione/minimizzazione: il solo proxy sul nostro dominio
       non basta. [Garante: cookie e analytics](https://www.garanteprivacy.it/faq/cookie).
@@ -198,6 +213,13 @@ considerare la campagna di 30 giorni interamente eseguita al primo clic.
 
 **Criterio di completamento:** verifica in un browser senza preferenze salvate,
 poi con rifiuto, accettazione e revoca; documenti coerenti con le richieste di rete.
+
+- [ ] Prima di distribuire questa versione: eseguire la migrazione idempotente
+      `pnpm sponsors:db:migrate` sul database dell'ambiente destinatario. Aggiunge
+      `sponsor_buyers.analytics_consent` e `sponsor_purchases.analytics_consent_at`;
+      gli acquisti precedenti senza consenso verificabile non alimentano analytics.
+- [ ] Ripetere il collaudo rete/storage su Vercel Preview e aggiornare i link alle
+      informative definitive. I link attuali puntano ancora alle bozze già committate.
 
 ## 6. Implementazione e infrastruttura live
 

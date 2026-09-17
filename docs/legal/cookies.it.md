@@ -1,79 +1,104 @@
-# Cookie policy e banner Unmarker.it
+# Cookie policy e preferenze Unmarker.it
 
-> BOZZA E SPECIFICA, 17 settembre 2026. Non pubblicabile come descrizione dello
-> stato attuale: il controllo del consenso non è ancora implementato. L'inventario
-> del browser e le impostazioni remote PostHog vanno verificati prima del rilascio.
+> BOZZA PER REVISIONE, 17 settembre 2026. Aggiornata all'implementazione in
+> questo worktree e all'audit del progetto PostHog 104940. Prima della pubblicazione
+> servono informativa definitiva, retention degli eventi e accordi dei fornitori.
+> Non descrive automaticamente il deployment attualmente in produzione.
 
-## Testo introduttivo proposto
+## Titolare e finalità
 
 Unmarker.it è gestito da NOMADE - S.R.L., Via Luigi Salvatore Cherubini 10,
 50121 Firenze (FI), P. IVA/CF 07505480488; contatto help@nomadesrl.it.
 
 Usiamo strumenti necessari per memorizzare preferenze e gestire gli acquisti.
-Con il tuo consenso usiamo PostHog per capire come viene utilizzato il sito e
-misurare visualizzazioni e clic degli sponsor. Puoi rifiutare gli analytics
-continuando a usare il sito e cambiare scelta in ogni momento dalle preferenze.
+Con il consenso usiamo PostHog per statistiche di utilizzo e diagnostica:
+visite, completamento del flusso immagini, visualizzazioni e clic sponsor,
+conversioni di acquisto, errori dell'app e prestazioni del browser. I dati sono
+pseudonimi, non anonimi. Non carichiamo le immagini elaborate con lo strumento.
+L'icona pubblica caricata per una campagna sponsor è un trattamento separato.
 
-## Inventario iniziale dal codice
+## Due categorie
 
-| Strumento                                        | Scopo                                                                                               | Durata/stato verificato                                                                                             |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `unmarker_sponsor_session`                       | Sessione necessaria all'acquisto e accesso agli ordini dal medesimo browser; valore opaco, HttpOnly | Cookie con durata di 120 giorni, limitato a `/api/sponsors`; verificare rinnovi e durata separata dei record server |
-| `theme` in local storage                         | Preferenza di tema                                                                                  | Nessuna scadenza automatica del local storage; rimozione con pulizia del browser                                    |
-| Preferenze lingua e suggerimenti                 | Scelta della lingua/interfaccia                                                                     | Verificare nomi e durata delle chiavi effettive nell'inventario finale                                              |
-| Flag in session storage per recupero caricamento | Evita cicli di ricaricamento dopo errori di caricamento delle risorse                               | Durata della sessione o rimozione da parte dell'app                                                                 |
-| Cookie/local storage PostHog                     | Identificatori e statistiche d'uso                                                                  | Nomi, durate, session replay e ulteriori strumenti DA VERIFICARE con versione SDK e configurazione remota           |
-| Preferenza consenso                              | Ricorda accettazione/rifiuto/versione dell'informativa                                              | DA IMPLEMENTARE e includere nell'inventario finale                                                                  |
+- **Necessari, sempre attivi:** preferenze richieste e sessione sicura degli
+  acquisti. Non servono a fare statistiche e non dipendono dal relativo consenso.
+- **Statistiche e diagnostica — PostHog, facoltative:** tutte le misurazioni sopra
+  indicate richiedono consenso, anche quelle inviate dal server per gli acquisti.
+  Nessuna categoria marketing, profilazione pubblicitaria o session replay è
+  abilitata da questa implementazione.
 
-La pagina di pagamento Stripe è separata: descriverne il rinvio all'informativa
-del fornitore e distinguere gli strumenti presenti su Unmarker da quelli usati
-su Checkout. Verificare eventuali strumenti aggiunti dall'hosting in produzione.
+## Inventario
 
-## Testo breve del banner
+| Strumento | Scopo | Durata |
+| --- | --- | --- |
+| `unmarker_sponsor_session`, cookie HttpOnly, SameSite=Lax, percorso `/api/sponsors` | Sessione d'acquisto e accesso agli ordini dal medesimo browser; non viene creata scegliendo i cookie | 120 giorni; durata dei record server distinta |
+| `theme`, localStorage | Preferenza chiaro/scuro | Fino a cancellazione del browser |
+| `unmarker.locale.preference`, localStorage | Lingua scelta | Fino a cancellazione del browser |
+| `unmarker.localeSuggestion.zh-Hans`, localStorage | Ricorda la risposta al suggerimento lingua | Fino a cancellazione del browser |
+| `chunk-reload:*`, sessionStorage | Evita ricaricamenti ripetuti dopo un errore di caricamento | Sessione della scheda o rimozione dopo caricamento riuscito |
+| `unmarker_consent`, localStorage | Scelta, data, versione dell'informativa e scadenza; nessun identificatore personale aggiuntivo | Scelta valida sei mesi; eventuale record scaduto viene sostituito alla nuova scelta |
+| `ph_<chiave-progetto>*`, localStorage e dati di sessione SDK | Identificatori pseudonimi, sessione e proprietà degli analytics consentiti | Nessuna scadenza nativa di localStorage; cancellati alla revoca o quando l'app rileva il consenso scaduto/assente |
+| `__ph_opt_in_out_<chiave-progetto>`, localStorage | Stato tecnico opt-in dell'SDK dopo accettazione | Rimosso insieme agli identificatori alla revoca; la scelta necessaria resta in `unmarker_consent` |
 
-**Privacy e statistiche**
+Il nuovo SDK è configurato per localStorage, senza cookie analytics condivisi
+tra sottodomini. La revoca tenta anche la rimozione dei cookie PostHog precedenti
+per questo progetto sul dominio corrente e sui domini superiori applicabili.
+Gli archivi locali non vengono cancellati automaticamente mentre il sito è chiuso:
+la scadenza del consenso viene verificata al successivo accesso e nelle schede aperte.
 
-Usiamo strumenti necessari al funzionamento del sito. Con il tuo consenso usiamo
-PostHog per analizzare l'utilizzo di Unmarker e misurare visualizzazioni e clic
-degli sponsor. Puoi rifiutare gli analytics e continuare a usare tutte le funzioni.
+Stripe Checkout è una pagina separata; vanno indicati nell'informativa definitiva
+il ruolo di Stripe e il rinvio alla sua informativa. Gli strumenti eventualmente
+inseriti dall'hosting o da futuri script richiedono una nuova verifica.
 
-Azioni: **Rifiuta analytics**, **Accetta analytics**, **Preferenze**.
-Link: **Privacy policy** e **Cookie policy**.
+## Scelta, modifica e revoca
 
-La formulazione va aggiornata se si decide di usare registrazioni di sessione:
-non includerle silenziosamente in una descrizione di semplici conteggi.
+Il banner propone **Rifiuta analytics**, **Accetta analytics** e **Preferenze**,
+senza oscurare o bloccare il sito. Accettazione e rifiuto hanno pari evidenza;
+la X equivale al rifiuto. Scorrere o continuare a navigare non vale come consenso.
+La categoria facoltativa è inizialmente disattivata.
 
-## Specifica da implementare
+Il pulsante **Preferenze cookie** nel footer permette in ogni momento di
+modificare la scelta o revocare con **Rifiuta analytics**. Chiudere le preferenze
+senza salvare non modifica la scelta. Il rifiuto non limita le funzioni del sito.
 
-- Stato iniziale senza analytics non necessari: non caricare/inizializzare il
-  client PostHog finché manca il consenso. Coprire anche captureException,
-  autocapture, pageview automatici, replay, identificatori e richieste di configurazione.
-- Non inviare retroattivamente gli eventi avvenuti prima dell'accettazione.
-- Le tre scelte devono essere accessibili con tastiera e tecnologie assistive;
-  rifiuto e accettazione devono essere presentati senza ostacoli o enfasi ingannevoli.
-- Gli strumenti strettamente necessari sono spiegati ma non subordinati al
-  consenso analytics; chiusura del banner mantiene il rifiuto predefinito.
-- Conservare scelta, versione e data, riapribili dal footer. Non chiedere
-  nuovamente a ogni pagina o visita; stabilire durata e condizioni di riproposizione
-  secondo le indicazioni del Garante, senza cancellare arbitrariamente un rifiuto.
-- Revoca: fermare raccolta/replay, rimuovere identificatori non necessari ove
-  possibile e sincronizzare la scelta nelle schede aperte. Testare anche una
-  revoca durante l'importazione asincrona dell'SDK.
-- Collegare la scelta agli eventi server degli acquisti: `analytics_id` viene
-  oggi conservato nell'acquisto e usato dall'outbox. Il solo blocco browser non
-  basta per la revoca; evitare invii successivi non consentiti e non inventare
-  identificatori sostitutivi per aggirare il rifiuto.
-- Non inviare dati di fatturazione, contenuti delle immagini, numeri carta o
-  campi sensibili in proprietà, URL, errori o registrazioni di sessione.
-- Decidere il replay esplicitamente dopo l'audit; proposta iniziale: disabilitato,
-  analytics degli eventi necessari alle metriche sponsor soltanto dopo consenso.
-- Le metriche analytics descrivono il campione consenziente; fatture e conteggi
-  amministrativi dei pagamenti restano nel database per le rispettive finalità.
+La scelta è ricordata per sei mesi in quel browser, quando lo storage è
+accessibile. Potrà essere richiesta nuovamente dopo la scadenza, se il browser
+non conserva più la preferenza o in presenza di cambiamenti sostanziali delle
+finalità. Una revisione editoriale non deve azzerare i rifiuti.
 
-## Collaudo richiesto
+Prima dell'accettazione PostHog non viene inizializzato e gli eventi precedenti
+non vengono recuperati. Dopo la revoca si interrompono raccolta e invii del
+browser, inclusi i tentativi di reinvio in coda; gli identificatori locali
+vengono rimossi e la scelta si propaga alle altre schede dello stesso sito.
 
-Browser pulito prima della scelta; rifiuto; accettazione; revoca; ricaricamento;
-più schede; storage non disponibile; pagamento e webhook dopo rifiuto/revoca.
-Verificare rete e storage, non soltanto la comparsa grafica del banner.
+Per chi ha acquistato dal medesimo browser, la revoca aggiorna anche il server,
+che rimuove l'associazione analytics dagli acquisti e scarta gli eventi ancora
+in attesa. Se manca la connessione, il blocco locale è immediato e compare un
+avviso per completare la sincronizzazione; si riprova al ritorno online o con
+il pulsante dedicato. La revoca dal browser non può fermare un invio server
+prima che il server riceva la richiesta, né richiamare dati già trasmessi.
 
-Riferimento: [Garante, FAQ cookie e altri strumenti di tracciamento](https://www.garanteprivacy.it/faq/cookie).
+La revoca non cancella dati già raccolti lecitamente o documenti amministrativi.
+Per esercitare gli altri diritti si può contattare il titolare. Cancellare la
+sessione d'acquisto o cambiare dispositivo può richiedere assistenza per ritrovare
+un ordine: non viene eseguito un collegamento tra dispositivi per aggirare il rifiuto.
+
+## Configurazione e limiti da completare
+
+L'audit del progetto PostHog Unmarker.it rileva session replay disabilitato;
+l'app lo disabilita anche esplicitamente, insieme ad autocapture dei clic,
+rageclick, heatmap, sondaggi, tour e conversazioni. Restano gli eventi applicativi
+espliciti, errori tecnici e Web Vitals, tutti subordinati al consenso.
+I parametri e i frammenti degli URL di navigazione vengono rimossi dagli eventi.
+
+**DA COMPLETARE:** retention degli eventi PostHog, entità contrattuale/accordi,
+trasferimenti e verifica finale sul deployment candidato. Il valore remoto
+`session_recording_retention_period=30d` riguarda solo il replay disabilitato:
+non è una prova della durata di conservazione degli eventi analytics.
+Gli endpoint europei non dimostrano da soli l'assenza di trasferimenti fuori SEE.
+
+Le statistiche sponsor e del flusso immagini descrivono il solo campione che ha
+acconsentito. I dati amministrativi dei pagamenti conservano finalità e basi
+giuridiche distinte dal consenso agli analytics.
+
+Riferimenti: [Garante, FAQ cookie](https://www.garanteprivacy.it/faq/cookie) e
+[linee guida del 10 giugno 2021](https://www.gpdp.it/home/docweb/-/docweb-display/docweb/9677876).

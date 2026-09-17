@@ -2,7 +2,8 @@
 
 > BOZZA NON PUBBLICABILE: versione 17 settembre 2026. I punti DA COMPLETARE
 > richiedono riscontro della configurazione effettiva e revisione. Le funzioni
-> di consenso descritte devono essere implementate prima della pubblicazione.
+> di consenso sono implementate nel worktree; verificare il deployment e
+> completare i punti aperti prima della pubblicazione.
 
 ## Titolare e contatti
 
@@ -21,7 +22,7 @@ telefono +39 339 8608631.
 | Pubblicazione sponsor           | Nome pubblico, URL, descrizione e icona forniti dal cliente; sono visibili ai visitatori                                                                  | Esecuzione della campagna richiesta, tenendo conto dei diritti di eventuali terzi                         |
 | Fatturazione e contabilità      | Dati fiscali, fatture, pagamenti, rimborsi e documenti correlati                                                                                          | Adempimento di obblighi legali                                                                            |
 | Assistenza e tutela dei diritti | Corrispondenza e dati necessari a risolvere richieste e contestazioni                                                                                     | Contratto, obblighi legali o legittimo interesse, secondo la richiesta                                    |
-| Analytics facoltativi           | Eventi di navigazione, utilizzo del flusso immagine, visualizzazioni/clic sponsor e conversioni; identificatori pseudonimi e informazioni sul dispositivo | Consenso, revocabile nelle preferenze                                                                     |
+| Analytics facoltativi           | Eventi di navigazione, utilizzo del flusso immagine, visualizzazioni/clic sponsor e conversioni, errori tecnici e prestazioni; identificatori pseudonimi e informazioni sul dispositivo | Consenso, revocabile nelle preferenze                                                                     |
 
 L'icona caricata per una sponsorizzazione è distinta dall'immagine elaborata dallo
 strumento: viene inviata al server, normalizzata e pubblicata nella campagna.
@@ -55,7 +56,7 @@ trasferimenti internazionali dal solo uso di endpoint europei.
 
 **DA COMPLETARE PRIMA DELLA PUBBLICAZIONE:** inserire periodi o criteri verificati
 per log, dati di campagne e icone dopo la scadenza, acquisti incompleti, assistenza,
-analytics ed eventuali registrazioni di sessione. Per documenti fiscali e prove
+analytics (session replay disabilitato). Per documenti fiscali e prove
 contrattuali indicare le durate previste dagli obblighi applicabili, le esigenze
 di difesa e le corrispondenti procedure di cancellazione, comprese le copie di backup.
 
@@ -81,6 +82,10 @@ statistico a una decisione automatizzata di questo tipo.
 ## Cookie e analytics
 
 La cookie policy descrive strumenti necessari e analytics facoltativi. Le
-preferenze devono essere accessibili dal footer del sito. Dettagli su replay,
-mascheramento e dati esclusi saranno inseriti dopo l'audit della configurazione,
-senza dichiarare anonimi dati che sono soltanto pseudonimi.
+preferenze sono riapribili dal footer, con rifiuto e revoca anche per gli eventi
+server degli acquisti del medesimo browser. La scelta vale sei mesi. Il replay
+è disabilitato sia nel progetto PostHog sia nel client; non registriamo le sessioni.
+Prima del consenso non inizializziamo PostHog. Le misurazioni sono pseudonime,
+non anonime; riguardano il solo campione consenziente. La revoca locale è immediata,
+quella server richiede connessione e conferma: in caso di errore il sito mostra
+un avviso e permette di riprovare. Si veda la cookie policy per l'inventario.
