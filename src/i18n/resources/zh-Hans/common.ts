@@ -98,6 +98,7 @@ export const common = {
       tax_type: "请选择该国家支持的税号类型。",
       italian_vat:
         "请输入有效的意大利增值税号：IT 后跟 11 位数字，并检查校验位。",
+      us_ein: "请输入 9 位美国 EIN，例如 12-3456789。",
       vat_prefix: "请包含账单国家对应的增值税前缀（如 IT、DE；希腊使用 EL）。",
       fiscal_code: "请输入企业的 11 位数字税号或专业人士的 16 位字符税号。",
       italian_postal: "请输入 5 位数字的意大利邮政编码。",
@@ -158,6 +159,8 @@ export const common = {
     errors: {
       invalid_billing:
         "请检查账单信息并确认专业购买和相关条款。欧盟增值税号应包含国家前缀。",
+      tax_id_invalid:
+        "Stripe 拒绝了此企业税号。请核对号码后重新提交。尚未扣款。",
       billing_unavailable:
         "税务设置或正式销售审批尚未完成。请联系 help@nomadesrl.it。",
       tax_verification_pending:

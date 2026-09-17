@@ -104,6 +104,7 @@ export const common = {
       tax_type: "Choose a tax ID type supported in the selected country.",
       italian_vat:
         "Enter a valid Italian VAT number: IT followed by 11 digits. Check the final check digit.",
+      us_ein: "Enter a 9-digit US EIN, for example 12-3456789.",
       vat_prefix:
         "Include the VAT prefix for your billing country (for example IT or DE; EL for Greece).",
       fiscal_code:
@@ -169,6 +170,8 @@ export const common = {
     errors: {
       invalid_billing:
         "Check all billing details and confirm the business purchase and conditions. Include the country prefix in an EU VAT number.",
+      tax_id_invalid:
+        "Stripe rejected this business tax ID. Check the number and submit again. No payment was taken.",
       billing_unavailable:
         "Tax configuration or live sales approval is incomplete. Please contact help@nomadesrl.it.",
       tax_verification_pending:

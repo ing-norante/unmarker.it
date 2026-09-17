@@ -4,7 +4,7 @@ import {
 } from "../../src/lib/consentPolicy.ts";
 import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import sharp from "sharp";
 import { z } from "zod";
 import {
@@ -293,43 +293,61 @@ export async function ensureCheckout(purchaseId: string, buyerId: string) {
   )
     return existingPurchase;
   // Commit the customer mapping before any session can be created remotely.
-  const customerId = await transaction(async (db) => {
-    if (existingPurchase.billing_details) {
-      assertLiveBillingReady(existingPurchase.billing_details.country);
-      const { rows } = await db.query<Purchase>(
-        "SELECT * FROM sponsor_purchases WHERE id=$1 FOR UPDATE",
-        [purchaseId],
+  let customerId: string;
+  try {
+    customerId = await transaction(async (db) => {
+      if (existingPurchase.billing_details) {
+        assertLiveBillingReady(existingPurchase.billing_details.country);
+        const { rows } = await db.query<Purchase>(
+          "SELECT * FROM sponsor_purchases WHERE id=$1 FOR UPDATE",
+          [purchaseId],
+        );
+        if (rows[0].stripe_customer_id) return rows[0].stripe_customer_id;
+        const customer = await stripe.customers.create(
+          {
+            ...stripeCustomerData(existingPurchase.billing_details),
+            metadata: { unmarker_purchase_id: purchaseId },
+          },
+          { idempotencyKey: `unmarker-billing-customer-${purchaseId}` },
+        );
+        await db.query(
+          "UPDATE sponsor_purchases SET stripe_customer_id=$2 WHERE id=$1",
+          [purchaseId, customer.id],
+        );
+        return customer.id;
+      }
+      const { rows } = await db.query<{ stripe_customer_id: string | null }>(
+        "SELECT stripe_customer_id FROM sponsor_buyers WHERE id=$1",
+        [buyerId],
       );
+      if (!rows[0]) throw new SponsorError("not_found", 404);
       if (rows[0].stripe_customer_id) return rows[0].stripe_customer_id;
       const customer = await stripe.customers.create(
-        {
-          ...stripeCustomerData(existingPurchase.billing_details),
-          metadata: { unmarker_purchase_id: purchaseId },
-        },
-        { idempotencyKey: `unmarker-billing-customer-${purchaseId}` },
+        { metadata: { unmarker_buyer_id: buyerId } },
+        { idempotencyKey: `unmarker-customer-${buyerId}` },
       );
       await db.query(
-        "UPDATE sponsor_purchases SET stripe_customer_id=$2 WHERE id=$1",
-        [purchaseId, customer.id],
+        "UPDATE sponsor_buyers SET stripe_customer_id=$2 WHERE id=$1",
+        [buyerId, customer.id],
       );
       return customer.id;
-    }
-    const { rows } = await db.query<{ stripe_customer_id: string | null }>(
-      "SELECT stripe_customer_id FROM sponsor_buyers WHERE id=$1",
-      [buyerId],
+    });
+  } catch (error) {
+    if (
+      !(error instanceof Stripe.errors.StripeInvalidRequestError) ||
+      error.code !== "tax_id_invalid"
+    )
+      throw error;
+    // Stripe rejected the tax ID before creating a customer or Checkout session.
+    // Release the reservation so corrected billing details can start a new request.
+    await database().query(
+      `UPDATE sponsor_purchases SET status='cancelled',updated_at=now()
+       WHERE id=$1 AND buyer_id=$2 AND status IN ('creating','attention')
+       AND stripe_customer_id IS NULL AND stripe_session_id IS NULL`,
+      [purchaseId, buyerId],
     );
-    if (!rows[0]) throw new SponsorError("not_found", 404);
-    if (rows[0].stripe_customer_id) return rows[0].stripe_customer_id;
-    const customer = await stripe.customers.create(
-      { metadata: { unmarker_buyer_id: buyerId } },
-      { idempotencyKey: `unmarker-customer-${buyerId}` },
-    );
-    await db.query(
-      "UPDATE sponsor_buyers SET stripe_customer_id=$2 WHERE id=$1",
-      [buyerId, customer.id],
-    );
-    return customer.id;
-  });
+    throw new SponsorError("tax_id_invalid", 422);
+  }
   return transaction(async (db) => {
     const { rows } = await db.query<Purchase>(
       "SELECT * FROM sponsor_purchases WHERE id=$1 AND buyer_id=$2 FOR UPDATE",

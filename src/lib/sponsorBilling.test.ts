@@ -40,6 +40,25 @@ describe("B2B billing validation", () => {
     expect(validItalianVat("IT12345678904")).toBe(false);
     expect(validItalianVat("IT00000000000")).toBe(false);
   });
+  it("requires a nine-digit US EIN before creating a Stripe customer", () => {
+    const us = {
+      ...billing,
+      country: "US",
+      taxIdType: "us_ein",
+      postalCode: "10001",
+      region: "NY",
+      fiscalCode: "",
+    };
+    expect(
+      sponsorBillingSchema.safeParse({ ...us, taxId: "12-3456789" }).success,
+    ).toBe(true);
+    expect(
+      sponsorBillingSchema.safeParse({ ...us, taxId: "123456789" }).success,
+    ).toBe(true);
+    expect(
+      sponsorBillingSchema.safeParse({ ...us, taxId: "12345678901" }).success,
+    ).toBe(false);
+  });
   it("requires business purpose and both unselected approvals", () => {
     for (const key of ["businessPurchase", "termsAccepted", "clausesAccepted"])
       expect(

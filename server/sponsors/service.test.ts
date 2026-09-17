@@ -37,6 +37,7 @@ const fake = vi.hoisted(() => ({
   customers: new Map<string, Stripe.CustomerCreateParams>(),
   verification: "verified" as string,
   taxRegistered: true,
+  rejectTaxId: false,
   sessions: new Map<string, Stripe.Checkout.Session>(),
   events: [] as Stripe.Event[],
   creates: 0,
@@ -53,6 +54,12 @@ vi.mock("./config.ts", async (importOriginal) => {
     getStripe: () => ({
       customers: {
         create: async (params: Stripe.CustomerCreateParams) => {
+          if (fake.rejectTaxId)
+            throw new Stripe.errors.StripeInvalidRequestError({
+              type: "invalid_request_error",
+              code: "tax_id_invalid",
+              message: "Invalid test tax ID",
+            });
           const id = `cus_${randomUUID()}`;
           fake.customers.set(id, params);
           return { id };
@@ -207,6 +214,7 @@ describe.skipIf(!connection)(
       fake.customers.clear();
       fake.verification = "verified";
       fake.taxRegistered = true;
+      fake.rejectTaxId = false;
       fake.events = [];
       fake.creates = 0;
       fake.failRetrieve = false;
@@ -330,6 +338,33 @@ describe.skipIf(!connection)(
       });
       expect(fake.creates).toBe(0);
       expect((await cancelPurchase(p.id, owner.id)).status).toBe("cancelled");
+    });
+    it("releases an unpaid reservation when Stripe rejects a tax ID", async () => {
+      const owner = await buyer();
+      const p = await reservePurchase(owner.id, form(), randomUUID());
+      fake.rejectTaxId = true;
+      await expect(ensureCheckout(p.id, owner.id)).rejects.toMatchObject({
+        code: "tax_id_invalid",
+        status: 422,
+      });
+      const { rows } = await database().query<{
+        status: string;
+        stripe_customer_id: string | null;
+        stripe_session_id: string | null;
+      }>(
+        "SELECT status,stripe_customer_id,stripe_session_id FROM sponsor_purchases WHERE id=$1",
+        [p.id],
+      );
+      expect(rows[0]).toEqual({
+        status: "cancelled",
+        stripe_customer_id: null,
+        stripe_session_id: null,
+      });
+      fake.rejectTaxId = false;
+      const replacement = await reservePurchase(owner.id, form(), randomUUID());
+      expect((await ensureCheckout(replacement.id, owner.id)).status).toBe(
+        "pending",
+      );
     });
     it("waits for EU VAT verification before payment and supports a retry", async () => {
       const owner = await buyer();

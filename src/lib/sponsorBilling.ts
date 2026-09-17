@@ -112,6 +112,12 @@ export const sponsorBillingSchema = z
       if (!v.postalCode) issue("postalCode", "required");
       if (!v.region) issue("region", "required");
     }
+    if (
+      v.country === "US" &&
+      v.taxIdType === "us_ein" &&
+      !/^(?:\d{9}|\d{2}-\d{7})$/.test(v.taxId)
+    )
+      issue("taxId", "us_ein");
     if (EU_COUNTRIES.has(v.country)) {
       const prefix = v.country === "GR" ? "EL" : v.country;
       if (!v.taxId.startsWith(prefix)) issue("taxId", "vat_prefix");

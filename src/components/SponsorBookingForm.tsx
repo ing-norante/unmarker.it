@@ -203,7 +203,9 @@ export default function SponsorBookingForm({
         });
         window.location.assign(purchase.checkoutUrl);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "temporary_error");
+        const code = e instanceof Error ? e.message : "temporary_error";
+        setError(code);
+        if (code === "tax_id_invalid") setRequestId(crypto.randomUUID());
         void findPending();
       }
     },
@@ -556,9 +558,13 @@ export default function SponsorBookingForm({
                           setRequestId(crypto.randomUUID());
                         }
                       } catch (e) {
-                        setError(
-                          e instanceof Error ? e.message : "temporary_error",
-                        );
+                        const code =
+                          e instanceof Error ? e.message : "temporary_error";
+                        setError(code);
+                        if (code === "tax_id_invalid") {
+                          setRequestId(crypto.randomUUID());
+                          void findPending();
+                        }
                       }
                     }}
                   >
