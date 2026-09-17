@@ -6,11 +6,11 @@ export const MAX_SPONSOR_DESCRIPTION_LENGTH = 90;
 export const MAX_ICON_BYTES = 256 * 1024;
 
 export const sponsorCreativeSchema = z.object({
-  name: z.string().trim().min(2).max(32),
+  name: z.string().trim().min(2, "name_length").max(32, "name_length"),
   url: z
     .string()
     .trim()
-    .max(500)
+    .max(500, "too_long")
     .refine((value) => {
       try {
         const url = new URL(value);
@@ -25,8 +25,12 @@ export const sponsorCreativeSchema = z.object({
       } catch {
         return false;
       }
-    }),
-  description: z.string().trim().min(10).max(MAX_SPONSOR_DESCRIPTION_LENGTH),
+    }, "public_url"),
+  description: z
+    .string()
+    .trim()
+    .min(10, "description_length")
+    .max(MAX_SPONSOR_DESCRIPTION_LENGTH, "description_length"),
 });
 
 export type SponsorCreative = z.infer<typeof sponsorCreativeSchema>;

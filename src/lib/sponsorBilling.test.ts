@@ -85,3 +85,65 @@ describe("B2B billing validation", () => {
     ).toBe(false);
   });
 });
+
+describe("billing field feedback", () => {
+  it("reports country-specific errors even with empty fields and unchecked approvals", () => {
+    const result = sponsorBillingSchema.safeParse(billingDefaults);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: ["fiscalCode"],
+            message: "fiscal_code",
+          }),
+          expect.objectContaining({
+            path: ["postalCode"],
+            message: "italian_postal",
+          }),
+          expect.objectContaining({
+            path: ["region"],
+            message: "italian_region",
+          }),
+          expect.objectContaining({
+            path: ["businessPurchase"],
+            message: "confirmation",
+          }),
+        ]),
+      );
+    }
+  });
+  it("normalizes valid billing details before checkout", () => {
+    const result = sponsorBillingSchema.parse({
+      ...billing,
+      email: " billing@example.com ",
+      taxId: "it 12345678903",
+      region: "fi",
+      pec: " ",
+    });
+    expect(result).toMatchObject({
+      email: "billing@example.com",
+      taxId: "IT12345678903",
+      region: "FI",
+      pec: "",
+    });
+  });
+  it("reports an actionable PEC error without suppressing the other fields", () => {
+    const result = sponsorBillingSchema.safeParse({
+      ...billingDefaults,
+      pec: "not-an-email",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: ["pec"], message: "email" }),
+          expect.objectContaining({
+            path: ["postalCode"],
+            message: "italian_postal",
+          }),
+        ]),
+      );
+    }
+  });
+});

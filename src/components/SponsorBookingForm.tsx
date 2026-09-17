@@ -1,17 +1,46 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { useForm } from "@tanstack/react-form";
+import { revalidateLogic, useForm } from "@tanstack/react-form";
 import { useTranslation } from "react-i18next";
-import { z } from "zod";
 import { ArrowRightIcon } from "@phosphor-icons/react/dist/ssr/ArrowRight";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupText,
+  InputGroupTextarea,
+} from "@/components/ui/input-group";
+import {
+  Attachment,
+  AttachmentMedia,
+  AttachmentContent,
+  AttachmentTitle,
+  AttachmentDescription,
+  AttachmentActions,
+  AttachmentAction,
+} from "@/components/ui/attachment";
+import { XIcon } from "@phosphor-icons/react/dist/ssr/X";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { SponsorFormProgress } from "@/components/SponsorFormProgress";
+import {
+  sponsorBookingSchema,
+  sponsorIconSchema,
+  sponsorFieldErrors,
+  focusInvalidField,
+  validateSponsorIcon,
+} from "@/lib/sponsorFormValidation";
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldSet,
+  FieldLegend,
 } from "@/components/ui/field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
@@ -22,8 +51,6 @@ import {
   getSponsorPurchase,
 } from "@/lib/sponsorApi";
 import {
-  sponsorCreativeSchema,
-  MAX_ICON_BYTES,
   MAX_SPONSOR_DESCRIPTION_LENGTH,
   type SponsorPurchaseStatus,
 } from "@/lib/sponsorPurchase";
@@ -41,6 +68,14 @@ export default function SponsorBookingForm({
 }) {
   const { t, i18n } = useTranslation("common");
   const id = useId();
+  const root = useRef<HTMLFormElement>(null);
+  const iconInput = useRef<HTMLInputElement>(null);
+  const focusStep = () =>
+    requestAnimationFrame(() => {
+      const step = document.getElementById(`${id}-step`);
+      step?.focus({ preventScroll: true });
+      step?.scrollIntoView({ block: "start" });
+    });
   const [billingStep, setBillingStep] = useState(false);
   const [billingDraft, setBillingDraft] = useState(billingDefaults);
   const billingRef = useRef<SponsorBilling | null>(null);
@@ -104,24 +139,27 @@ export default function SponsorBookingForm({
       description: "",
       icon: null as File | null,
     },
-    validators: {
-      onSubmit: z.object({
-        name: sponsorCreativeSchema.shape.name,
-        url: sponsorCreativeSchema.shape.url,
-        description: sponsorCreativeSchema.shape.description,
-        icon: z.custom<File>(
-          (v) =>
-            v instanceof File &&
-            v.size > 0 &&
-            v.size <= MAX_ICON_BYTES &&
-            ["image/png", "image/jpeg", "image/webp"].includes(v.type),
-        ),
-      }),
-    },
+    validationLogic: revalidateLogic({
+      mode: "blur",
+      modeAfterSubmission: "change",
+    }),
+    validators: { onDynamic: sponsorBookingSchema },
+    onSubmitInvalid: () => focusInvalidField(root.current),
     onSubmit: async ({ value }) => {
       setError(null);
+      if (!checkoutEnabled || availableSpots === 0 || pending) {
+        setError(
+          pending
+            ? "existing_checkout"
+            : availableSpots === 0
+              ? "sold_out"
+              : "unavailable",
+        );
+        return;
+      }
       if (!billingStep) {
         setBillingStep(true);
+        focusStep();
         return;
       }
       if (!billingRef.current) return;
@@ -152,30 +190,47 @@ export default function SponsorBookingForm({
   });
   if (billingStep)
     return (
-      <SponsorBillingForm
-        initial={billingDraft}
-        error={error}
-        onBack={(draft) => {
-          setBillingDraft(draft);
-          setBillingStep(false);
-          setError(null);
-        }}
-        onSubmit={async (billing) => {
-          billingRef.current = billing;
-          setBillingDraft(billing);
-          await form.handleSubmit();
-        }}
-      />
+      <section
+        id={`${id}-step`}
+        tabIndex={-1}
+        aria-label={t("sponsors.form.steps.billing")}
+      >
+        <SponsorBillingForm
+          initial={billingDraft}
+          error={error}
+          onBack={(draft) => {
+            setBillingDraft(draft);
+            setBillingStep(false);
+            setError(null);
+            focusStep();
+          }}
+          onSubmit={async (billing) => {
+            billingRef.current = billing;
+            setBillingDraft(billing);
+            await form.handleSubmit();
+          }}
+        />
+      </section>
     );
   return (
     <form
+      ref={root}
+      id={`${id}-step`}
+      tabIndex={-1}
+      noValidate
+      aria-label={t("sponsors.form.steps.creative")}
       onSubmit={(e) => {
         e.preventDefault();
         void form.handleSubmit();
       }}
     >
-      <div className="space-y-4">
-        <FieldGroup className="grid gap-4 sm:grid-cols-2">
+      <SponsorFormProgress step={1} />
+      <FieldSet>
+        <FieldLegend>{t("sponsors.form.creativeTitle")}</FieldLegend>
+        <FieldDescription>
+          {t("sponsors.form.creativeHint")} {t("sponsors.form.requiredHint")}
+        </FieldDescription>
+        <FieldGroup className="grid gap-5 sm:grid-cols-2">
           {(["name", "url", "description"] as const).map((name) => (
             <form.Field key={name} name={name}>
               {(field) => {
@@ -192,7 +247,7 @@ export default function SponsorBookingForm({
                     >,
                   ) => field.handleChange(e.target.value),
                   "aria-invalid": invalid,
-                  "aria-describedby": `${id}-${name}-help`,
+                  "aria-describedby": `${id}-${name}-help${invalid ? ` ${id}-${name}-error` : ""}`,
                   required: true,
                   maxLength:
                     name === "name"
@@ -212,15 +267,26 @@ export default function SponsorBookingForm({
                       {t(`sponsors.form.${name}`)}
                     </FieldLabel>
                     {name === "description" ? (
-                      <Textarea
-                        {...props}
-                        minLength={10}
-                        rows={3}
-                        placeholder={t("sponsors.form.descriptionPlaceholder")}
-                      />
+                      <InputGroup>
+                        <InputGroupTextarea
+                          {...props}
+                          minLength={10}
+                          rows={3}
+                          placeholder={t(
+                            "sponsors.form.descriptionPlaceholder",
+                          )}
+                        />
+                        <InputGroupAddon align="block-end">
+                          <InputGroupText className="ml-auto">
+                            {field.state.value.length}/
+                            {MAX_SPONSOR_DESCRIPTION_LENGTH}
+                          </InputGroupText>
+                        </InputGroupAddon>
+                      </InputGroup>
                     ) : (
                       <Input
                         {...props}
+                        minLength={name === "name" ? 2 : undefined}
                         type={name === "url" ? "url" : "text"}
                         placeholder={
                           name === "url"
@@ -231,19 +297,26 @@ export default function SponsorBookingForm({
                       />
                     )}
                     <FieldDescription id={`${id}-${name}-help`}>
-                      {name === "description"
-                        ? `${field.state.value.length}/${MAX_SPONSOR_DESCRIPTION_LENGTH}`
-                        : t(`sponsors.form.${name}Hint`)}
+                      {t(`sponsors.form.${name}Hint`)}
                     </FieldDescription>
                     {invalid && (
-                      <FieldError>{t(`sponsors.form.${name}Error`)}</FieldError>
+                      <FieldError
+                        id={`${id}-${name}-error`}
+                        errors={sponsorFieldErrors(field.state.meta.errors, t)}
+                      />
                     )}
                   </Field>
                 );
               }}
             </form.Field>
           ))}
-          <form.Field name="icon">
+          <form.Field
+            name="icon"
+            validators={{
+              onChangeAsync: ({ value }) => validateSponsorIcon(value),
+              onSubmitAsync: ({ value }) => validateSponsorIcon(value),
+            }}
+          >
             {(field) => {
               const invalid =
                 field.state.meta.isTouched && !field.state.meta.isValid;
@@ -252,50 +325,114 @@ export default function SponsorBookingForm({
                   <FieldLabel htmlFor={`${id}-icon`}>
                     {t("sponsors.form.icon")}
                   </FieldLabel>
-                  <Input
+                  <Button
                     id={`${id}-icon`}
+                    type="button"
+                    variant="outline"
+                    className="w-fit"
+                    aria-invalid={invalid}
+                    aria-describedby={`${id}-icon-help${invalid ? ` ${id}-icon-error` : ""}`}
+                    onBlur={field.handleBlur}
+                    onClick={() => iconInput.current?.click()}
+                  >
+                    {t(
+                      field.state.value
+                        ? "sponsors.form.replaceIcon"
+                        : "sponsors.form.chooseIcon",
+                    )}
+                  </Button>
+                  <input
+                    ref={iconInput}
+                    hidden
+                    id={`${id}-icon-file`}
                     name="icon"
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
-                    required={!field.state.value}
-                    aria-invalid={invalid}
-                    aria-describedby={`${id}-icon-help`}
-                    onBlur={field.handleBlur}
+                    aria-label={t("sponsors.form.icon")}
                     onChange={(e) => {
                       const file = e.target.files?.[0] ?? null;
                       field.handleChange(file);
+                      field.handleBlur();
                       if (previewRef.current)
                         URL.revokeObjectURL(previewRef.current);
                       previewRef.current =
-                        file &&
-                        file.size <= MAX_ICON_BYTES &&
-                        ["image/png", "image/jpeg", "image/webp"].includes(
-                          file.type,
-                        )
+                        file && sponsorIconSchema.safeParse(file).success
                           ? URL.createObjectURL(file)
                           : null;
                       setPreview(previewRef.current);
                     }}
                   />
                   <FieldDescription id={`${id}-icon-help`}>
-                    {field.state.value && (
-                      <span className="block">{field.state.value.name}</span>
-                    )}
                     {t("sponsors.form.iconHint")}
                   </FieldDescription>
+                  {field.state.value && (
+                    <Attachment
+                      state={
+                        invalid
+                          ? "error"
+                          : field.state.meta.isValidating
+                            ? "processing"
+                            : "done"
+                      }
+                    >
+                      {preview && (
+                        <AttachmentMedia variant="image">
+                          <img src={preview} alt="" />
+                        </AttachmentMedia>
+                      )}
+                      <AttachmentContent>
+                        <AttachmentTitle>
+                          {field.state.value.name}
+                        </AttachmentTitle>
+                        <AttachmentDescription>
+                          {Math.ceil(field.state.value.size / 1024)} KB ·{" "}
+                          {t("sponsors.form.iconSelected")}
+                        </AttachmentDescription>
+                      </AttachmentContent>
+                      <AttachmentActions>
+                        <AttachmentAction
+                          type="button"
+                          aria-label={t("sponsors.form.removeIcon")}
+                          onClick={() => {
+                            field.handleChange(null);
+                            if (iconInput.current) iconInput.current.value = "";
+                            if (previewRef.current)
+                              URL.revokeObjectURL(previewRef.current);
+                            previewRef.current = null;
+                            setPreview(null);
+                            document.getElementById(`${id}-icon`)?.focus();
+                          }}
+                        >
+                          <XIcon />
+                        </AttachmentAction>
+                      </AttachmentActions>
+                    </Attachment>
+                  )}
+                  {field.state.meta.isValidating && (
+                    <p className="text-muted-foreground text-xs" role="status">
+                      {t("sponsors.form.checkingIcon")}
+                    </p>
+                  )}
                   {invalid && (
-                    <FieldError>{t("sponsors.form.iconError")}</FieldError>
+                    <FieldError
+                      id={`${id}-icon-error`}
+                      errors={sponsorFieldErrors(field.state.meta.errors, t)}
+                    />
                   )}
                 </Field>
               );
             }}
           </form.Field>
         </FieldGroup>
-        <details className="text-sm">
-          <summary className="focus-visible:outline-ring cursor-pointer font-medium focus-visible:outline-2 focus-visible:outline-offset-4">
+      </FieldSet>
+      <Collapsible defaultOpen className="mt-6">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" type="button">
             {t("sponsors.form.preview")}
-          </summary>
-          <div className="mt-3 flex items-start gap-3">
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-3 flex items-start gap-3 border p-4">
             {preview && (
               <img
                 src={preview}
@@ -307,7 +444,7 @@ export default function SponsorBookingForm({
               selector={(s) => [s.values.name, s.values.description]}
             >
               {([name, description]) => (
-                <div className="min-w-0 space-y-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <p className="text-sm font-bold wrap-anywhere">
                     {name || t("sponsors.form.namePlaceholder")}
                   </p>
@@ -321,9 +458,9 @@ export default function SponsorBookingForm({
           <p className="text-muted-foreground mt-3 text-xs">
             {t("sponsors.form.previewHint")}
           </p>
-        </details>
-      </div>
-      <div className="mt-5 flex flex-col gap-3">
+        </CollapsibleContent>
+      </Collapsible>
+      <div className="mt-6 flex flex-col gap-3">
         {pending && (
           <Alert>
             <AlertTitle>{t("sponsors.pendingCheckout")}</AlertTitle>
@@ -413,27 +550,32 @@ export default function SponsorBookingForm({
             )}
           </p>
         )}
-        <form.Subscribe selector={(s) => s.isSubmitting}>
-          {(submitting) => (
+        <form.Subscribe
+          selector={(s) => [s.isSubmitting, s.isValidating] as const}
+        >
+          {([submitting, validating]) => (
             <Button
               className="w-full"
               type="submit"
               disabled={
                 submitting ||
+                validating ||
                 !checkoutEnabled ||
                 availableSpots === 0 ||
                 pending !== null
               }
             >
-              {submitting ? (
+              {submitting || validating ? (
                 <Spinner data-icon="inline-start" />
               ) : (
                 <ArrowRightIcon data-icon="inline-start" />
               )}
               {t(
-                submitting
-                  ? "sponsors.preparingCheckout"
-                  : "sponsors.billing.next",
+                validating
+                  ? "sponsors.form.checkingIcon"
+                  : submitting
+                    ? "sponsors.preparingCheckout"
+                    : "sponsors.billing.next",
                 { price },
               )}
             </Button>

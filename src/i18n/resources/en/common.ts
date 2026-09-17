@@ -45,10 +45,15 @@ export const common = {
     campaignDates: "From {{start}} until {{end}}.",
     checkAgain: "Check payment again",
     billing: {
+      businessHeading: "Business details",
+      addressHeading: "Billing address",
+      searchCountry: "Search for a country…",
+      noCountries: "No matching country. Try another name.",
+      routingTitle: "SdI code or PEC (optional)",
       title: "2. Billing details",
       description:
         "For businesses and professionals buying for their work. These details are private and will be used for your invoice.",
-      legalName: "Legal business name / professional name",
+      legalName: "Legal business name",
       country: "Billing country",
       countryHint:
         "Country of the business receiving this service. If your country or business tax ID is not supported, contact help@nomadesrl.it before paying.",
@@ -84,7 +89,55 @@ export const common = {
         "€500 excluding applicable taxes. Review the final tax and total on Stripe before paying. One payment, no renewal.",
       continue: "Continue to Stripe",
     },
+    validation: {
+      required: "This field is required.",
+      too_long: "Use no more than {{max}} characters.",
+      invalid: "Check this value and try again.",
+      email: "Enter a valid email address, for example billing@example.com.",
+      country: "Choose a supported billing country from the list.",
+      tax_type: "Choose a tax ID type supported in the selected country.",
+      italian_vat:
+        "Enter a valid Italian VAT number: IT followed by 11 digits. Check the final check digit.",
+      vat_prefix:
+        "Include the VAT prefix for your billing country (for example IT or DE; EL for Greece).",
+      fiscal_code:
+        "Enter the 11-digit company codice fiscale or the 16-character professional codice fiscale.",
+      italian_postal: "Enter a 5-digit Italian postal code.",
+      italian_region: "Enter the two-letter province code, for example FI.",
+      recipient_code:
+        "Enter 7 letters or digits for the SdI code, or leave it empty. XXXXXXX is not valid for an Italian customer.",
+      confirmation: "Select this confirmation to continue.",
+      terms_changed:
+        "The conditions have changed. Reload this page before continuing.",
+      name_length: "Use between 2 and 32 characters for the project name.",
+      description_length:
+        "Use between 10 and 90 characters for the description.",
+      public_url:
+        "Enter a public http:// or https:// URL, without a username or password.",
+      icon_required: "Choose an icon for your sponsor card.",
+      icon_size: "Choose an image no larger than 256 KB.",
+      icon_type: "Use a PNG, JPEG or WebP image.",
+      icon_dimensions: "Resize the icon to a maximum of 1024 × 1024 pixels.",
+      icon_decode:
+        "This image could not be read. Export it again as PNG, JPEG or WebP.",
+    },
     form: {
+      chooseIcon: "Choose icon",
+      replaceIcon: "Replace icon",
+      stepsLabel: "Sponsorship checkout steps",
+      stepOf: "Step {{step}} of {{total}}",
+      steps: {
+        creative: "Your sponsor card",
+        billing: "Billing details",
+        payment: "Pay on Stripe",
+      },
+      creativeTitle: "Your sponsor card",
+      creativeHint: "These details will appear publicly in your ad.",
+      requiredHint: "All fields are required unless marked optional.",
+      descriptionHint: "10–90 characters. Keep it clear and specific.",
+      iconSelected: "Selected locally",
+      removeIcon: "Remove icon",
+      checkingIcon: "Checking image…",
       name: "Project name",
       namePlaceholder: "Your project",
       nameHint: "2–32 characters.",
