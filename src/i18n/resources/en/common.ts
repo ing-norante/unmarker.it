@@ -149,7 +149,7 @@ export const common = {
       nameHint: "2–32 characters.",
       nameError: "Enter a name between 2 and 32 characters.",
       url: "Website link",
-      urlHint: "The public page visitors will open.",
+      urlHint: "The URL visitors will open.",
       urlError: "Enter a complete http:// or https:// website URL.",
       description: "Short description",
       descriptionPlaceholder: "What makes your project worth a visit?",
