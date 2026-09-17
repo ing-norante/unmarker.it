@@ -68,11 +68,11 @@ export const common = {
         "If you have no recipient code or PEC, leave both blank. We will use 0000000 and send a copy to your invoice email.",
       conditions: "Purchase conditions",
       draftNotice:
-        "Sandbox only: these conditions are drafts for testing, not final terms for live purchases.",
+        "Test checkout. The approved conditions are v1.0.0, effective 18 September 2026. Live purchases are not yet enabled.",
       businessPurchase:
         "I am purchasing for my business or professional activity and am authorised to do so.",
       termsAccepted:
-        "I have read and accept the sponsorship conditions linked above (draft in sandbox).",
+        "I have read and accept the sponsorship conditions linked above (Italian, v1.0.0).",
       clausesAccepted:
         "Under articles 1341 and 1342 of the Italian Civil Code, I specifically approve clause 6 (voluntary cancellation without refund) and clause 7 (downtime and proportional refunds, without excluding mandatory legal remedies).",
       checkField: "Check this billing detail and its format.",
@@ -192,26 +192,23 @@ export const common = {
       "Choose whether to allow optional statistics. You can change your choice or withdraw consent here at any time.",
     necessary: "Necessary · always active",
     necessaryDescription:
-      "Theme, language, cookie choices and the secure sponsor checkout session. These keep your requested features working.",
+      "Language, cookie choices and the secure sponsor checkout session. These keep your requested features working.",
     analytics: "Statistics & diagnostics · PostHog",
     analyticsDescription:
       "Optional usage, sponsor views/clicks and purchase conversions, errors and performance metrics, using a pseudonymous browser identifier. No session recordings, image uploads or advertising profiles.",
     retention:
       "We remember your choice for six months on this browser when storage is available. Withdrawal stops future analytics; it does not delete accounting records or data already sent.",
-    drafts: "Italian drafts on GitHub; final policies pending.",
     syncError:
       "Your choice is saved on this device. We could not sync it with your sponsor purchases. Retry to finish updating server-side analytics.",
     retry: "Retry sync",
   },
   footer: {
-    legal: "Legal · drafts",
+    legal: "Legal",
     terms: "Sponsor terms",
     privacy: "Privacy policy",
     cookies: "Cookie policy",
     refunds: "Cancellations & refunds",
-    draftNotice: "For review only.",
-    draftDescription:
-      "Not yet applicable to purchases. Italian drafts open on GitHub in a new tab.",
+    documentLanguage: "Legal documents are available in Italian.",
     description:
       "Analyze and process AI watermarks, directly in your browser. Your images stay on your device.",
     research: "Research",

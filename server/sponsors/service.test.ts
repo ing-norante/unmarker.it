@@ -365,7 +365,7 @@ describe.skipIf(!connection)(
       expect(active.status).toBe("active");
       expect(active.billing_snapshot).toMatchObject({
         payment: { subtotal: 50000, tax: 11000, total: 61000 },
-        termsVersion: "2026-09-17-draft",
+        termsVersion: "v1.0.0",
         specificallyApprovedClauses: [6, 7],
       });
       expect(active.terms_accepted_at).toBeInstanceOf(Date);

@@ -55,8 +55,17 @@ export function CookieConsent() {
   useEffect(() => {
     const show = () => showPreferences();
     window.addEventListener("unmarker:cookie-preferences", show);
-    return () =>
+    const fromLink = () => {
+      if (window.location.hash === "#cookie-preferences") show();
+    };
+    window.addEventListener("hashchange", fromLink);
+    // Defer until hydration has finished; a legal page can link here directly.
+    const timer = window.setTimeout(fromLink, 0);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("hashchange", fromLink);
       window.removeEventListener("unmarker:cookie-preferences", show);
+    };
   }, []);
   const choose = (enabled: boolean) => {
     saveConsent(enabled);
@@ -81,8 +90,6 @@ export function CookieConsent() {
       >
         {t("footer.cookies")}
       </a>
-      {" — "}
-      {t("consent.drafts")}
     </p>
   );
   return (

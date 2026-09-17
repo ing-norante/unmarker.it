@@ -1,14 +1,16 @@
 # Documenti legali e amministrativi Unmarker
 
-Bozze del 17 settembre 2026, non pubblicate. I testi descrivono il servizio da
-portare in produzione; non attestano che le modifiche tecniche siano già attive.
+Versione v1.0.0, efficacia 18 settembre 2026. Testi predisposti per le pagine
+pubbliche `/legal/*`, con condizioni commerciali approvate dal titolare.
+La pubblicazione locale non equivale a un deployment in produzione.
 
 ## Documenti
 
-- [Condizioni sponsor B2B](./sponsor-terms.it.md): include cancellazioni e downtime.
-- [Informativa privacy](./privacy.it.md): bozza da completare con configurazioni
-  effettive, retention e accordi dei fornitori.
-- [Cookie policy e specifica del banner](./cookies.it.md).
+- [Condizioni sponsor B2B](./sponsor-terms.it.md).
+- [Informativa privacy](./privacy.it.md).
+- [Cookie policy](./cookies.it.md).
+- [Operazioni e verifiche di pubblicazione](./operations.md): stato aggiornato,
+  gestione manuale della conservazione, conferme acquisto e limiti verificati.
 - [Fatturazione e rimborsi: specifica operativa](./billing-and-refunds.md).
 
 ## Dati confermati
@@ -37,28 +39,10 @@ i dati del cliente, dei soci o i documenti integrali.
 | Cancellazione volontaria | Nessun rimborso per semplice ripensamento, fatti salvi i diritti inderogabili |
 | Disservizi               | Rimborso proporzionale al downtime della campagna                             |
 
-Per la privacy si propone lo stesso recapito di assistenza, senza inventare un
-indirizzo dedicato o un DPO non comunicato.
-
-## Verifiche residue concrete
-
-1. Legale: qualificazione del contratto pubblicitario, cancellazioni B2B, rimedi
-   per inadempimento e modalità di eventuale approvazione specifica delle clausole
-   ai sensi degli artt. 1341-1342 c.c. Una checkbox generica non va descritta come
-   sufficiente per qualsiasi clausola. Nessuna esclusione di dolo/colpa grave.
-2. Commercialista: regole IVA per clienti italiani/UE/extra UE e prova della
-   qualità professionale. La visura riporta attività immobiliari e programmazione
-   informatica (ATECO secondario 62.10.00): confermare se la vendita di spazi
-   pubblicitari richiede aggiornamenti dell'attività dichiarata.
-3. Privacy: audit delle impostazioni PostHog live, durate di conservazione,
-   replay, fornitori, regioni e garanzie per trasferimenti. Nessun valore mancante
-   viene presentato come verificato.
-4. Sviluppo: B2B/IVA, numerazione coordinata, export amministrativo e cancellazione
-   di campagne pagate senza rimborso. La sincronizzazione dei rimborsi parziali
-   senza revoca è implementata; calcolo downtime e note di credito restano da fare.
-5. Prima della pubblicazione: rimuovere le note redazionali soltanto dopo aver
-   risolto i punti, aggiungere data di efficacia e traduzioni coerenti con le
-   lingue del checkout. Conservare la versione dei termini accettata dall'acquirente.
+La casella help@nomadesrl.it è ospitata su Aruba. L'amministratore unico gestisce
+personalmente le richieste privacy. PostHog Free è confermato dal titolare;
+la retention effettiva e gli accordi sottoscritti vanno verificati come descritto
+nel [registro operativo](./operations.md).
 
 ## Riferimenti per la revisione
 

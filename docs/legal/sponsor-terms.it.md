@@ -1,7 +1,6 @@
 # Condizioni di vendita delle sponsorizzazioni Unmarker.it
 
-> BOZZA PER REVISIONE, versione 17 settembre 2026. Non pubblicata né applicabile
-> agli acquisti attuali. Il checkout deve essere adeguato prima dell'utilizzo.
+> Versione v1.0.0 · Efficace dal 18 settembre 2026.
 
 ## 1. Fornitore e contatti
 
@@ -29,7 +28,7 @@ nei limiti delle restrizioni normative e dei paesi/metodi di pagamento supportat
 ## 3. Oggetto, durata e visibilità
 
 Il cliente acquista la pubblicazione di una scheda sponsor con nome, icona,
-collegamento al proprio sito e breve descrizione, negli spazi sponsor di Unmarker.it.
+collegamento al proprio sito e descrizione di massimo 90 caratteri, negli spazi sponsor di Unmarker.it.
 
 La durata è di 30 giorni consecutivi, pari a 720 ore, dal pagamento confermato.
 Il riepilogo dell'acquisto indica inizio e scadenza. La campagna si conclude
@@ -94,7 +93,7 @@ durante la campagna acquistata, un disservizio di Unmarker.it impedisce la
 pubblicazione della sua scheda sponsor. Rientrano anche interruzioni dei fornitori
 tecnici che rendano indisponibile la pubblicazione sul sito.
 
-La proposta di calcolo comprende le frazioni di giornata:
+Il calcolo comprende le frazioni di giornata:
 
 **Rimborso imponibile = 500,00 € × ore di indisponibilità / 720 ore.**
 
@@ -132,21 +131,8 @@ facoltativo agli analytics. Il rifiuto degli analytics non impedisce l'acquisto.
 
 Il contratto è regolato dalla legge italiana, fatti salvi i limiti e le norme
 inderogabili applicabili al rapporto. La competenza giudiziaria è determinata
-dalle regole applicabili; questa bozza non introduce un foro esclusivo.
+dalle regole applicabili; queste condizioni non introducono un foro esclusivo.
 
 Gli aggiornamenti delle condizioni valgono per gli acquisti successivi alla
 loro entrata in vigore. Per ciascuna campagna resta disponibile la versione
 accettata al momento dell'acquisto.
-
----
-
-### Note redazionali da rimuovere prima della pubblicazione
-
-- Far validare la qualificazione del contratto e l'efficacia della clausola 6,
-  comprese eventuali approvazioni specifiche: non confondere B2B con libertà
-  di escludere qualunque rimedio.
-- Il calcolo sulle frazioni di giornata è una proposta attuativa del pro-rata
-  richiesto, da confermare insieme alla misurazione dei disservizi.
-- Implementare conferma conservabile, dati fiscali e rimozione su richiesta.
-  La sincronizzazione mantiene attive le campagne con rimborso parziale;
-  calcolo del downtime ed emissione delle note di credito restano da implementare.

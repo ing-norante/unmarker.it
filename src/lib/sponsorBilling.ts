@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { sponsorTaxIdTypes } from "./sponsorTaxIds.ts";
 
-// A draft can be exercised in a sandbox, never used to open live sales.
-export const SPONSOR_TERMS_VERSION = "2026-09-17-draft";
+// Approved text; live sales stay gated until the publication/operational checklist is closed.
+export const SPONSOR_TERMS_VERSION = "v1.0.0";
 export const SPONSOR_TERMS_PUBLISHED: boolean = false;
 export const SPONSOR_TAX_CODE = "txcd_10701000";
 export const EU_COUNTRIES = new Set(

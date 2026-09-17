@@ -9,7 +9,7 @@ import { trackAction } from "@/lib/analytics";
 const linkClassName =
   "inline-flex min-h-11 items-center gap-2 py-2 text-sm leading-6 text-muted-foreground underline-offset-4 hover:text-primary-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
 
-const legalDrafts = [
+const legalLinks = [
   { label: "footer.terms", href: legalDocuments.terms },
   { label: "footer.privacy", href: legalDocuments.privacy },
   { label: "footer.cookies", href: legalDocuments.cookies },
@@ -92,15 +92,12 @@ export function Footer() {
           </ul>
         </div>
 
-        <nav
-          aria-labelledby="footer-legal-heading"
-          aria-describedby="footer-legal-notice"
-        >
+        <nav aria-labelledby="footer-legal-heading">
           <h2 id="footer-legal-heading" className="text-sm font-bold">
             {t("footer.legal")}
           </h2>
           <ul className="mt-3">
-            {legalDrafts.map(({ label, href }) => (
+            {legalLinks.map(({ label, href }) => (
               <li key={label}>
                 <a
                   href={href}
@@ -122,14 +119,8 @@ export function Footer() {
           >
             {t("consent.preferences")}
           </Button>
-          <p
-            id="footer-legal-notice"
-            className="text-muted-foreground mt-3 text-xs leading-5"
-          >
-            <strong className="text-foreground">
-              {t("footer.draftNotice")}
-            </strong>{" "}
-            {t("footer.draftDescription")}
+          <p className="text-muted-foreground mt-3 text-xs leading-5">
+            {t("footer.documentLanguage")}
           </p>
         </nav>
       </div>

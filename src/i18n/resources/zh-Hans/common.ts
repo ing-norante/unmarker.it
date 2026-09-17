@@ -63,9 +63,10 @@ export const common = {
       routingHint:
         "如没有收件人代码或 PEC，可留空。我们将使用 0000000，并将副本发送至发票邮箱。",
       conditions: "购买条件",
-      draftNotice: "仅供沙盒测试：这些条件仍为草案，尚不适用于正式销售。",
+      draftNotice:
+        "测试结账。已确认的条款为 v1.0.0，自 2026 年 9 月 18 日起生效。正式购买尚未启用。",
       businessPurchase: "我因企业或专业活动需要购买，并有权代表该主体购买。",
-      termsAccepted: "我已阅读并接受上方链接的赞助条件（沙盒中为草案）。",
+      termsAccepted: "我已阅读并接受上方链接的赞助条件（意大利语，v1.0.0）。",
       clausesAccepted:
         "根据意大利民法典第 1341 和 1342 条，我特别同意第 6 条（自愿取消不退款）及第 7 条（故障和按比例退款，不排除法定救济）。",
       checkField: "请检查此账单信息及其格式。",
@@ -169,26 +170,23 @@ export const common = {
     description: "选择是否允许可选统计。您可以随时在此更改选择或撤回同意。",
     necessary: "必要功能 · 始终开启",
     necessaryDescription:
-      "主题、语言、Cookie 选择和安全的赞助购买会话，用于提供您请求的功能。",
+      "语言、Cookie 选择和安全的赞助购买会话，用于提供您请求的功能。",
     analytics: "统计与诊断 · PostHog",
     analyticsDescription:
       "使用假名化的浏览器标识符，收集使用情况、赞助展示和点击、购买转化、错误及性能指标。不录制会话、不上传处理的图片，也不建立广告画像。",
     retention:
       "浏览器允许存储时，我们会保存您的选择六个月。撤回同意会停止后续统计，但不会删除会计记录或已发送的数据。",
-    drafts: "GitHub 上的意大利语草案；正式政策尚待完成。",
     syncError:
       "您的选择已保存在此设备上，但未能与赞助购买同步。请重试以完成服务器端统计设置的更新。",
     retry: "重试同步",
   },
   footer: {
-    legal: "法律文件 · 草案",
+    legal: "法律文件",
     terms: "赞助服务条款",
     privacy: "隐私政策",
     cookies: "Cookie 政策",
     refunds: "取消与退款",
-    draftNotice: "仅供审阅。",
-    draftDescription:
-      "尚不适用于购买。意大利语草案将在新标签页的 GitHub 中打开。",
+    documentLanguage: "法律文件以意大利语提供。",
     description: "直接在浏览器中分析和处理 AI 水印。图片始终保留在您的设备上。",
     research: "研究资料",
     contact: "联系与支持",

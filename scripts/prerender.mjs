@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { writeLegalPages } from "./legal-pages.ts";
 
 const rootDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -37,4 +38,5 @@ for (const locale of ["en", "zh-Hans"]) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, prerendered);
 }
+await writeLegalPages(distDir, template);
 await rm(serverDir, { recursive: true, force: true });

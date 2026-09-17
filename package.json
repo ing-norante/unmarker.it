@@ -33,7 +33,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist/server && node scripts/prerender.mjs && node scripts/verify-localization.mjs",
+    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist/server && node --import tsx scripts/prerender.mjs && node scripts/verify-localization.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview",
@@ -81,6 +81,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.12.0",
+    "marked": "^18.0.13",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwind-lint": "^0.12.1",
