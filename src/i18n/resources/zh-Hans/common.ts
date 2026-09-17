@@ -146,6 +146,8 @@ export const common = {
     dismiss: "保持英文",
   },
   actions: {
+    imageActions: "图片操作",
+    download: "下载",
     cancel: "取消",
     reset: "重新开始",
     retry: "重试",

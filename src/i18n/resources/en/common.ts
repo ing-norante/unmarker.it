@@ -168,6 +168,8 @@ export const common = {
     dismiss: "Keep English",
   },
   actions: {
+    imageActions: "Image actions",
+    download: "Download",
     cancel: "Cancel",
     reset: "Start over",
     retry: "Retry",

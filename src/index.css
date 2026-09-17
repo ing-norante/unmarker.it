@@ -512,3 +512,49 @@ html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-d
   border: 1px solid var(--border);
   box-shadow: 0 6px 24px color-mix(in oklab, var(--foreground) 12%, transparent);
 }
+
+
+/* One action group: sticky in the workspace on desktop, docked on mobile. */
+.workflow-action-bar { top: var(--sponsor-top-height, 0px); }
+@media (min-width: 1440px) {
+  .workflow-action-bar { top: 0; }
+}
+.workflow-actions > [data-slot="button"] {
+  height: auto;
+  min-height: 2.75rem;
+  max-width: 100%;
+  padding-block: 0.5rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1023px) {
+  :root { --mobile-sponsor-offset: 0px; }
+  :root:has(.sponsor-layout-has-bottom) {
+    --mobile-sponsor-offset: calc(3.25rem + 1px + env(safe-area-inset-bottom, 0px));
+  }
+  html {
+    scroll-padding-bottom: calc(var(--workflow-toolbar-height, 0px) + var(--mobile-sponsor-offset) + 1rem);
+  }
+  body { padding-bottom: var(--workflow-toolbar-height, 0px); }
+  .workflow-actions-mobile {
+    position: fixed;
+    inset-inline: 0;
+    bottom: var(--mobile-sponsor-offset);
+    z-index: 40;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    padding: 0.75rem max(0.75rem, env(safe-area-inset-right, 0px)) calc(0.75rem + env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-left, 0px));
+    border-top: 1px solid var(--border);
+    background: var(--background);
+    box-shadow: 0 -4px 16px rgb(0 0 0 / 20%);
+  }
+  :root:has(.sponsor-layout-has-bottom) .workflow-actions-mobile { padding-bottom: 0.75rem; }
+  .workflow-actions-mobile > [data-slot="button"] { min-width: 0; padding-inline: 0.375rem; font-size: 0.75rem; }
+  .workflow-actions-mobile > [data-slot="button"] svg { display: none; }
+  .cookie-banner, .sponsor-layout .locale-suggestion {
+    bottom: calc(var(--workflow-toolbar-height, 0px) + var(--mobile-sponsor-offset) + 1rem);
+    max-height: calc(100dvh - var(--workflow-toolbar-height, 0px) - var(--mobile-sponsor-offset) - 2rem);
+  }
+}
