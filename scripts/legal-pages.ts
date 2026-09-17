@@ -8,15 +8,15 @@ const root = path.resolve(import.meta.dirname, "..");
 export const legalPages = [
   {
     slug: "sponsorship-terms",
-    file: "sponsor-terms.it.md",
-    label: "Condizioni sponsor",
+    file: "sponsor-terms.en.md",
+    label: "Sponsorship terms",
   },
-  { slug: "privacy", file: "privacy.it.md", label: "Privacy" },
-  { slug: "cookies", file: "cookies.it.md", label: "Cookie" },
+  { slug: "privacy", file: "privacy.en.md", label: "Privacy policy" },
+  { slug: "cookies", file: "cookies.en.md", label: "Cookie policy" },
   {
     slug: "cancellations-refunds",
-    file: "sponsor-terms.it.md",
-    label: "Cancellazioni e rimborsi",
+    file: "sponsor-terms.en.md",
+    label: "Cancellations and refunds",
   },
 ] as const;
 
@@ -34,11 +34,11 @@ export async function renderLegalPage(slug: string, stylesheets: string[]) {
   if (slug === "cancellations-refunds") {
     const start = source.indexOf("## 6.");
     const end = source.indexOf("## 8.");
-    const version = source.match(/^> Versione .+$/m)?.[0];
+    const version = source.match(/^> Version .+$/m)?.[0];
     if (start < 0 || end <= start || !version)
       throw new Error("Missing refund clauses or terms version");
     const sections = source.slice(start, end);
-    source = `# Cancellazioni e rimborsi\n\n${version}\n\nQuesta pagina riproduce gli articoli 6 e 7 delle [condizioni di vendita](/legal/sponsorship-terms). Per il contratto completo si applicano le condizioni di vendita.\n\n${sections}`;
+    source = `# Cancellations and refunds\n\n${version}\n\nThis page reproduces clauses 6 and 7 of the [Sponsorship Terms of Sale](/legal/sponsorship-terms). The full terms govern the contract.\n\n${sections}`;
   }
   const title = source.split("\n")[0].replace(/^# /, "");
   const content = await markdown.parse(source);
@@ -49,8 +49,8 @@ export async function renderLegalPage(slug: string, stylesheets: string[]) {
     )
     .join("");
   return `<!doctype html>
-<html lang="it"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, follow"><meta name="color-scheme" content="dark"><title>${escape(title)} | Unmarker.it</title><link rel="canonical" href="https://www.unmarker.it/legal/${page.slug}">${stylesheets.map((url) => `<link rel="stylesheet" href="${escape(url)}">`).join("")}</head>
-<body class="legal-page"><a class="legal-skip" href="#documento">Vai al documento</a><div class="legal-shell"><header class="legal-header"><a class="legal-brand" href="/">UNMARKER.IT</a><a href="/">Torna allo strumento</a></header><nav class="legal-nav" aria-label="Documenti legali">${navigation}</nav><main id="documento" class="legal-document">${content}</main><footer class="legal-footer"><p>NOMADE - S.R.L. · P. IVA / C.F. 07505480488</p><p>Via Luigi Salvatore Cherubini 10, 50121 Firenze (FI), Italia · Registro Imprese di Firenze 07505480488 · REA FI - 708292 · Capitale sociale 100.000,00 € i.v.</p><a href="mailto:help@nomadesrl.it">help@nomadesrl.it</a> · <a href="mailto:info@pec.nomadesrl.it">PEC</a><p><a href="/#cookie-preferences">Modifica le preferenze cookie</a></p><p>Puoi conservare il documento usando Stampa → Salva come PDF nel browser. Queste pagine non caricano analytics.</p></footer></div></body></html>`;
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, follow"><meta name="color-scheme" content="dark"><title>${escape(title)} | Unmarker.it</title><link rel="canonical" href="https://www.unmarker.it/legal/${page.slug}">${stylesheets.map((url) => `<link rel="stylesheet" href="${escape(url)}">`).join("")}</head>
+<body class="legal-page"><a class="legal-skip" href="#documento">Skip to document</a><div class="legal-shell"><header class="legal-header"><a class="legal-brand" href="/">UNMARKER.IT</a><a href="/">Back to the tool</a></header><nav class="legal-nav" aria-label="Legal documents">${navigation}</nav><main id="documento" class="legal-document">${content}</main><footer class="legal-footer"><p>NOMADE - S.R.L. · VAT / Tax ID 07505480488</p><p>Via Luigi Salvatore Cherubini 10, 50121 Florence (FI), Italy · Florence Business Register 07505480488 · REA FI - 708292 · Share capital €100,000.00, fully paid</p><a href="mailto:help@nomadesrl.it">help@nomadesrl.it</a> · <a href="mailto:info@pec.nomadesrl.it">Certified email (PEC)</a><p><a href="/#cookie-preferences">Change cookie preferences</a></p><p>You can keep a copy using your browser’s Print → Save as PDF command. These pages do not load analytics.</p></footer></div></body></html>`;
 }
 
 export async function writeLegalPages(dist: string, template: string) {

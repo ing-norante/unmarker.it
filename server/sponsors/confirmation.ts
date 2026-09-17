@@ -89,8 +89,8 @@ Applicable VAT: ${money(tax)}
 Total paid: ${money(total)}
 Payment method: card via Stripe.
 ${p.publication_stopped_at ? `\nPublication ended early on ${date(p.publication_stopped_at)}.\n` : ""}
-Attached are the sales terms you accepted when purchasing (Italian text,
-version ${evidence.termsVersion}). Please keep them with this email.
+Attached are the sales terms you accepted when purchasing (version
+${evidence.termsVersion}). Please keep them with this email.
 Clauses 6 and 7 cover voluntary cancellation and downtime refunds, without
 excluding applicable mandatory rights.
 

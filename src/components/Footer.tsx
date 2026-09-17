@@ -115,14 +115,11 @@ export function Footer() {
           >
             {t("consent.preferences")}
           </Button>
-          <p className="text-muted-foreground mt-3 text-xs leading-5">
-            {t("footer.documentLanguage")}
-          </p>
         </nav>
       </div>
 
       <dl className="mt-8 grid grid-cols-2 gap-x-3 gap-y-2 border-t py-1.5 text-xs leading-3 sm:grid-cols-3 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.55fr)_minmax(0,1.4fr)_minmax(0,1.15fr)_minmax(0,0.65fr)_minmax(0,1.2fr)]">
-        <LegalField label="NOMADE - S.R.L." emphasize>
+        <LegalField label="NoMaDe - S.r.l." emphasize>
           © {new Date().getFullYear()}
         </LegalField>
         <LegalField label={t("footer.registeredOffice")}>

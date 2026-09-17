@@ -1,14 +1,21 @@
 # Documenti legali e amministrativi Unmarker
 
-Versione v1.0.0, efficacia 16 settembre 2026. Testi predisposti per le pagine
-pubbliche `/legal/*`, con condizioni commerciali approvate dal titolare.
+Versione v1.0.0, efficacia 18 settembre 2026. I testi inglesi sono la fonte
+delle pagine pubbliche `/legal/*` e della copia dei termini salvata con l'ordine.
+I testi italiani rimangono nel repository per archivio societario e verifica
+con il commercialista; non vengono pubblicati sul sito.
 La pubblicazione locale non equivale a un deployment in produzione.
 
 ## Documenti
 
-- [Condizioni sponsor B2B](./sponsor-terms.it.md).
-- [Informativa privacy](./privacy.it.md).
-- [Cookie policy](./cookies.it.md).
+- [Condizioni sponsor B2B, pubbliche in inglese](./sponsor-terms.en.md) e
+  [archivio italiano](./sponsor-terms.it.md).
+- [Privacy policy, pubblica in inglese](./privacy.en.md) e
+  [archivio italiano](./privacy.it.md).
+- [Cookie policy, pubblica in inglese](./cookies.en.md) e
+  [archivio italiano](./cookies.it.md).
+- La pagina pubblica "Cancellations and refunds" estrae le clausole 6 e 7
+  dai termini inglesi; le clausole italiane restano nei termini d'archivio.
 - [Operazioni e verifiche di pubblicazione](./operations.md): stato aggiornato,
   gestione manuale della conservazione, conferme acquisto e limiti verificati.
 - [Fatturazione e rimborsi: specifica operativa](./billing-and-refunds.md).

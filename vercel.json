@@ -2,7 +2,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/sponsors.ts": {
-      "includeFiles": "docs/legal/sponsor-terms.it.md"
+      "includeFiles": "docs/legal/sponsor-terms.en.md"
     }
   },
   "redirects": [

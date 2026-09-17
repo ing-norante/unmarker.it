@@ -1,6 +1,6 @@
 # Condizioni di vendita delle sponsorizzazioni Unmarker.it
 
-> Versione v1.0.0 · Efficace dal 16 settembre 2026.
+> Versione v1.0.0 · Efficace dal 18 settembre 2026.
 
 ## 1. Fornitore e contatti
 

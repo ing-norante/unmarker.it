@@ -83,7 +83,7 @@ export const common = {
       businessPurchase:
         "I am purchasing for my business or professional activity and am authorised to do so.",
       termsAccepted:
-        "I have read and accept the sponsorship conditions linked above (Italian, v1.0.0).",
+        "I have read and accept the sponsorship terms linked above (English, v1.0.0).",
       clausesAccepted:
         "Under articles 1341 and 1342 of the Italian Civil Code, I specifically approve clause 6 (voluntary cancellation without refund) and clause 7 (downtime and proportional refunds, without excluding mandatory legal remedies).",
       checkField: "Check this billing detail and its format.",
@@ -276,7 +276,6 @@ export const common = {
     privacy: "Privacy policy",
     cookies: "Cookie policy",
     refunds: "Cancellations & refunds",
-    documentLanguage: "Legal documents are available in Italian.",
     description:
       "Analyze and process AI watermarks, directly in your browser. Your images stay on your device.",
     research: "Research",

@@ -77,7 +77,7 @@ export const common = {
       draftNotice:
         "测试结账。已确认的条款为 v1.0.0，自 2026 年 9 月 18 日起生效。正式购买尚未启用。",
       businessPurchase: "我因企业或专业活动需要购买，并有权代表该主体购买。",
-      termsAccepted: "我已阅读并接受上方链接的赞助条件（意大利语，v1.0.0）。",
+      termsAccepted: "我已阅读并接受上方链接的赞助条款（英语，v1.0.0）。",
       clausesAccepted:
         "根据意大利民法典第 1341 和 1342 条，我特别同意第 6 条（自愿取消不退款）及第 7 条（故障和按比例退款，不排除法定救济）。",
       checkField: "请检查此账单信息及其格式。",
@@ -249,7 +249,6 @@ export const common = {
     privacy: "隐私政策",
     cookies: "Cookie 政策",
     refunds: "取消与退款",
-    documentLanguage: "法律文件以意大利语提供。",
     description: "直接在浏览器中分析和处理 AI 水印。图片始终保留在您的设备上。",
     research: "研究资料",
     contact: "联系与支持",

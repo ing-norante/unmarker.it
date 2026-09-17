@@ -1,7 +1,7 @@
 # SEO audit — Sponsorship
 
-**Data:** 18 settembre 2026  
-**Pagina analizzata:** http://127.0.0.1:5173/sponsorship  
+**Data:** 18 settembre 2026
+**Pagina analizzata:** http://127.0.0.1:5173/sponsorship
 **URL canonico previsto:** https://www.unmarker.it/sponsorship
 
 ## Sintesi
@@ -141,7 +141,7 @@ Proposta per sostituire il WebPage inglese attuale, **non applicata**. Non inclu
       "@type": "Organization",
       "@id": "https://www.unmarker.it/#organization",
       "name": "NoMaDe S.r.l.",
-      "legalName": "NOMADE - S.R.L.",
+      "legalName": "NoMaDe - S.R.L.",
       "vatID": "IT07505480488",
       "email": "help@nomadesrl.it"
     }

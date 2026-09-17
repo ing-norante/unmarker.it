@@ -90,7 +90,7 @@ export async function verifyBusinessTaxId(customer: string, b: SponsorBilling) {
 
 export async function termsEvidence() {
   const text = await readFile(
-    resolve("docs/legal/sponsor-terms.it.md"),
+    resolve("docs/legal/sponsor-terms.en.md"),
     "utf8",
   );
   return { sha256: createHash("sha256").update(text).digest("hex"), text };

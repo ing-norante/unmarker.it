@@ -1,6 +1,6 @@
 # Pubblicazione v1.0.0 e gestione minima
 
-Data confermata dal titolare: **16 settembre 2026**. Le condizioni commerciali
+Data confermata dal titolare: **18 settembre 2026**. Le condizioni commerciali
 sono approvate dal titolare. Questo registro interno non è una pagina pubblica.
 
 ## Confini della verifica
@@ -64,8 +64,9 @@ Nessuna firma o conclusione di accordi è stata effettuata dall'agente.
 
 Le pagine `/legal/*` sono HTML statico, senza SDK analytics, con `noindex, follow`
 nel documento e negli header Vercel. Non sono bloccate nel robots.txt. Le condizioni
-restano in un unico Markdown: la pagina rimborsi estrae gli artt. 6 e 7 e il backend
-salva quel medesimo testo. Al prossimo aggiornamento conservare la versione precedente
+restano in un unico Markdown inglese: la pagina rimborsi estrae le clausole 6 e 7
+e il backend salva quel medesimo testo. Le versioni italiane restano nell'archivio
+interno del repository. Al prossimo aggiornamento conservare la versione precedente
 e cambiare versione dei termini; non azzerare i rifiuti cookie per modifiche editoriali.
 
 ## Fonti
