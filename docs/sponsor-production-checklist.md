@@ -12,8 +12,8 @@ ricontrollate le impostazioni live dei pannelli Stripe, Vercel e Neon.
 
 **Decisioni confermate da Giuseppe:** Stripe Payments standard, con NoMaDe S.r.l.
 come venditore; acquisti B2B; prezzo imponibile di **500 € più IVA dove dovuta**;
-Fatture in Cloud come gestionale. La restrizione B2B e il trattamento IVA devono
-ancora essere implementati. Sono ammessi aziende e liberi professionisti in Italia,
+Fatture in Cloud come gestionale. Il worktree implementa raccolta B2B e Stripe Tax in sandbox; la matrice fiscale
+per il live deve ancora essere approvata. Sono ammessi aziende e liberi professionisti in Italia,
 UE ed extra UE, nei limiti normativi e dei paesi supportati. Cancellazione volontaria
 senza rimborso per ripensamento; disservizi con rimborso pro-rata del downtime,
 fatti salvi i diritti inderogabili.
@@ -28,22 +28,24 @@ da NoMaDe; la corretta classificazione dei documenti resta al commercialista.
 
 | Area             | Situazione nel codice                                                                                                      |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Acquisto         | Pagamento unico, totale fisso di 500 €, 720 ore dal pagamento confermato                                                   |
+| Acquisto         | Pagamento unico, 500 € imponibili più imposte, 720 ore dal pagamento confermato                                                   |
 | Rinnovo          | Nessun abbonamento o rinnovo automatico                                                                                    |
 | Managed Payments | Disabilitato esplicitamente nelle Checkout Session                                                                         |
-| IVA              | Nessuna integrazione di calcolo automatico; totale atteso rigidamente pari a 50000 centesimi                               |
-| Fatturazione     | Nessun flusso XML/SdI o registro delle fatture implementato                                                                |
-| Dati fiscali     | Il form raccoglie la creatività; Checkout non richiede esplicitamente tutti i dati necessari alla fattura                  |
-| Documenti legali | Footer con dati societari e link alle bozze su GitHub, chiaramente segnalate; nessuna accettazione contrattuale registrata |
+| IVA              | Stripe Tax sandbox; caso IT verificato 500 € + 110 € = 610 €; live da configurare                               |
+| Fatturazione     | Export amministrativo JSON disponibile; XML/FIC/SdI e registro fatture da completare                                                                |
+| Dati fiscali     | Passaggio B2B con anagrafica, indirizzo, Tax ID, CF italiano e recapiti SdI                  |
+| Documenti legali | Bozze segnalate; tre conferme, timestamp, versione e testo/hash conservati; nuovi acquisti live bloccati |
 | Analytics        | Consenso preventivo browser/server, revoca e preferenze; replay disabilitato                                               |
 | Cron             | Endpoint autenticato disponibile; nessuna pianificazione in `vercel.json`                                                  |
 | Rimborsi         | I parziali mantengono la campagna fino alla scadenza; il totale cumulativo integrale la rimuove                            |
-| Pausa vendite    | Manca un interruttore dedicato ai nuovi acquisti; il blocco live attuale agisce sulla configurazione condivisa             |
+| Pausa vendite    | Nuovi acquisti live bloccati da documenti in bozza/paesi non approvati; pausa operativa ancora da aggiungere             |
 
 Riferimenti implementativi: `server/sponsors/service.ts`,
 `server/sponsors/config.ts`, `server/sponsors/schema.sql`,
 `src/lib/analytics.ts`, `src/components/Footer.tsx`, `vercel.json`.
 Per la preview: [sponsor-preview.md](./sponsor-preview.md).
+Dettagli della nuova integrazione: [checkout B2B e Stripe Tax](./sponsor-billing-checkout.md).
+Queste modifiche fiscali non sono ancora distribuite in Preview.
 
 ## 1. Managed Payments: che cosa cambierebbe
 
@@ -153,9 +155,10 @@ saldo. [Stripe: riconciliazione dei payout](https://docs.stripe.com/reports/payo
 - [ ] Definire contenuti ammessi, diritti su icona/testi, controlli e rimozioni,
       indisponibilità del servizio, rimborsi e gestione dei reclami. I tre sponsor
       interni non vanno presentati come clienti paganti o testimonianze commerciali.
-- [ ] **Sviluppo:** mostrare le condizioni prima del pagamento e registrare
-      versione e accettazione. Inviare conferma contrattuale conservabile con
-      importi, creatività, date e condizioni applicabili.
+- [x] **Sviluppo:** mostrare le condizioni e registrare versione, testo/hash,
+      timestamp e approvazioni separate (in sandbox con bozze segnalate).
+- [ ] Inviare conferma contrattuale conservabile con importi, creatività,
+      date e condizioni definitive applicabili.
 - [ ] **Giuseppe:** attivare un recapito di assistenza e una procedura per
       acquirenti che hanno perso il cookie/sessione del browser.
 
@@ -223,9 +226,12 @@ poi con rifiuto, accettazione e revoca; documenti coerenti con le richieste di r
 
 ## 6. Implementazione e infrastruttura live
 
-- [ ] Adeguare form e Checkout ai dati fiscali e alla matrice IVA approvata.
-      Se si aggiungono imposte ai 500 €, cambiare anche le verifiche server degli
-      importi e i relativi test: modificare soltanto il prezzo in Stripe non basta.
+- [x] Adeguare form, Checkout e verifiche server a dati fiscali e imposte:
+      500 € imponibili distinti dal totale, snapshot privati, compatibilità legacy.
+- [ ] Approvare la matrice fiscale e i paesi live; configurare Tax e registrazioni
+      live. L'approvazione sandbox non autorizza registrazioni fiscali live.
+- [ ] Migrare i cinque nuovi campi fiscali su Preview e Production prima del deploy;
+      ripetere il collaudo della nuova versione in Preview.
 - [ ] Verificare nell'account live `acct_1UGRfqCwozMNRcOx` requisiti pendenti,
       possibilità di incassare/ricevere payout, conto bancario, descrizione del
       servizio, sito Unmarker, assistenza e descrittore riconoscibile sull'estratto conto.
@@ -276,7 +282,8 @@ La [CLI indicata da Giuseppe](https://github.com/16bitsrl/fattureincloud-cli)
 supporta proprio la conversione XML → documento tramite API JSON, con anteprima
 `--dry-run`. Quindi il percorso proposto è:
 
-1. Esportazione protetta dei dati e dell'XML dell'acquisto pagato.
+1. Esportazione protetta dei dati dell’acquisto pagato (JSON già disponibile);
+   produzione dell’XML/documento FIC da completare.
 2. Verifica locale del tracciato e anteprima della conversione nella CLI.
 3. Creazione controllata della fattura in Fatture in Cloud, marcata pagata.
 4. Revisione di Giuseppe e invio manuale allo SdI.

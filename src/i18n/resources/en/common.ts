@@ -10,16 +10,21 @@ export const common = {
     pause: "Pause sponsor animations",
     resume: "Resume sponsor animations",
     dialogTitle: "Advertise on Unmarker.it",
-    dialogDescription: "Put your project in front of thousands of people worldwide using Unmarker.it to work with AI images.",
+    dialogDescription:
+      "Put your project in front of thousands of people worldwide using Unmarker.it to work with AI images.",
     howItWorks: "How it works",
-    howItWorksDescription: "Your website appears in desktop sidebars and mobile sponsor bars throughout the app. Paired cards share the rotation equally: each sponsor gets 10 seconds per cycle. One price for every position. Visitors can pause animations.",
+    howItWorksDescription:
+      "Your website appears in desktop sidebars and mobile sponsor bars throughout the app. Paired cards share the rotation equally: each sponsor gets 10 seconds per cycle. One price for every position. Visitors can pause animations.",
     availability: "Availability",
-    availabilityDescription: "There are {{total}} sponsor slots, filled on a first-come, first-served basis.",
+    availabilityDescription:
+      "There are {{total}} sponsor slots, filled on a first-come, first-served basis.",
     pricing: "Pricing",
-    monthlyPrice: "{{price}} per slot for {{days}} days.",
-    durationDescription: "Your {{days}} days start when your payment is confirmed.",
+    monthlyPrice: "{{price}} + applicable VAT · {{days}} days.",
+    durationDescription:
+      "Your {{days}} days start when your payment is confirmed.",
     materials: "All you need",
-    materialsDescription: "Your project name, a favicon or icon, your website URL, and a short description.",
+    materialsDescription:
+      "Your project name, a favicon or icon, your website URL, and a short description.",
     bookingUnavailable: "Online booking is temporarily unavailable.",
     soldOut: "All sponsor slots are currently booked.",
     book: "Lock your spot",
@@ -29,7 +34,8 @@ export const common = {
     paymentSummary: "{{days}} days. No automatic renewal.",
     payWithStripe: "Pay {{price}} with Stripe",
     preparingCheckout: "Preparing checkout…",
-    secureCheckout: "Secure payment on Stripe. Your card details never reach Unmarker.it.",
+    secureCheckout:
+      "Secure payment on Stripe. Your card details never reach Unmarker.it.",
     pendingCheckout: "You already have a checkout in progress",
     resumeCheckout: "Continue to payment",
     cancelCheckout: "Cancel this checkout",
@@ -38,38 +44,116 @@ export const common = {
     checkingPayment: "Checking your payment with Stripe…",
     campaignDates: "From {{start}} until {{end}}.",
     checkAgain: "Check payment again",
+    billing: {
+      title: "2. Billing details",
+      description:
+        "For businesses and professionals buying for their work. These details are private and will be used for your invoice.",
+      legalName: "Legal business name / professional name",
+      country: "Billing country",
+      countryHint:
+        "Country of the business receiving this service. If your country or business tax ID is not supported, contact help@nomadesrl.it before paying.",
+      taxIdType: "Business tax ID type",
+      taxId:
+        "VAT / business tax ID (including country prefix where applicable)",
+      fiscalCode: "Italian codice fiscale",
+      email: "Invoice email",
+      line1: "Registered billing address",
+      city: "City",
+      postalCode: "Postal code",
+      region: "State / province (IT: two-letter code)",
+      recipientCode: "SdI recipient code",
+      pec: "Invoice PEC",
+      optional: "optional",
+      routingHint:
+        "If you have no recipient code or PEC, leave both blank. We will use 0000000 and send a copy to your invoice email.",
+      conditions: "Purchase conditions",
+      draftNotice:
+        "Sandbox only: these conditions are drafts for testing, not final terms for live purchases.",
+      businessPurchase:
+        "I am purchasing for my business or professional activity and am authorised to do so.",
+      termsAccepted:
+        "I have read and accept the sponsorship conditions linked above (draft in sandbox).",
+      clausesAccepted:
+        "Under articles 1341 and 1342 of the Italian Civil Code, I specifically approve clause 6 (voluntary cancellation without refund) and clause 7 (downtime and proportional refunds, without excluding mandatory legal remedies).",
+      checkField: "Check this billing detail and its format.",
+      requiredConfirmation: "This confirmation is required to continue.",
+      back: "Back to sponsor",
+      next: "Continue to billing",
+      retry: "Retry billing verification",
+      totalHint:
+        "€500 excluding applicable taxes. Review the final tax and total on Stripe before paying. One payment, no renewal.",
+      continue: "Continue to Stripe",
+    },
     form: {
-      name: "Project name", namePlaceholder: "Your project", nameHint: "2–32 characters.", nameError: "Enter a name between 2 and 32 characters.",
-      url: "Website link", urlHint: "The public page visitors will open.", urlError: "Enter a complete http:// or https:// website URL.",
-      description: "Short description", descriptionPlaceholder: "What makes your project worth a visit?", descriptionError: "Use 10–120 characters for your description.",
-      icon: "Favicon or icon", iconHint: "This icon will be uploaded for your ad. PNG, JPEG or WebP · up to 256 KB and 1024×1024 pixels.", iconError: "Choose a PNG, JPEG or WebP image up to 256 KB.",
-      preview: "Your preview", previewHint: "Your placement adapts to desktop and mobile.", errorTitle: "Checkout could not be completed",
+      name: "Project name",
+      namePlaceholder: "Your project",
+      nameHint: "2–32 characters.",
+      nameError: "Enter a name between 2 and 32 characters.",
+      url: "Website link",
+      urlHint: "The public page visitors will open.",
+      urlError: "Enter a complete http:// or https:// website URL.",
+      description: "Short description",
+      descriptionPlaceholder: "What makes your project worth a visit?",
+      descriptionError: "Use 10–120 characters for your description.",
+      icon: "Favicon or icon",
+      iconHint:
+        "This icon will be uploaded for your ad. PNG, JPEG or WebP · up to 256 KB and 1024×1024 pixels.",
+      iconError: "Choose a PNG, JPEG or WebP image up to 256 KB.",
+      preview: "Your preview",
+      previewHint: "Your placement adapts to desktop and mobile.",
+      errorTitle: "Checkout could not be completed",
     },
     errors: {
-      temporary_error: "We could not complete this request. Please retry; an existing checkout will be reused.",
-      unavailable: "Booking is temporarily unavailable. Please try again later.",
+      invalid_billing:
+        "Check all billing details and confirm the business purchase and conditions. Include the country prefix in an EU VAT number.",
+      billing_unavailable:
+        "Tax configuration or live sales approval is incomplete. Please contact help@nomadesrl.it.",
+      tax_verification_pending:
+        "VAT verification is still pending. Retry shortly using the same details, or go back to cancel this checkout. No payment has been taken.",
+      tax_verification_failed:
+        "We could not verify this EU VAT number. Go back and cancel this checkout to correct your details, or contact help@nomadesrl.it. No payment has been taken.",
+
+      temporary_error:
+        "We could not complete this request. Please retry; an existing checkout will be reused.",
+      unavailable:
+        "Booking is temporarily unavailable. Please try again later.",
       invalid_form: "Check the project name, website link and description.",
-      invalid_icon: "Use a valid PNG, JPEG or WebP, up to 256 KB and 1024×1024 pixels.",
+      invalid_icon:
+        "Use a valid PNG, JPEG or WebP, up to 256 KB and 1024×1024 pixels.",
       request_too_large: "The uploaded file is too large.",
-      sold_out: "The last available spot was just reserved. Please check back later.",
+      sold_out:
+        "The last available spot was just reserved. Please check back later.",
       rate_limited: "Too many checkout attempts. Please try again in an hour.",
-      existing_checkout: "Continue or cancel your existing checkout before starting another.",
-      request_changed: "Your checkout already contains different details. Cancel it before starting a new one.",
-      session_expired: "Open this page in the browser you used to purchase. Your purchase remains linked to that browser session.",
+      existing_checkout:
+        "Continue or cancel your existing checkout before starting another.",
+      request_changed:
+        "Your checkout already contains different details. Cancel it before starting a new one.",
+      session_expired:
+        "Open this page in the browser you used to purchase. Your purchase remains linked to that browser session.",
       not_found: "This purchase is not available in this browser session.",
-      forbidden: "This request could not be verified. Reload the page and try again.",
-      payment_pending: "Stripe has not finished confirming the payment. Check again shortly.",
-      payment_mismatch: "The payment needs verification. Your placement has not been activated.",
+      forbidden:
+        "This request could not be verified. Reload the page and try again.",
+      payment_pending:
+        "Stripe has not finished confirming the payment. Check again shortly.",
+      payment_mismatch:
+        "The payment needs verification. Your placement has not been activated.",
     },
     purchaseStatus: {
-      creating: "We are preparing your checkout. No payment has been confirmed yet.",
-      pending: "Your payment has not been confirmed yet. You can continue or cancel the checkout.",
-      active: "Payment confirmed. Your project is now displayed for 30 days, with no automatic renewal.",
-      expired: "Your 30-day sponsorship has ended. You can purchase another placement whenever you choose.",
-      cancelled: "This checkout is cancelled or expired. You can start a new booking.",
-      refunded: "This payment was refunded. The placement is no longer displayed.",
+      creating:
+        "We are preparing your checkout. No payment has been confirmed yet.",
+      pending:
+        "Your payment has not been confirmed yet. You can continue or cancel the checkout.",
+      active:
+        "Payment confirmed. Your project is now displayed for 30 days, with no automatic renewal.",
+      expired:
+        "Your 30-day sponsorship has ended. You can purchase another placement whenever you choose.",
+      cancelled:
+        "This checkout is cancelled or expired. You can start a new booking.",
+      refunded:
+        "This payment was refunded. The placement is no longer displayed.",
       disputed: "This payment is under dispute. The placement is paused.",
-      attention: "We are checking an interrupted checkout. Please retry shortly; no new payment will be created automatically.",
+      attention:
+        "We are checking an interrupted checkout. Please retry shortly; no new payment will be created automatically.",
     },
   },
   language: {

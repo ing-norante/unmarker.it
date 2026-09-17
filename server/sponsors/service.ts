@@ -17,6 +17,19 @@ import {
 import { sponsors, TOTAL_SPONSOR_SLOTS } from "../../src/lib/sponsors.ts";
 import { database, transaction } from "./db.ts";
 import { getConfig, getStripe, SponsorError } from "./config.ts";
+import {
+  sponsorBillingSchema,
+  SPONSOR_TERMS_PUBLISHED,
+  type SponsorBilling,
+} from "../../src/lib/sponsorBilling.ts";
+import {
+  assertLiveBillingReady,
+  assertTaxConfiguration,
+  stripeCustomerData,
+  verifyBusinessTaxId,
+  validateTaxedSession,
+  termsEvidence,
+} from "./billing.ts";
 
 export interface Purchase {
   id: string;
@@ -38,6 +51,11 @@ export interface Purchase {
   paid_event_id: string | null;
   analytics_id: string | null;
   analytics_consent_at: string | null;
+  billing_details: SponsorBilling | null;
+  terms_accepted_at: Date | null;
+  stripe_customer_id: string | null;
+  stripe_price_id: string | null;
+  billing_snapshot: Record<string, unknown> | null;
 }
 
 export async function normalizeIcon(bytes: Buffer) {
@@ -92,7 +110,10 @@ export async function catalog() {
       expiresAt: p.expires_at!.toISOString(),
     })),
     availableSpots: available,
-    checkoutEnabled: true,
+    checkoutEnabled:
+      !getConfig().live ||
+      (SPONSOR_TERMS_PUBLISHED &&
+        Boolean(process.env.SPONSOR_APPROVED_BILLING_COUNTRIES)),
     testMode: !getConfig().live,
     priceEur: SPONSOR_PRICE_CENTS / 100,
     durationDays: SPONSOR_DURATION_DAYS,
@@ -144,6 +165,16 @@ export async function reservePurchase(
   form: FormData,
   rateKey: string,
 ) {
+  let billing: SponsorBilling;
+  try {
+    billing = sponsorBillingSchema.parse(
+      JSON.parse(String(form.get("billing"))),
+    );
+  } catch {
+    throw new SponsorError("invalid_billing");
+  }
+  assertLiveBillingReady(billing.country);
+  const terms = await termsEvidence();
   const creative = sponsorCreativeSchema.safeParse(
     Object.fromEntries(
       ["name", "url", "description"].map((k) => [k, form.get(k)]),
@@ -157,6 +188,7 @@ export async function reservePurchase(
   const icon = await normalizeIcon(Buffer.from(await iconFile.arrayBuffer()));
   const hash = createHash("sha256")
     .update(JSON.stringify(creative.data))
+    .update(JSON.stringify(billing))
     .update(icon)
     .digest("hex");
   const attribution = z
@@ -203,8 +235,8 @@ export async function reservePurchase(
     if ((await capacity(db)) === 0) throw new SponsorError("sold_out", 409);
     const { rows } = await db.query<Purchase>(
       `INSERT INTO sponsor_purchases
-      (id,buyer_id,request_id,request_hash,name,url,description,icon,status,checkout_expires_at,analytics_id,analytics_consent_at)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'creating',now()+interval '40 minutes',$9,$10) RETURNING *`,
+      (id,buyer_id,request_id,request_hash,name,url,description,icon,status,checkout_expires_at,analytics_id,analytics_consent_at,billing_details,terms_accepted_at,billing_snapshot,stripe_price_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'creating',now()+interval '40 minutes',$9,$10,$11,now(),$12,$13) RETURNING *`,
       [
         randomUUID(),
         buyerId,
@@ -216,6 +248,13 @@ export async function reservePurchase(
         icon,
         consented && attribution.success ? attribution.data : null,
         consented ? current.updatedAt : null,
+        billing,
+        {
+          terms,
+          termsVersion: billing.termsVersion,
+          specificallyApprovedClauses: [6, 7],
+        },
+        getConfig().priceId,
       ],
     );
     return rows[0];
@@ -225,8 +264,34 @@ export async function reservePurchase(
 export async function ensureCheckout(purchaseId: string, buyerId: string) {
   const stripe = getStripe();
   const config = getConfig();
+  const existingPurchase = await ownedPurchase(purchaseId, buyerId);
+  if (
+    existingPurchase.stripe_session_id ||
+    !["creating", "attention"].includes(existingPurchase.status)
+  )
+    return existingPurchase;
   // Commit the customer mapping before any session can be created remotely.
   const customerId = await transaction(async (db) => {
+    if (existingPurchase.billing_details) {
+      assertLiveBillingReady(existingPurchase.billing_details.country);
+      const { rows } = await db.query<Purchase>(
+        "SELECT * FROM sponsor_purchases WHERE id=$1 FOR UPDATE",
+        [purchaseId],
+      );
+      if (rows[0].stripe_customer_id) return rows[0].stripe_customer_id;
+      const customer = await stripe.customers.create(
+        {
+          ...stripeCustomerData(existingPurchase.billing_details),
+          metadata: { unmarker_purchase_id: purchaseId },
+        },
+        { idempotencyKey: `unmarker-billing-customer-${purchaseId}` },
+      );
+      await db.query(
+        "UPDATE sponsor_purchases SET stripe_customer_id=$2 WHERE id=$1",
+        [purchaseId, customer.id],
+      );
+      return customer.id;
+    }
     const { rows } = await db.query<{ stripe_customer_id: string | null }>(
       "SELECT stripe_customer_id FROM sponsor_buyers WHERE id=$1",
       [buyerId],
@@ -277,7 +342,8 @@ export async function ensureCheckout(purchaseId: string, buyerId: string) {
       );
       return { ...purchase, status };
     }
-    const price = await stripe.prices.retrieve(config.priceId);
+    const priceId = purchase.stripe_price_id ?? config.priceId;
+    const price = await stripe.prices.retrieve(priceId);
     if (
       !price.active ||
       price.type !== "one_time" ||
@@ -286,6 +352,17 @@ export async function ensureCheckout(purchaseId: string, buyerId: string) {
       price.livemode !== config.live
     )
       throw new SponsorError("unavailable", 503);
+    if (purchase.billing_details) {
+      await assertTaxConfiguration(price);
+      const verification = await verifyBusinessTaxId(
+        customerId,
+        purchase.billing_details,
+      );
+      await db.query(
+        "UPDATE sponsor_purchases SET billing_snapshot=billing_snapshot || $2::jsonb WHERE id=$1",
+        [purchase.id, JSON.stringify({ verification })],
+      );
+    }
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
@@ -294,11 +371,25 @@ export async function ensureCheckout(purchaseId: string, buyerId: string) {
         adaptive_pricing: { enabled: false },
         customer: customerId,
         payment_method_types: ["card"],
-        line_items: [{ price: config.priceId, quantity: 1 }],
+        line_items: [{ price: priceId, quantity: 1 }],
+        ...(purchase.billing_details
+          ? {
+              automatic_tax: { enabled: true },
+              // Billing data is collected and validated before Checkout. Do not let a
+              // new card address silently change the jurisdiction or invoice identity.
+              customer_update: {
+                address: "never" as const,
+                name: "never" as const,
+              },
+            }
+          : {}),
         client_reference_id: purchase.id,
         metadata: {
           unmarker_purchase_id: purchase.id,
           unmarker_buyer_id: buyerId,
+          ...(purchase.billing_details
+            ? { terms_version: purchase.billing_details.termsVersion }
+            : {}),
         },
         payment_intent_data: {
           metadata: { unmarker_purchase_id: purchase.id },
@@ -309,7 +400,7 @@ export async function ensureCheckout(purchaseId: string, buyerId: string) {
         custom_text: {
           submit: {
             message:
-              "One payment for 30 days on Unmarker.it. No automatic renewal. Your placement starts when payment is confirmed.",
+              "Business purchase: EUR 500 plus applicable taxes for 30 days on Unmarker.it. No automatic renewal. Your placement starts when payment is confirmed. Billing details were supplied on Unmarker.it; return there to change them.",
           },
         },
       },
@@ -386,7 +477,13 @@ async function syncLocked(
   const config = getConfig();
   const session = await stripe.checkout.sessions.retrieve(
     purchase.stripe_session_id,
-    { expand: ["line_items.data.price", "payment_intent.latest_charge"] },
+    {
+      expand: [
+        "line_items.data.price",
+        "line_items.data.taxes",
+        "payment_intent.latest_charge",
+      ],
+    },
   );
   const { rows: buyers } = await db.query<{ stripe_customer_id: string }>(
     "SELECT stripe_customer_id FROM sponsor_buyers WHERE id=$1",
@@ -396,13 +493,15 @@ async function syncLocked(
   if (
     session.livemode !== config.live ||
     session.mode !== "payment" ||
-    session.customer !== buyers[0].stripe_customer_id ||
+    session.customer !==
+      (purchase.stripe_customer_id ?? buyers[0].stripe_customer_id) ||
     session.client_reference_id !== purchase.id ||
     session.metadata?.unmarker_purchase_id !== purchase.id ||
     session.currency !== "eur" ||
-    session.amount_total !== SPONSOR_PRICE_CENTS ||
+    (!purchase.billing_details &&
+      session.amount_total !== SPONSOR_PRICE_CENTS) ||
     session.line_items?.data.length !== 1 ||
-    item?.price?.id !== config.priceId ||
+    item?.price?.id !== (purchase.stripe_price_id ?? config.priceId) ||
     item.quantity !== 1
   )
     throw new SponsorError("payment_mismatch", 409);
@@ -412,7 +511,16 @@ async function syncLocked(
   const pi =
     typeof session.payment_intent === "object" ? session.payment_intent : null;
   if (session.payment_status === "paid" && pi?.status === "succeeded") {
-    if (pi.currency !== "eur" || pi.amount_received !== SPONSOR_PRICE_CENTS)
+    if (purchase.billing_details) {
+      const payment = validateTaxedSession(session, purchase.billing_details);
+      // Preserve the first finalized invoice snapshot across later refunds and retries.
+      await db.query(
+        `UPDATE sponsor_purchases SET billing_snapshot=billing_snapshot || $2::jsonb
+        WHERE id=$1 AND NOT (billing_snapshot ? 'payment')`,
+        [purchase.id, JSON.stringify({ payment })],
+      );
+    }
+    if (pi.currency !== "eur" || pi.amount_received !== session.amount_total)
       throw new SponsorError("payment_mismatch", 409);
     if (!paidAt) {
       const confirmation = await successfulPaymentEvent(pi, event);
@@ -525,7 +633,32 @@ export async function processWebhook(event: Stripe.Event) {
 }
 
 export async function cancelPurchase(id: string, buyerId: string) {
-  const purchase = await ownedPurchase(id, buyerId);
+  let purchase = await ownedPurchase(id, buyerId);
+  if (!purchase.stripe_session_id && purchase.billing_details) {
+    purchase = await transaction(async (db) => {
+      const { rows } = await db.query<Purchase>(
+        "SELECT * FROM sponsor_purchases WHERE id=$1 AND buyer_id=$2 FOR UPDATE",
+        [id, buyerId],
+      );
+      const current = rows[0];
+      if (current.stripe_session_id) return current;
+      if (current.stripe_customer_id) {
+        // Recover a remotely created session before releasing a reservation.
+        for await (const session of getStripe().checkout.sessions.list({
+          customer: current.stripe_customer_id,
+          limit: 100,
+        })) {
+          if (session.metadata?.unmarker_purchase_id === id)
+            return attachSession(db, id, session);
+        }
+      }
+      const result = await db.query<Purchase>(
+        "UPDATE sponsor_purchases SET status='cancelled',updated_at=now() WHERE id=$1 RETURNING *",
+        [id],
+      );
+      return result.rows[0];
+    });
+  }
   if (purchase.stripe_session_id && purchase.status === "pending") {
     const session = await getStripe().checkout.sessions.retrieve(
       purchase.stripe_session_id,

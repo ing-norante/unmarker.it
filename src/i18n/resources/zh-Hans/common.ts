@@ -10,16 +10,19 @@ export const common = {
     pause: "暂停赞助商动画",
     resume: "继续赞助商动画",
     dialogTitle: "在 Unmarker.it 投放广告",
-    dialogDescription: "向全球数千名使用 Unmarker.it 处理 AI 图片的用户展示您的项目。",
+    dialogDescription:
+      "向全球数千名使用 Unmarker.it 处理 AI 图片的用户展示您的项目。",
     howItWorks: "展示方式",
-    howItWorksDescription: "您的网站将展示在应用各页面的桌面侧栏及移动端赞助商栏中。双面卡片公平轮换，每位赞助商在每个周期展示 10 秒。所有位置价格相同。用户可以暂停动画。",
+    howItWorksDescription:
+      "您的网站将展示在应用各页面的桌面侧栏及移动端赞助商栏中。双面卡片公平轮换，每位赞助商在每个周期展示 10 秒。所有位置价格相同。用户可以暂停动画。",
     availability: "广告位",
     availabilityDescription: "共有 {{total}} 个赞助广告位，先到先得。",
     pricing: "价格",
-    monthlyPrice: "每个广告位 {{days}} 天，价格 {{price}}。",
+    monthlyPrice: "每个广告位 {{price}} + 适用增值税，持续 {{days}} 天。",
     durationDescription: "付款确认后，即开始计算您的 {{days}} 天展示期。",
     materials: "所需材料",
-    materialsDescription: "项目名称、网站图标或其他图标、网站 URL，以及简短描述。",
+    materialsDescription:
+      "项目名称、网站图标或其他图标、网站 URL，以及简短描述。",
     bookingUnavailable: "在线预订暂时不可用。",
     soldOut: "所有赞助广告位目前均已预订。",
     book: "预订广告位",
@@ -38,24 +41,83 @@ export const common = {
     checkingPayment: "正在通过 Stripe 确认付款…",
     campaignDates: "从 {{start}} 至 {{end}}。",
     checkAgain: "再次检查付款",
+    billing: {
+      title: "2. 账单信息",
+      description:
+        "仅限企业和专业人士因工作需要购买。这些信息不会公开，仅用于开具发票。",
+      legalName: "企业法定名称 / 专业人士姓名",
+      country: "账单国家或地区",
+      countryHint:
+        "请填写接受服务的企业所在国家。如您的国家或税号类型不受支持，请在付款前联系 help@nomadesrl.it。",
+      taxIdType: "企业税号类型",
+      taxId: "增值税号 / 企业税号（如适用，含国家前缀）",
+      fiscalCode: "意大利税务代码（codice fiscale）",
+      email: "发票邮箱",
+      line1: "注册账单地址",
+      city: "城市",
+      postalCode: "邮政编码",
+      region: "州 / 省（意大利使用两字母代码）",
+      recipientCode: "SdI 收件人代码",
+      pec: "发票 PEC 邮箱",
+      optional: "选填",
+      routingHint:
+        "如没有收件人代码或 PEC，可留空。我们将使用 0000000，并将副本发送至发票邮箱。",
+      conditions: "购买条件",
+      draftNotice: "仅供沙盒测试：这些条件仍为草案，尚不适用于正式销售。",
+      businessPurchase: "我因企业或专业活动需要购买，并有权代表该主体购买。",
+      termsAccepted: "我已阅读并接受上方链接的赞助条件（沙盒中为草案）。",
+      clausesAccepted:
+        "根据意大利民法典第 1341 和 1342 条，我特别同意第 6 条（自愿取消不退款）及第 7 条（故障和按比例退款，不排除法定救济）。",
+      checkField: "请检查此账单信息及其格式。",
+      requiredConfirmation: "请确认后继续。",
+      back: "返回赞助内容",
+      next: "继续填写账单",
+      retry: "重新验证账单",
+      totalHint:
+        "不含适用税费的价格为 €500。付款前请在 Stripe 确认税费和总额。一次性付款，无自动续订。",
+      continue: "继续前往 Stripe",
+    },
     form: {
-      name: "项目名称", namePlaceholder: "您的项目", nameHint: "2–32 个字符。", nameError: "请输入 2–32 个字符的名称。",
-      url: "网站链接", urlHint: "访客点击后打开的公开网页。", urlError: "请输入以 http:// 或 https:// 开头的完整网址。",
-      description: "简短描述", descriptionPlaceholder: "您的项目有什么值得关注？", descriptionError: "描述需包含 10–120 个字符。",
-      icon: "网站图标", iconHint: "此图标将上传并用于您的广告。PNG、JPEG 或 WebP，最大 256 KB、1024×1024 像素。", iconError: "请选择不超过 256 KB 的 PNG、JPEG 或 WebP 图片。",
-      preview: "广告预览", previewHint: "您的广告将适配桌面和移动设备。", errorTitle: "未能完成付款",
+      name: "项目名称",
+      namePlaceholder: "您的项目",
+      nameHint: "2–32 个字符。",
+      nameError: "请输入 2–32 个字符的名称。",
+      url: "网站链接",
+      urlHint: "访客点击后打开的公开网页。",
+      urlError: "请输入以 http:// 或 https:// 开头的完整网址。",
+      description: "简短描述",
+      descriptionPlaceholder: "您的项目有什么值得关注？",
+      descriptionError: "描述需包含 10–120 个字符。",
+      icon: "网站图标",
+      iconHint:
+        "此图标将上传并用于您的广告。PNG、JPEG 或 WebP，最大 256 KB、1024×1024 像素。",
+      iconError: "请选择不超过 256 KB 的 PNG、JPEG 或 WebP 图片。",
+      preview: "广告预览",
+      previewHint: "您的广告将适配桌面和移动设备。",
+      errorTitle: "未能完成付款",
     },
     errors: {
+      invalid_billing:
+        "请检查账单信息并确认专业购买和相关条款。欧盟增值税号应包含国家前缀。",
+      billing_unavailable:
+        "税务设置或正式销售审批尚未完成。请联系 help@nomadesrl.it。",
+      tax_verification_pending:
+        "增值税号正在验证。请稍后使用相同信息重试，或返回取消结账。尚未扣款。",
+      tax_verification_failed:
+        "无法验证此欧盟增值税号。请返回取消结账并更正信息，或联系 help@nomadesrl.it。尚未扣款。",
+
       temporary_error: "未能完成请求，请重试。已有的付款页面将被复用。",
       unavailable: "预订暂时不可用，请稍后再试。",
       invalid_form: "请检查项目名称、网站链接和描述。",
-      invalid_icon: "请使用有效的 PNG、JPEG 或 WebP，最大 256 KB、1024×1024 像素。",
+      invalid_icon:
+        "请使用有效的 PNG、JPEG 或 WebP，最大 256 KB、1024×1024 像素。",
       request_too_large: "上传的文件过大。",
       sold_out: "最后一个广告位刚被预订，请稍后再来。",
       rate_limited: "付款尝试过多，请一小时后重试。",
       existing_checkout: "请先继续或取消已有的付款，再创建新预订。",
       request_changed: "已有付款包含不同信息，请取消后重新预订。",
-      session_expired: "请在购买时使用的浏览器中打开此页面。购买记录与该浏览器会话关联。",
+      session_expired:
+        "请在购买时使用的浏览器中打开此页面。购买记录与该浏览器会话关联。",
       not_found: "当前浏览器会话无法访问此购买记录。",
       forbidden: "无法验证请求，请刷新页面后重试。",
       payment_pending: "Stripe 尚未完成付款确认，请稍后再次检查。",
@@ -149,7 +211,8 @@ export const common = {
   },
   errorBoundary: {
     title: "出现错误",
-    description: "页面未能正确加载。浏览器翻译工具可能导致此问题。请重新加载页面以继续。",
+    description:
+      "页面未能正确加载。浏览器翻译工具可能导致此问题。请重新加载页面以继续。",
     reload: "重新加载页面",
   },
   generic: {

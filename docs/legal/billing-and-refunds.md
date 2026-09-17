@@ -39,6 +39,14 @@ Campi da ricostruire per ogni acquisto, senza copiarli dal campione:
 [FIC: XML esterni](https://developers.fattureincloud.it/docs/guides/externally-generated-xml/),
 [CLI](https://github.com/16bitsrl/fattureincloud-cli).
 
+## Raccolta tecnica disponibile nel worktree
+
+Il checkout raccoglie i dati fiscali prima di Stripe e conserva una fotografia
+privata della vendita pagata. `pnpm sponsors:billing:export <uuid> <file.json>`
+esporta i dati per l'amministrazione, senza numerare o inviare fatture.
+Vedere [checkout B2B](../sponsor-billing-checkout.md). L'XML e il collegamento FIC
+restano da completare; non confondere questo export con un documento fiscale.
+
 ## IVA: matrice da validare
 
 | Acquirente           | Impostazione di lavoro                                  | Verifica prima del live                                                                  |
@@ -99,12 +107,12 @@ la sequenza concordata con FIC. Nessun secondo addebito per una fattura già pag
 ## Verifiche tecniche da aggiungere
 
 - Totale 610 € per il caso italiano approvato; casi esteri coerenti con la matrice.
-- I controlli attuali `unit_amount` e `amount_total` a 50000 centesimi vanno
-  separati in imponibile, imposta e totale verificati lato server.
+- Implementato: imponibile 50000 distinto da imposta e totale verificati lato server;
+  la vecchia verifica a 50000 resta solo per gli acquisti legacy senza dati fiscali.
 - Export e re-export idempotenti; import ripetuto non crea una seconda fattura.
 - Numerazione condivisa con un'emissione manuale concorrente in FIC.
-- Verificato: rimborsi parziali da 1 centesimo fino a 499,99 € sul totale attuale
-  di 500 € lasciano attiva la campagna; webhook firmati duplicati, riconciliazione,
+- Verificato: rimborsi parziali da 1 centesimo fino a 609,99 € sul caso italiano
+  di 610 € lasciano attiva la campagna, incluso un rimborso di 500 €; webhook firmati duplicati, riconciliazione,
   rimborsi cumulativi integrali, eventi fuori ordine, campagne scadute e
   contestazioni non cambiano le date né duplicano gli eventi di attivazione.
 - Intervalli sovrapposti, frazioni di giorno, cambio ora legale, campagne già

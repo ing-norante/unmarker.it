@@ -1,3 +1,4 @@
+import { billingDefaults } from "../../src/lib/sponsorBilling";
 import { createConsent } from "../../src/lib/consentPolicy";
 import {
   afterAll,
@@ -30,6 +31,9 @@ import {
 import { handleSponsorRequest } from "./http";
 
 const fake = vi.hoisted(() => ({
+  customers: new Map<string, Stripe.CustomerCreateParams>(),
+  verification: "verified" as string,
+  taxRegistered: true,
   sessions: new Map<string, Stripe.Checkout.Session>(),
   events: [] as Stripe.Event[],
   creates: 0,
@@ -44,7 +48,36 @@ vi.mock("./config.ts", async (importOriginal) => {
     ...original,
     getConfig: () => ({ ...original.getConfig(), live: fake.analyticsLive }),
     getStripe: () => ({
-      customers: { create: async () => ({ id: `cus_${randomUUID()}` }) },
+      customers: {
+        create: async (params: Stripe.CustomerCreateParams) => {
+          const id = `cus_${randomUUID()}`;
+          fake.customers.set(id, params);
+          return { id };
+        },
+        listTaxIds: async (id: string) => ({
+          data:
+            fake.customers.get(id)?.tax_id_data?.map((t) => ({
+              ...t,
+              verification: { status: fake.verification },
+            })) ?? [],
+        }),
+      },
+      products: {
+        retrieve: async () => ({ id: "prod_test", tax_code: "txcd_10701000" }),
+      },
+      tax: {
+        settings: {
+          retrieve: async () => ({
+            status: "active",
+            head_office: { address: { country: "IT" } },
+          }),
+        },
+        registrations: {
+          list: async () => ({
+            data: fake.taxRegistered ? [{ country: "IT" }] : [],
+          }),
+        },
+      },
       prices: {
         retrieve: async (id: string) => ({
           id,
@@ -52,6 +85,8 @@ vi.mock("./config.ts", async (importOriginal) => {
           type: "one_time",
           currency: "eur",
           unit_amount: 50000,
+          product: "prod_test",
+          tax_behavior: "exclusive",
           livemode: false,
         }),
       },
@@ -75,12 +110,35 @@ vi.mock("./config.ts", async (importOriginal) => {
               status: "open",
               payment_status: "unpaid",
               currency: "eur",
-              amount_total: 50000,
+              amount_total: params.automatic_tax?.enabled ? 61000 : 50000,
+              amount_subtotal: 50000,
+              automatic_tax: {
+                enabled: !!params.automatic_tax?.enabled,
+                status: "complete",
+              },
+              total_details: {
+                amount_tax: params.automatic_tax?.enabled ? 11000 : 0,
+                amount_discount: 0,
+                amount_shipping: 0,
+              },
+              customer_details: {
+                name: "Test Business",
+                email: "billing@example.com",
+                address: { country: "IT" },
+              },
               livemode: false,
               url: "https://checkout.stripe.com/c/pay/test",
               expires_at: params.expires_at,
               line_items: {
-                data: [{ price: { id: "price_test" }, quantity: 1 }],
+                data: [
+                  {
+                    price: { id: "price_test", tax_behavior: "exclusive" },
+                    quantity: 1,
+                    amount_subtotal: 50000,
+                    amount_total: params.automatic_tax?.enabled ? 61000 : 50000,
+                    taxes: [],
+                  },
+                ],
               },
               payment_intent: null,
             } as unknown as Stripe.Checkout.Session;
@@ -143,6 +201,9 @@ describe.skipIf(!connection)(
         "TRUNCATE sponsor_buyers, sponsor_purchases, sponsor_webhook_receipts, sponsor_analytics_outbox, sponsor_rate_limits CASCADE",
       );
       fake.sessions.clear();
+      fake.customers.clear();
+      fake.verification = "verified";
+      fake.taxRegistered = true;
       fake.events = [];
       fake.creates = 0;
       fake.failRetrieve = false;
@@ -178,6 +239,23 @@ describe.skipIf(!connection)(
         new File([new Uint8Array(png)], "icon.png", { type: "image/png" }),
       );
       data.set("requestId", requestId);
+      data.set(
+        "billing",
+        JSON.stringify({
+          ...billingDefaults,
+          legalName: "Test Business",
+          email: "billing@example.com",
+          taxId: "IT12345678903",
+          fiscalCode: "12345678903",
+          line1: "Via Roma 1",
+          city: "Firenze",
+          postalCode: "50121",
+          region: "FI",
+          businessPurchase: true,
+          termsAccepted: true,
+          clausesAccepted: true,
+        }),
+      );
       return data;
     }
     async function order() {
@@ -191,7 +269,7 @@ describe.skipIf(!connection)(
         id: `pi_${randomUUID()}`,
         status: "succeeded",
         currency: "eur",
-        amount_received: 50000,
+        amount_received: session.amount_total,
         created: when - 3600,
         latest_charge: { paid: true, amount_refunded: 0, disputed: false },
       } as Stripe.PaymentIntent;
@@ -224,6 +302,121 @@ describe.skipIf(!connection)(
       );
     }
 
+    it("rejects missing billing data, consumer purchases and missing specific approval", async () => {
+      for (const change of ["missing", "businessPurchase", "clausesAccepted"]) {
+        const owner = await buyer();
+        const data = form();
+        if (change === "missing") data.delete("billing");
+        else {
+          const b = JSON.parse(String(data.get("billing")));
+          b[change] = false;
+          data.set("billing", JSON.stringify(b));
+        }
+        await expect(
+          reservePurchase(owner.id, data, randomUUID()),
+        ).rejects.toMatchObject({ code: "invalid_billing" });
+      }
+      expect(fake.creates).toBe(0);
+    });
+    it("requires an active Italian tax registration before creating Checkout", async () => {
+      fake.taxRegistered = false;
+      const owner = await buyer();
+      const p = await reservePurchase(owner.id, form(), randomUUID());
+      await expect(ensureCheckout(p.id, owner.id)).rejects.toMatchObject({
+        code: "billing_unavailable",
+      });
+      expect(fake.creates).toBe(0);
+      expect((await cancelPurchase(p.id, owner.id)).status).toBe("cancelled");
+    });
+    it("waits for EU VAT verification before payment and supports a retry", async () => {
+      const owner = await buyer();
+      const data = form();
+      const b = JSON.parse(String(data.get("billing")));
+      Object.assign(b, {
+        country: "DE",
+        taxId: "DE123456789",
+        fiscalCode: "",
+        city: "Berlin",
+        postalCode: "10115",
+        region: "BE",
+      });
+      data.set("billing", JSON.stringify(b));
+      const p = await reservePurchase(owner.id, data, randomUUID());
+      fake.verification = "pending";
+      await expect(ensureCheckout(p.id, owner.id)).rejects.toMatchObject({
+        code: "tax_verification_pending",
+      });
+      expect(fake.creates).toBe(0);
+      expect(fake.customers.size).toBe(1);
+      fake.verification = "unverified";
+      await expect(ensureCheckout(p.id, owner.id)).rejects.toMatchObject({
+        code: "tax_verification_failed",
+      });
+      fake.verification = "verified";
+      const checkout = await ensureCheckout(p.id, owner.id);
+      expect(checkout.stripe_session_id).toBeTruthy();
+      expect(fake.customers.size).toBe(1);
+      expect(fake.creates).toBe(1);
+    });
+    it("stores a finalized tax and terms snapshot without exposing billing in the catalog", async () => {
+      const { purchase } = await order();
+      pay(purchase.stripe_session_id!);
+      const active = await syncSponsorPurchase(purchase.id);
+      expect(active.status).toBe("active");
+      expect(active.billing_snapshot).toMatchObject({
+        payment: { subtotal: 50000, tax: 11000, total: 61000 },
+        termsVersion: "2026-09-17-draft",
+        specificallyApprovedClauses: [6, 7],
+      });
+      expect(active.terms_accepted_at).toBeInstanceOf(Date);
+      const exposed = JSON.stringify(await catalog());
+      expect(exposed).not.toContain("billing@example.com");
+      expect(exposed).not.toContain("IT12345678903");
+      fake.sessions.get(purchase.stripe_session_id!)!.customer_details!.name =
+        "Later customer change";
+      expect((await syncSponsorPurchase(purchase.id)).billing_snapshot).toEqual(
+        active.billing_snapshot,
+      );
+    });
+    it("rejects a paid Italian checkout with missing VAT even if the total matches its payment", async () => {
+      const { purchase } = await order();
+      const session = fake.sessions.get(purchase.stripe_session_id!)!;
+      session.amount_total = 50000;
+      session.total_details!.amount_tax = 0;
+      session.line_items!.data[0].amount_total = 50000;
+      pay(session.id);
+      await expect(syncSponsorPurchase(purchase.id)).rejects.toMatchObject({
+        code: "payment_mismatch",
+      });
+    });
+    it("continues reconciling purchases created before fiscal data collection", async () => {
+      const { owner, purchase } = await order();
+      const session = fake.sessions.get(purchase.stripe_session_id!)!;
+      await database().query(
+        "UPDATE sponsor_buyers SET stripe_customer_id=$2 WHERE id=$1",
+        [owner.id, session.customer],
+      );
+      await database().query(
+        "UPDATE sponsor_purchases SET billing_details=NULL,stripe_customer_id=NULL,stripe_price_id=NULL,billing_snapshot=NULL WHERE id=$1",
+        [purchase.id],
+      );
+      session.amount_total = 50000;
+      session.automatic_tax.enabled = false;
+      pay(session.id);
+      expect((await syncSponsorPurchase(purchase.id)).status).toBe("active");
+    });
+    it("does not reuse a browser's billing identity for its next purchase", async () => {
+      const { owner, purchase } = await order();
+      pay(purchase.stripe_session_id!);
+      await syncSponsorPurchase(purchase.id);
+      const data = form();
+      const b = JSON.parse(String(data.get("billing")));
+      b.legalName = "Another business";
+      data.set("billing", JSON.stringify(b));
+      const second = await reservePurchase(owner.id, data, randomUUID());
+      await ensureCheckout(second.id, owner.id);
+      expect(fake.customers.size).toBe(2);
+    });
     it("validates icon bytes, strips source metadata and rejects SVG", async () => {
       const icon = await normalizeIcon(png);
       expect((await sharp(icon).metadata()).format).toBe("webp");
@@ -502,7 +695,7 @@ describe.skipIf(!connection)(
       await processWebhook(event);
       const session = fake.sessions.get(purchase.stripe_session_id!)!;
       const pi = session.payment_intent as Stripe.PaymentIntent;
-      (pi.latest_charge as Stripe.Charge).amount_refunded = 50000;
+      (pi.latest_charge as Stripe.Charge).amount_refunded = 61000;
       await processWebhook({
         ...event,
         id: "evt_late_checkout",
@@ -512,7 +705,7 @@ describe.skipIf(!connection)(
       expect((await syncSponsorPurchase(purchase.id)).status).toBe("refunded");
       expect((await catalog()).sponsors).toHaveLength(0);
     });
-    it.each([1, 5000, 49999])(
+    it.each([1, 5000, 50000, 60999])(
       "keeps a campaign and its slot after a partial refund of %i cents",
       async (amountRefunded) => {
         const { purchase } = await order();
@@ -591,7 +784,7 @@ describe.skipIf(!connection)(
       await processWebhook(partialEvent);
       expect((await syncSponsorPurchase(purchase.id)).status).toBe("active");
 
-      charge.amount_refunded = 50000;
+      charge.amount_refunded = 61000;
       // A missed full-refund webhook is recovered by reconciliation.
       expect(await reconcilePurchases()).toEqual({ synced: 1, failures: [] });
       await processWebhook(partialEvent);

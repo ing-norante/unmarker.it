@@ -19,6 +19,7 @@ import {
   createSponsorCheckout,
   getSponsorPurchases,
   cancelSponsorPurchase,
+  getSponsorPurchase,
 } from "@/lib/sponsorApi";
 import {
   sponsorCreativeSchema,
@@ -27,6 +28,8 @@ import {
 } from "@/lib/sponsorPurchase";
 import { trackSponsorEvent } from "@/lib/analytics";
 import { sponsorship } from "@/lib/sponsors";
+import SponsorBillingForm from "./SponsorBillingForm";
+import { billingDefaults, type SponsorBilling } from "@/lib/sponsorBilling";
 
 export default function SponsorBookingForm({
   checkoutEnabled,
@@ -37,6 +40,9 @@ export default function SponsorBookingForm({
 }) {
   const { t, i18n } = useTranslation("common");
   const id = useId();
+  const [billingStep, setBillingStep] = useState(false);
+  const [billingDraft, setBillingDraft] = useState(billingDefaults);
+  const billingRef = useRef<SponsorBilling | null>(null);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<SponsorPurchaseStatus | null>(null);
@@ -54,11 +60,12 @@ export default function SponsorBookingForm({
     });
   const findPending = async () => {
     try {
-      setPending(
+      const purchase =
         (await getSponsorPurchases()).find((p) =>
           ["pending", "creating", "attention"].includes(p.status),
-        ) ?? null,
-      );
+        ) ?? null;
+      setPending(purchase);
+      if (purchase) setBillingStep(false);
     } catch {
       /* Main submit shows actionable errors. */
     }
@@ -112,12 +119,18 @@ export default function SponsorBookingForm({
     },
     onSubmit: async ({ value }) => {
       setError(null);
+      if (!billingStep) {
+        setBillingStep(true);
+        return;
+      }
+      if (!billingRef.current) return;
       try {
         const data = new FormData();
         for (const key of ["name", "url", "description"] as const)
           data.set(key, value[key]);
         data.set("icon", value.icon!);
         data.set("requestId", requestId);
+        data.set("billing", JSON.stringify(billingRef.current));
         const purchase = await createSponsorCheckout(data);
         if (!purchase.checkoutUrl) {
           setPending(purchase);
@@ -136,6 +149,23 @@ export default function SponsorBookingForm({
       }
     },
   });
+  if (billingStep)
+    return (
+      <SponsorBillingForm
+        initial={billingDraft}
+        error={error}
+        onBack={(draft) => {
+          setBillingDraft(draft);
+          setBillingStep(false);
+          setError(null);
+        }}
+        onSubmit={async (billing) => {
+          billingRef.current = billing;
+          setBillingDraft(billing);
+          await form.handleSubmit();
+        }}
+      />
+    );
   return (
     <form
       onSubmit={(e) => {
@@ -221,7 +251,7 @@ export default function SponsorBookingForm({
                     name="icon"
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
-                    required
+                    required={!field.state.value}
                     aria-invalid={invalid}
                     aria-describedby={`${id}-icon-help`}
                     onBlur={field.handleBlur}
@@ -242,6 +272,9 @@ export default function SponsorBookingForm({
                     }}
                   />
                   <FieldDescription id={`${id}-icon-help`}>
+                    {field.state.value && (
+                      <span className="block">{field.state.value.name}</span>
+                    )}
                     {t("sponsors.form.iconHint")}
                   </FieldDescription>
                   {invalid && (
@@ -298,11 +331,37 @@ export default function SponsorBookingForm({
                     </a>
                   </Button>
                 )}
+                {!pending.checkoutUrl && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={cancelling}
+                    onClick={async () => {
+                      setError(null);
+                      try {
+                        const result = await getSponsorPurchase(pending.id);
+                        setPending(result);
+                        if (result.checkoutUrl)
+                          window.location.assign(result.checkoutUrl);
+                        if (result.status === "cancelled") {
+                          setPending(null);
+                          setRequestId(crypto.randomUUID());
+                        }
+                      } catch (e) {
+                        setError(
+                          e instanceof Error ? e.message : "temporary_error",
+                        );
+                      }
+                    }}
+                  >
+                    {t("sponsors.billing.retry")}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={cancelling || !pending.checkoutUrl}
+                  disabled={cancelling}
                   onClick={async () => {
                     setCancelling(true);
                     try {
@@ -368,7 +427,7 @@ export default function SponsorBookingForm({
               {t(
                 submitting
                   ? "sponsors.preparingCheckout"
-                  : "sponsors.payWithStripe",
+                  : "sponsors.billing.next",
                 { price },
               )}
             </Button>

@@ -51,3 +51,10 @@ CREATE TABLE IF NOT EXISTS sponsor_analytics_outbox (
 -- Existing purchases have no recorded consent: they are ineligible for analytics.
 ALTER TABLE sponsor_buyers ADD COLUMN IF NOT EXISTS analytics_consent jsonb;
 ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS analytics_consent_at bigint;
+
+-- Purchase-scoped snapshots, never exposed by the catalog or analytics.
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS billing_details jsonb;
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS stripe_customer_id text;
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS billing_snapshot jsonb;
+ALTER TABLE sponsor_purchases ADD COLUMN IF NOT EXISTS stripe_price_id text;

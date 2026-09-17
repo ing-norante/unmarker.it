@@ -41,6 +41,7 @@
     "sponsors:db:up": "docker compose -p unmarker-sponsors-5486 -f compose.sponsors.yml up -d --wait",
     "sponsors:db:migrate": "node --env-file=.env --import tsx scripts/sponsors-db.ts",
     "sponsors:api": "node --env-file=.env --import tsx scripts/sponsors-api.ts",
+    "sponsors:billing:export": "node --env-file=.env --import tsx scripts/sponsors-billing-export.ts",
     "sponsors:reconcile": "node --env-file=.env --import tsx scripts/sponsors-reconcile.ts",
     "sponsors:stripe:setup": "node --env-file=.env --import tsx scripts/sponsors-stripe-setup.ts",
     "sponsors:stripe:listen": "node --env-file=.env scripts/sponsors-stripe-listen.mjs",
