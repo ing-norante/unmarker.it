@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { openCookiePreferences } from "@/lib/cookieConsent";
 import { legalDocuments } from "@/lib/legalDocuments";
 import { GithubLogoIcon } from "@phosphor-icons/react";
@@ -112,14 +113,15 @@ export function Footer() {
               </li>
             ))}
           </ul>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             data-cookie-preferences
-            className={linkClassName}
+            className="h-auto min-h-11 justify-start px-0 py-2"
             onClick={openCookiePreferences}
           >
             {t("consent.preferences")}
-          </button>
+          </Button>
           <p
             id="footer-legal-notice"
             className="text-muted-foreground mt-3 text-xs leading-5"

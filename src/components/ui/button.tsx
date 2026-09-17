@@ -6,20 +6,20 @@ import { Slot } from "radix-ui";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 rounded-none cursor-pointer items-center justify-center border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/95",
         outline:
-          "border-border bg-background hover:bg-input/50 hover:text-foreground aria-expanded:text-foreground",
+          "border-primary bg-background text-primary-text hover:bg-primary/10 aria-expanded:bg-primary/10",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "border-primary bg-background text-primary-text hover:bg-primary/10 aria-expanded:bg-primary/10",
         ghost:
-          "hover:bg-muted/50 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
+          "bg-transparent text-primary-text underline underline-offset-4 hover:decoration-2 aria-expanded:decoration-2",
         destructive:
           "bg-destructive/10 text-destructive-text hover:bg-destructive/30",
-        link: "text-primary-text underline-offset-4 hover:underline",
+        link: "bg-transparent text-primary-text underline underline-offset-4 hover:decoration-2",
       },
       size: {
         default:
