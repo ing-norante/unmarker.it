@@ -1,6 +1,6 @@
 # Documenti legali e amministrativi Unmarker
 
-Versione v1.0.0, efficacia 18 settembre 2026. Testi predisposti per le pagine
+Versione v1.0.0, efficacia 16 settembre 2026. Testi predisposti per le pagine
 pubbliche `/legal/*`, con condizioni commerciali approvate dal titolare.
 La pubblicazione locale non equivale a un deployment in produzione.
 

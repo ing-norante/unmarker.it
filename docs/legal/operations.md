@@ -1,6 +1,6 @@
 # Pubblicazione v1.0.0 e gestione minima
 
-Data confermata dal titolare: **18 settembre 2026**. Le condizioni commerciali
+Data confermata dal titolare: **16 settembre 2026**. Le condizioni commerciali
 sono approvate dal titolare. Questo registro interno non è una pagina pubblica.
 
 ## Confini della verifica

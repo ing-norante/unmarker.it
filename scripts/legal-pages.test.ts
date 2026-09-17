@@ -15,7 +15,7 @@ describe("published legal documents", () => {
       expect(html).toContain('href="/assets/site.css"');
       expect(html).not.toContain("<script");
       expect(html).not.toMatch(/BOZZA|DA COMPLETARE|DA VERIFICARE/);
-      expect(html).toContain("18 settembre 2026");
+      expect(html).toContain("16 settembre 2026");
     }
     expect(legalPages).toHaveLength(Object.keys(legalDocuments).length);
     expect(await renderLegalPage("unknown", [])).toBeNull();
