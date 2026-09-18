@@ -104,10 +104,11 @@ describe.each(["en", "zh-Hans"] as const)(
 
     it("exposes one named image-selection action with associated instructions", async () => {
       const { html, i18n } = await renderLocalized(
-        <ImageUploader onImageSelect={() => {}} />,
+        <ImageUploader onImagesSelect={() => {}} />,
         locale,
       );
       expect(html.match(/<button\b/g)).toHaveLength(1);
+      expect(html).toMatch(/<input\b[^>]*multiple=""/);
       expect(html).not.toContain('role="button"');
       expect(html).toContain(
         `aria-label="${i18n.t("common:actions.chooseImage")}"`,
@@ -120,7 +121,7 @@ describe.each(["en", "zh-Hans"] as const)(
 
     it("disables both the image-selection action and its file input", async () => {
       const { html } = await renderLocalized(
-        <ImageUploader disabled onImageSelect={() => {}} />,
+        <ImageUploader disabled onImagesSelect={() => {}} />,
         locale,
       );
       expect(html).toMatch(/<button\b[^>]*disabled=""/);

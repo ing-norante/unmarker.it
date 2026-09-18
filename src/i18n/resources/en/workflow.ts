@@ -1,4 +1,6 @@
+import { batch, c2pa } from "./batch";
 export const workflow = {
+  batch, c2pa,
   phase: {
     idle: { title: "Ready", label: "idle", description: "Choose an image to analyze it and start processing." },
     "preflight-scanning": { title: "Analyzing", label: "analyzing", description: "Reading metadata and checking for visible Gemini-style marks." },
@@ -79,7 +81,8 @@ export const workflow = {
       risk: { label: "Hidden watermarks may be present", description: "Invisible AI watermark signals may exist even when no metadata marker is present." },
     },
     score: {
-      strong: { label: "Strong local AI evidence", description: "Local provenance or C2PA-style AI metadata was found in the file." },
+      credentials: { label: "Content Credentials found", description: "Credentials alone do not establish AI origin. Review the declared origin and local verification below." },
+      strong: { label: "Strong local AI evidence", description: "An explicit AI generation or editing declaration was found locally. This is a declaration, not proof of how the pixels were created." },
       metadata: { label: "AI metadata signals found", description: "Local metadata markers suggest this image passed through an AI generation workflow." },
       visible: { label: "Visible AI watermark evidence", description: "A Gemini-style visible watermark was detected locally. No strong metadata provenance was found." },
       none: { label: "No local AI signals found", description: "This does not prove the image is human-made; it only means local metadata and visible watermark checks found no AI signal." },
@@ -153,6 +156,13 @@ export const workflow = {
     cleanupFailed: "Could not clean metadata.",
   },
   warnings: {
+    preflightMetadata: "Input metadata could not be fully checked.",
+    visibleRestore: "The Gemini repair did not finish. Image processing continued without that repair.",
+    pixelWorkerFallback: "Background processing was unavailable; this image used the browser fallback.",
+    residualVisible: "A Gemini mark is still detected in the output. Inspect the image before using it.",
+    residualMetadata: "Metadata signals remain in the output. Review the output analysis.",
+    metadataCoverage: "Metadata coverage is incomplete. Some structures could not be fully inspected.",
+
     postflightMetadata: "Metadata in the output could not be fully checked.",
     postflightVisible: "The output could not be fully checked for a Gemini watermark.",
     visibleScan: "The image could not be fully checked for a Gemini watermark.",

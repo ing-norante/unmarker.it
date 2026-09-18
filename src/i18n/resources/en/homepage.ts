@@ -10,10 +10,10 @@ export const homepage = {
   },
   workflowHeading: "WORKFLOW",
   uploader: {
-    title: "Add an image",
+    title: "Add images",
     dragging: "Drop your image",
     description:
-      "Choose or drop an image to analyze it and start processing automatically when supported.",
+      "Choose or drop images to analyze it and start processing automatically when supported.",
     defaultDescription: "Drop it here, or click to select a file from your device.",
     privacy: "Your image is processed in this browser and is never uploaded.",
   },

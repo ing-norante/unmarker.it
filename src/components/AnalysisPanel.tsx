@@ -1,8 +1,4 @@
-import {
-  CircleNotchIcon,
-  EyeIcon,
-  QuestionIcon,
-} from "@phosphor-icons/react";
+import { CircleNotchIcon, EyeIcon, QuestionIcon } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -11,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MetadataSignalsList } from "@/components/MetadataSignalsList";
 import type { ImageAuditResult, WorkflowPhase } from "@/lib/types";
@@ -31,60 +26,33 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
 
   return (
     <div className="grid min-w-0 gap-4 @min-[52rem]/comparison:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <Card className="@container/panel min-w-0 bg-card/95">
+      <Card className="bg-card/95 @container/panel min-w-0">
         <CardHeader>
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 [&>div]:flex-1 [&>div]:basis-48">
             <div>
               <CardTitle>{t("workflow:analysis.provenance")}</CardTitle>
-              <CardDescription>{t(`workflow:audit.score.${audit.aiScore.kind}.description`)}</CardDescription>
+              <CardDescription>
+                {t(`workflow:audit.score.${audit.aiScore.kind}.description`)}
+              </CardDescription>
             </div>
-            <Badge variant={scoreBadgeVariant(audit.aiScore.confidence)}>
-              {audit.aiScore.kind === "incomplete"
-                ? t("common:generic.partial")
-                : t(`common:confidence.${audit.aiScore.confidence}`)}
-            </Badge>
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">
-            <div>
-              {audit.aiScore.percentage !== null && (
-                <p className="text-4xl leading-none font-black tabular-nums">
-                  {audit.aiScore.percentage}%
-                </p>
-              )}
-              <p className="text-muted-foreground text-ui-body">
-                {t(`workflow:audit.score.${audit.aiScore.kind}.label`)}
-              </p>
-            </div>
-            <Badge variant="outline" className="h-auto max-w-full whitespace-normal wrap-anywhere">
-              {audit.aiScore.provider ??
-                (audit.aiScore.kind === "none"
-                  ? t("common:generic.noProvider")
-                  : t("workflow:audit.score.unknownProvider"))}
-            </Badge>
-          </div>
-          {audit.aiScore.percentage !== null && (
-            <Progress
-              role="meter"
-              value={audit.aiScore.percentage}
-              aria-label={t("workflow:analysis.provenance")}
-            />
+          <p className="text-lg font-bold">
+            {t(`workflow:audit.score.${audit.aiScore.kind}.label`)}
+          </p>
+          {audit.aiScore.provider && (
+            <Badge variant="outline">{audit.aiScore.provider}</Badge>
           )}
-          <div className="flex flex-col gap-2">
+          <ul className="text-muted-foreground space-y-2 text-base leading-relaxed wrap-anywhere">
             {audit.aiScore.evidence.slice(0, 4).map((item) => (
-              <p
-                key={messageId(item)}
-                className="bg-muted/40 text-muted-foreground border p-2 text-base leading-relaxed wrap-anywhere"
-              >
-                {translateMessage(t, item)}
-              </p>
+              <li key={messageId(item)}>{translateMessage(t, item)}</li>
             ))}
-          </div>
+          </ul>
         </CardContent>
       </Card>
 
-      <Card className="@container/panel min-w-0 bg-card/95">
+      <Card className="bg-card/95 @container/panel min-w-0">
         <CardHeader>
           <CardTitle>{t("workflow:analysis.watermarkScan")}</CardTitle>
           <CardDescription>
@@ -95,19 +63,30 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
           <SignalStatus
             icon="visible"
             title={t("workflow:analysis.visible")}
-            label={t(`workflow:audit.visible.${visibleKey(audit.visibleWatermark.status)}.label`)}
-            description={t(`workflow:audit.visible.${visibleKey(audit.visibleWatermark.status)}.description`)}
+            label={t(
+              `workflow:audit.visible.${visibleKey(audit.visibleWatermark.status)}.label`,
+            )}
+            description={t(
+              `workflow:audit.visible.${visibleKey(audit.visibleWatermark.status)}.description`,
+            )}
             tone={visibleTone(audit)}
-            badge={formatConfidence(audit.visibleWatermark.confidence, t("common:generic.notScanned"))}
+            badge={formatConfidence(
+              audit.visibleWatermark.confidence,
+              t("common:generic.notScanned"),
+            )}
           />
           <SignalStatus
             icon="hidden"
             title={t("workflow:analysis.hidden")}
-            label={t(`workflow:audit.hidden.${audit.hiddenWatermark.status === "neutralized-unverified" ? "neutralized" : "risk"}.label`)}
-            description={t(`workflow:audit.hidden.${audit.hiddenWatermark.status === "neutralized-unverified" ? "neutralized" : "risk"}.description`)}
+            label={t(
+              `workflow:audit.hidden.${audit.stage === "postflight" ? "neutralized" : "risk"}.label`,
+            )}
+            description={t(
+              `workflow:audit.hidden.${audit.stage === "postflight" ? "neutralized" : "risk"}.description`,
+            )}
             tone="neutral"
             badge={
-              audit.hiddenWatermark.status === "neutralized-unverified"
+              audit.stage === "postflight"
                 ? t("common:generic.processed")
                 : t("common:generic.pending")
             }
@@ -115,14 +94,62 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
         </CardContent>
       </Card>
 
-      <Card className="min-w-0 bg-card/95 @min-[52rem]/comparison:col-span-2">
+      {audit.metadataScan?.c2pa && (
+        <Card className="bg-card/95 min-w-0 @min-[52rem]/comparison:col-span-2">
+          <CardHeader>
+            <CardTitle>{t("workflow:c2pa.title")}</CardTitle>
+            <CardDescription>{t("workflow:c2pa.description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <Badge variant="outline">
+              {t(`workflow:c2pa.presence.${audit.metadataScan.c2pa.presence}`)}
+            </Badge>
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-muted-foreground text-sm">
+                  {t("workflow:c2pa.originLabel")}
+                </dt>
+                <dd>
+                  {t(`workflow:c2pa.origin.${audit.metadataScan.c2pa.origin}`)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-sm">
+                  {t("workflow:c2pa.integrityLabel")}
+                </dt>
+                <dd>
+                  {t(
+                    `workflow:c2pa.integrity.${audit.metadataScan.c2pa.integrity}`,
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-sm">
+                  {t("workflow:c2pa.trustLabel")}
+                </dt>
+                <dd>{t("workflow:c2pa.trust")}</dd>
+              </div>
+            </dl>
+            <ul className="text-muted-foreground space-y-1 text-sm">
+              {audit.metadataScan.c2pa.reasons.map((reason) => (
+                <li key={reason}>{t(`workflow:c2pa.reason.${reason}`)}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="bg-card/95 min-w-0 @min-[52rem]/comparison:col-span-2">
         <CardHeader>
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 [&>div]:flex-1 [&>div]:basis-48">
             <div>
               <CardTitle>{t("workflow:analysis.metadata")}</CardTitle>
               <CardDescription>
                 {audit.metadataScan
-                  ? t("workflow:analysis.metadataCount", { count: audit.metadataScan.signals.length, format: audit.metadataScan.format.toUpperCase() })
+                  ? t("workflow:analysis.metadataCount", {
+                      count: audit.metadataScan.signals.length,
+                      format: audit.metadataScan.format.toUpperCase(),
+                    })
                   : t("workflow:analysis.metadataUnavailable")}
               </CardDescription>
             </div>
@@ -137,7 +164,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
       </Card>
 
       {audit.warnings.length > 0 && (
-        <Card className="min-w-0 bg-card/95 @min-[52rem]/comparison:col-span-2">
+        <Card className="bg-card/95 min-w-0 @min-[52rem]/comparison:col-span-2">
           <CardHeader>
             <CardTitle>{t("workflow:analysis.warnings")}</CardTitle>
           </CardHeader>
@@ -162,7 +189,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
 function AnalysisSkeleton({ phase }: { phase: WorkflowPhase }) {
   const { t } = useTranslation("workflow");
   return (
-    <Card className="@container/panel min-w-0 bg-card/95">
+    <Card className="bg-card/95 @container/panel min-w-0">
       <CardHeader>
         <div className="flex items-center gap-3">
           <CircleNotchIcon className="text-muted-foreground animate-spin" />
@@ -172,9 +199,7 @@ function AnalysisSkeleton({ phase }: { phase: WorkflowPhase }) {
                 ? t("analysis.analyzing")
                 : t("analysis.waiting")}
             </CardTitle>
-            <CardDescription>
-              {t("analysis.reading")}
-            </CardDescription>
+            <CardDescription>{t("analysis.reading")}</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -215,9 +240,7 @@ function SignalStatus({
         <p className="text-foreground text-base leading-snug font-bold text-balance">
           {label}
         </p>
-        <p className="text-muted-foreground text-ui-body mt-1">
-          {description}
-        </p>
+        <p className="text-muted-foreground text-ui-body mt-1">{description}</p>
       </div>
     </div>
   );
@@ -237,7 +260,13 @@ function visibleTone(audit: ImageAuditResult) {
 }
 
 function visibleKey(status: ImageAuditResult["visibleWatermark"]["status"]) {
-  return status === "not-scanned" ? "notScanned" : status === "scan-failed" ? "failed" : status === "detected" ? "detected" : "clear";
+  return status === "not-scanned"
+    ? "notScanned"
+    : status === "scan-failed"
+      ? "failed"
+      : status === "detected"
+        ? "detected"
+        : "clear";
 }
 
 function formatConfidence(confidence: number | null, notScanned: string) {
@@ -246,20 +275,6 @@ function formatConfidence(confidence: number | null, notScanned: string) {
   }
 
   return `${Math.round(confidence * 100)}%`;
-}
-
-function scoreBadgeVariant(
-  confidence: ImageAuditResult["aiScore"]["confidence"],
-) {
-  if (confidence === "high") {
-    return "destructive";
-  }
-
-  if (confidence === "medium") {
-    return "secondary";
-  }
-
-  return "outline";
 }
 
 function statusBadgeVariant(tone: "ok" | "warning" | "danger" | "neutral") {

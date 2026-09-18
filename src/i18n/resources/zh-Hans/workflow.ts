@@ -1,4 +1,6 @@
+import { batch, c2pa } from "./batch";
 export const workflow = {
+  batch, c2pa,
   phase: {
     idle: { title: "就绪", label: "空闲", description: "选择图片以开始分析和处理。" },
     "preflight-scanning": { title: "正在分析", label: "分析中", description: "正在读取元数据并检查可见的 Gemini 风格标记。" },
@@ -79,6 +81,7 @@ export const workflow = {
       risk: { label: "可能存在隐形水印", description: "即使没有元数据标记，图片中仍可能存在隐形 AI 水印信号。" },
     },
     score: {
+      credentials: { label: "发现内容凭证", description: "凭证本身不能证明 AI 来源。请查看下方声明的来源和本地验证。" },
       strong: { label: "发现强 AI 来源线索", description: "文件中发现了本地来源信息或 C2PA 风格的 AI 元数据。" },
       metadata: { label: "发现 AI 元数据信号", description: "本地元数据标记表明此图片可能经过 AI 生成流程。" },
       visible: { label: "发现可见 AI 水印线索", description: "本地检测到 Gemini 风格的可见水印，但未发现强元数据来源信息。" },
@@ -153,6 +156,13 @@ export const workflow = {
     cleanupFailed: "无法清理元数据。",
   },
   warnings: {
+    preflightMetadata: "无法完整检查输入元数据。",
+    visibleRestore: "Gemini 修复未完成，已继续处理图像。",
+    pixelWorkerFallback: "后台处理不可用，此图像使用了浏览器后备处理。",
+    residualVisible: "输出中仍检测到 Gemini 标记。使用前请检查图像。",
+    residualMetadata: "输出中仍有元数据信号。请查看输出分析。",
+    metadataCoverage: "元数据检查不完整，部分结构未能全面检查。",
+
     postflightMetadata: "未能完成输出文件的元数据检查。",
     postflightVisible: "未能完成输出图片的 Gemini 水印检查。",
     visibleScan: "未能完成图片的 Gemini 水印检查。",

@@ -247,7 +247,7 @@ export const common = {
     reprocess: "Reprocess",
     downloadJpeg: "Download JPEG",
     cleanMetadata: "Clean metadata & download",
-    chooseImage: "Choose image",
+    chooseImage: "Choose images",
   },
   consent: {
     title: "Privacy & statistics",

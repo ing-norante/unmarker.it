@@ -11,16 +11,10 @@ import {
   FilePolicyDetails,
   WorkflowSummary,
 } from "@/components/WorkflowStatus";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  getWorkflowFilePolicy,
-  validateWorkflowFile,
-} from "@/lib/fileValidation";
-import type { StatusMessage } from "@/lib/types";
+import { getWorkflowFilePolicy } from "@/lib/fileValidation";
 import { useTranslation } from "react-i18next";
-import { translateMessage } from "@/i18n/messages";
 import { LocaleSuggestion } from "@/components/LocaleSuggestion";
 import { SponsorLayout } from "@/components/SponsorLayout";
 
@@ -42,35 +36,23 @@ function App() {
 
 function AppContent() {
   const { t } = useTranslation(["homepage", "workflow"]);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [focusUploader, setFocusUploader] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
-    null,
-  );
   const filePolicy = getWorkflowFilePolicy();
-
-  const selectImage = useCallback((file: File) => {
-    const validation = validateWorkflowFile(file);
-    if (!validation.ok) {
-      setStatusMessage(validation.statusMessage);
-      return;
-    }
-
-    setStatusMessage(null);
+  const selectImages = useCallback((files: File[]) => {
     setFocusUploader(false);
-    setSelectedFile(file);
+    setSelectedFiles(files);
   }, []);
 
-  if (selectedFile) {
+  if (selectedFiles.length) {
     return (
       <ChunkErrorBoundary fallback={<ChunkReloadNotice />}>
-        <Suspense fallback={<LoadingShell fileName={selectedFile.name} />}>
+        <Suspense fallback={<LoadingShell fileName={selectedFiles[0].name} />}>
           <WorkflowApp
-            key={`${selectedFile.name}:${selectedFile.size}:${selectedFile.lastModified}`}
-            initialFile={selectedFile}
+            initialFiles={selectedFiles}
             onResetToShell={() => {
               setFocusUploader(true);
-              setSelectedFile(null);
+              setSelectedFiles([]);
             }}
           />
         </Suspense>
@@ -102,24 +84,10 @@ function AppContent() {
             </div>
 
             <section className="sticky-uploader-column order-2 flex min-w-0 flex-col lg:col-start-2 lg:min-h-0">
-              {statusMessage && (
-                <Alert
-                  variant={statusMessage.variant}
-                  className="mb-4 shrink-0"
-                >
-                  <AlertTitle>
-                    <span>{translateMessage(t, statusMessage.title)}</span>
-                  </AlertTitle>
-                  <AlertDescription>
-                    <span>{translateMessage(t, statusMessage.description)}</span>
-                  </AlertDescription>
-                </Alert>
-              )}
-
               <div className="flex min-h-[min(62vh,50rem)] flex-col lg:min-h-[min(70vh,50rem)] lg:flex-1 2xl:min-h-[min(72vh,56rem)]">
                 <ImageUploader
                   autoFocus={focusUploader}
-                  onImageSelect={selectImage}
+                  onImagesSelect={selectImages}
                   accept={filePolicy.accept}
                   title={t("homepage:uploader.title")}
                   description={t("homepage:uploader.description")}
