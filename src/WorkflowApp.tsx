@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useBatchQueue } from "@/hooks/useBatchQueue";
 import { DEFAULT_OPTIONS } from "@/lib/pipeline";
 import { exportBatch } from "@/lib/batch/export";
+import { trackAction } from "@/lib/analytics";
 import { downloadBlob } from "@/lib/downloadBlob";
 
 export default function WorkflowApp({
@@ -77,7 +78,12 @@ export default function WorkflowApp({
               snapshot={snapshot}
               selectedId={selected?.id ?? null}
               onSelect={setSelectedId}
-              onAdd={(files) => queue.add(files, options)}
+              onAdd={(files) => {
+                trackAction("upload_image", "uploader", {
+                  file_count: files.length,
+                });
+                queue.add(files, options);
+              }}
               locked={exporting}
             />
           </div>
@@ -103,7 +109,10 @@ export default function WorkflowApp({
                 <Button
                   variant="ghost"
                   disabled={pending || exporting}
-                  onClick={onResetToShell}
+                  onClick={() => {
+                    trackAction("reset", "action_bar");
+                    onResetToShell();
+                  }}
                 >
                   {t("batch.clear")}
                 </Button>

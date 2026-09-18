@@ -9,6 +9,7 @@ import { WorkflowSummary } from "./WorkflowStatus";
 import { Button } from "./ui/button";
 import { cleanImageMetadata } from "@/lib/metadataCleaner";
 import { useBlobUrl } from "@/hooks/useBlobUrl";
+import { trackAction } from "@/lib/analytics";
 import { downloadBlob } from "@/lib/downloadBlob";
 import { translateMetadataWarning } from "@/i18n/metadata";
 import { translateMessage } from "@/i18n/messages";
@@ -57,6 +58,10 @@ export function BatchResult({
       if (!alive.current) return;
       if (result.removedCount > 0) {
         downloadBlob(result.blob, result.fileName);
+        trackAction("download_metadata_clean", "workflow", {
+          removed_count: result.removedCount,
+          format: result.format,
+        });
         setNotice(
           [
             t("batch.downloadStarted"),
@@ -84,6 +89,7 @@ export function BatchResult({
             <Button
               onClick={() => {
                 downloadBlob(item.result!.output!, item.outputName);
+                trackAction("download_processed", "action_bar");
                 setNotice(t("batch.downloadStarted"));
               }}
             >
@@ -94,7 +100,10 @@ export function BatchResult({
           {["waiting", "running"].includes(item.status) ? (
             <Button
               variant="outline"
-              onClick={() => queue.cancel(item.id)}
+              onClick={() => {
+                trackAction("cancel_processing", "action_bar");
+                queue.cancel(item.id);
+              }}
               disabled={locked}
             >
               {t("batch.cancel")}

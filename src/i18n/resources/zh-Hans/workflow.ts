@@ -82,7 +82,7 @@ export const workflow = {
     },
     score: {
       credentials: { label: "发现内容凭证", description: "凭证本身不能证明 AI 来源。请查看下方声明的来源和本地验证。" },
-      strong: { label: "发现强 AI 来源线索", description: "文件中发现了本地来源信息或 C2PA 风格的 AI 元数据。" },
+      strong: { label: "发现强 AI 来源线索", description: "本地发现了明确的 AI 生成或编辑声明。这是声明，并不能证明像素的实际创作方式。" },
       metadata: { label: "发现 AI 元数据信号", description: "本地元数据标记表明此图片可能经过 AI 生成流程。" },
       visible: { label: "发现可见 AI 水印线索", description: "本地检测到 Gemini 风格的可见水印，但未发现强元数据来源信息。" },
       none: { label: "未发现本地 AI 信号", description: "这不能证明图片由人类创作；只表示本地元数据和可见水印检查未发现 AI 信号。" },
