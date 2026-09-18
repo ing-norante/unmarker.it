@@ -169,6 +169,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.8.0
         version: 1.8.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@contentauth/c2pa-web':
+        specifier: 0.15.1
+        version: 0.15.1
       '@fontsource-variable/geist-mono':
         specifier: ^5.3.0
         version: 5.3.0
@@ -182,14 +185,17 @@ importers:
         specifier: 1.33.5
         version: 1.33.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@techstark/opencv-js':
-        specifier: 4.12.0-release.1
-        version: 4.12.0-release.1
+        specifier: 5.0.0-release.1
+        version: 5.0.0-release.1
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
       cn:
         specifier: ^0.3.0
         version: 0.3.0
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       i18next:
         specifier: ^26.4.2
         version: 26.4.2(typescript@6.0.3)
@@ -461,6 +467,18 @@ packages:
 
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
+
+  '@contentauth/c2pa-types@0.7.4':
+    resolution: {integrity: sha512-lPxm/5yvUqS2LItFMvgfCDWm8yCw9vsW32vrkCPgj4QkzGxQ9WuUkK32eWzsxBL9sCDbCQDNNtFroH6qTaU90w==}
+
+  '@contentauth/c2pa-utilities@0.3.0':
+    resolution: {integrity: sha512-1rlnqnZrfw5IE85JbIPYybIb65l3o8YJzLUAoD4zHNkEZguhM33hCPw5FE1BHHI1VvNmO8qbKZWok6vL84zdiQ==}
+
+  '@contentauth/c2pa-wasm@0.13.0':
+    resolution: {integrity: sha512-GW2eLZVHjfNgNeCu7IPwrLDfXds9VukdH+/9VMl8jvCj5Fxl+c60mFMAa7boNDSef0hiQQWSafG6xENWN45j/w==}
+
+  '@contentauth/c2pa-web@0.15.1':
+    resolution: {integrity: sha512-DMypgxqhzZfC+YrZ/qSHSz+lzH4HqsPoP3mbNFBPSwge8bv4mhEeQ0DzECznPYGYY+HInaOTBfJ2lbVQglqu4w==}
 
   '@csstools/css-calc@2.1.2':
     resolution: {integrity: sha512-TklMyb3uBB28b5uQdxjReG4L80NxAqgrECqLZFQbyLekwwlcDDS8r3f07DKqeo8C4926Br0gf/ZDe17Zv4wIuw==}
@@ -1919,8 +1937,8 @@ packages:
   '@tanstack/store@0.11.1':
     resolution: {integrity: sha512-mzTOBhypOuDJAy/D8n2MfUZ1HFkXnmSETviRyhqEC8LUE7/IZQExOTxMANj3KjTofYTkFNpBY67qaVrT41YccA==}
 
-  '@techstark/opencv-js@4.12.0-release.1':
-    resolution: {integrity: sha512-LtTaph9v/HqLPXEg3m1xs2h7QJh10pUpuDT0nj8g77lelWnTwwQrehtd+fXElLOdrkqc4Fea6Z/sJBvEJLYPfw==}
+  '@techstark/opencv-js@5.0.0-release.1':
+    resolution: {integrity: sha512-PIm+eB0MFtieXoNC2GRao0dv/02sehG+Nv2nSW5D6pQm6J/4WqvDHm0RyoqOmGYQm67jdGiaOdIeTShCY3PIUg==}
 
   '@ts-morph/common@0.27.0':
     resolution: {integrity: sha512-Wf29UqxWDpc+i61k3oIOzcUfQt79PIT9y/MWfAGlrkjg6lBC1hwDECLXPVJAhWjiGbfBCxZd65F/LIZF3+jeJQ==}
@@ -2579,6 +2597,9 @@ packages:
   fflate@0.4.9:
     resolution: {integrity: sha512-zdxgIEddhfsyCaWpJ2SdXEP8ZMrKJ6+5jl4OupODcywU0IhRk6gdXuVGcPICyfx2H97hVK7xmJtRLPjkxAX8Vw==}
 
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
+
   figures@6.1.0:
     resolution: {integrity: sha512-d+l3qxjSesT4V7v2fh+QnmFnUWv9lSpjarhShNTgBOfA0ttejbQUAlHLitbjkoRiDulW0OPoQPYIGhIC8ohejg==}
     engines: {node: '>=18'}
@@ -2702,6 +2723,9 @@ packages:
 
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
+
+  highgain@0.1.0:
+    resolution: {integrity: sha512-Vw/g2upw4MYLZ9e95k79+idMoPFEKvTQVTce9LCDfI+T6AiG+SdiR4WDKszB1grQy0O+uhxd6cqbdi3VhECdbA==}
 
   hono@4.13.8:
     resolution: {integrity: sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ==}
@@ -3846,6 +3870,10 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4'
 
+  ts-deepmerge@8.0.0:
+    resolution: {integrity: sha512-133O+10nJmVI8w5xeVZPEv5PIrv7iaUae07wv1aH8XJH95Ur6YIhWAPhPyP1YPlbPS9fCVcNIZTu7m8urRVF0A==}
+    engines: {node: '>=14.13.1'}
+
   ts-morph@26.0.0:
     resolution: {integrity: sha512-ztMO++owQnz8c/gIENcM9XfCEzgoGphTv+nKpYNM1bgsdOVC/jRZuEBf6N+mLLDNg68Kl+GgUZfOySaRiG1/Ug==}
 
@@ -4350,6 +4378,22 @@ snapshots:
     dependencies:
       hashery: 1.5.1
       keyv: 5.6.0
+
+  '@contentauth/c2pa-types@0.7.4': {}
+
+  '@contentauth/c2pa-utilities@0.3.0':
+    dependencies:
+      '@contentauth/c2pa-types': 0.7.4
+      ts-deepmerge: 8.0.0
+
+  '@contentauth/c2pa-wasm@0.13.0': {}
+
+  '@contentauth/c2pa-web@0.15.1':
+    dependencies:
+      '@contentauth/c2pa-types': 0.7.4
+      '@contentauth/c2pa-utilities': 0.3.0
+      '@contentauth/c2pa-wasm': 0.13.0
+      highgain: 0.1.0
 
   '@csstools/css-calc@2.1.2(@csstools/css-parser-algorithms@3.0.4(@csstools/css-tokenizer@3.0.3))(@csstools/css-tokenizer@3.0.3)':
     dependencies:
@@ -5676,7 +5720,7 @@ snapshots:
 
   '@tanstack/store@0.11.1': {}
 
-  '@techstark/opencv-js@4.12.0-release.1': {}
+  '@techstark/opencv-js@5.0.0-release.1': {}
 
   '@ts-morph/common@0.27.0':
     dependencies:
@@ -6380,6 +6424,8 @@ snapshots:
 
   fflate@0.4.9: {}
 
+  fflate@0.8.3: {}
+
   figures@6.1.0:
     dependencies:
       is-unicode-supported: 2.1.0
@@ -6501,6 +6547,8 @@ snapshots:
   hermes-parser@0.25.1:
     dependencies:
       hermes-estree: 0.25.1
+
+  highgain@0.1.0: {}
 
   hono@4.13.8: {}
 
@@ -7524,6 +7572,8 @@ snapshots:
   ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:
       typescript: 6.0.3
+
+  ts-deepmerge@8.0.0: {}
 
   ts-morph@26.0.0:
     dependencies:
