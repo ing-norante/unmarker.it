@@ -26,24 +26,26 @@ This describes the current mechanism, not a claim of unique technology or guaran
 
 ## Operating Context
 
-- Users choose or drag in one image from their device. The app starts the workflow automatically.
+- Users choose or drag in one or more images from their device. The app starts the workflow automatically.
 - Users inspect analysis and before/after results, download the processed JPEG, adjust JPEG quality and reprocess, or reset to select another image.
 - Supported inputs can remain in analysis-only mode when browser decoding or processing is unavailable. Metadata-clean downloads in the original format are a secondary action where supported.
 - The interface supports English at `/` and Simplified Chinese at `/zh-hans/`.
 - Processing uses browser Canvas APIs and an OpenCV.js Web Worker. Browser decoding support determines which images can be processed.
 - The existing application uses React, TypeScript, Vite, Tailwind CSS, and Radix primitives; dependency details live in `package.json`.
-- Project instructions in `AGENTS.md` reserve local dev-server QA sessions for the human. Do not launch a local test session.
 
 ## Capabilities and Constraints
 
 ### Current implementation
+
+- A sequential local queue supports pause, per-image cancellation and retry, individual JPEG downloads and ZIP export with a local report. Queue retention limits are 20 files, 200 MiB inputs and 128 MiB outputs; they do not bound total browser memory.
+- Local C2PA reading separates declared origin, integrity and unknown signer trust. Remote manifests and online verification are disabled.
 
 - Image files and pixels are processed locally. Configured PostHog instrumentation can send usage and error events; local image processing must not be described as an absence of all network activity.
 - Input size is limited to 25 MB, and pixel processing is limited to 40 megapixels (`src/lib/fileValidation.ts`).
 - Browser-readable images can be processed. PNG, JPEG, WebP, AVIF, HEIF, and JXL have metadata-analysis support; metadata support does not guarantee pixel decoding.
 - Gemini Scan targets the visible Gemini / Nano Banana sparkle watermark. Gemini Restore runs when that mark is detected.
 - Shake applies a small geometric transform, Stir adds noise, and Crush recompresses to JPEG. These steps can change image quality; the main output is lossy JPEG.
-- The AI provenance score uses local metadata and visible-mark evidence. It is not a general AI-image detector or proof of authorship.
+- Categorical origin evidence uses local metadata and visible-mark evidence; C2PA presence alone is not AI evidence. It is not a general AI-image detector or proof of authorship.
 - Postflight checks rescan the generated JPEG. Hidden-watermark disruption is not independently verified: no universal local detector proves removal.
 - Existing pipeline terms are Gemini Scan, Gemini Restore, Shake, Stir, Crush, preflight analysis, and postflight verification.
 
@@ -59,7 +61,7 @@ The existing product name is **Unmarker.it**. Existing interface copy emphasizes
 ## Evidence on Hand
 
 - `README.md` describes the workflow, privacy boundaries, and technical limitations. Current implementation takes precedence where it has evolved beyond the README.
-- `src/hooks/useImageWorkflow.ts`, `src/lib/pipeline.ts`, and `src/workers/geminiVisible.worker.ts` implement the processing workflow.
+- `src/lib/engine/`, `src/lib/batch/`, `src/lib/pipeline.ts`, and `src/workers/geminiVisible.worker.ts` implement the processing workflow.
 - `src/lib/imageAudit.ts` and `src/lib/aiProvenanceScore.ts` define the local evidence and verification logic.
 - `src/i18n/resources/en/` and `src/i18n/resources/zh-Hans/` contain existing product copy; `src/i18n/locales.ts` defines localized routes.
 - `public/favicon.svg`, the app icons, and `public/og-image*.png` provide existing brand assets.
