@@ -46,6 +46,52 @@ describe("pipeline", () => {
     );
   });
 
+  it("bounds stir readback memory to strips and observes cancellation between strips", async () => {
+    const controller = new AbortController();
+    const context = {
+      canvas: { width: 8192, height: 4096 },
+      getImageData: vi.fn(
+        (_x: number, _y: number, width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+          width,
+          height,
+        }),
+      ),
+      putImageData: vi.fn(() => controller.abort()),
+    };
+    await expect(
+      applyStir(
+        context as unknown as CanvasRenderingContext2D,
+        { noiseAmplitude: 0 },
+        controller.signal,
+        { next: () => 0 },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(context.getImageData).toHaveBeenCalledExactlyOnceWith(0, 0, 8192, 8);
+    expect(context.putImageData).toHaveBeenCalledOnce();
+  });
+
+  it("supports OffscreenCanvas encoding and propagates cancellation", async () => {
+    const blob = new Blob(["worker jpeg"], { type: "image/jpeg" });
+    const canvas = { convertToBlob: vi.fn(async () => blob) };
+    await expect(
+      applyCrush(canvas as unknown as OffscreenCanvas, { quality: 0.85 }),
+    ).resolves.toBe(blob);
+    expect(canvas.convertToBlob).toHaveBeenCalledWith({
+      type: "image/jpeg",
+      quality: 0.85,
+    });
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      applyCrush(
+        canvas as unknown as OffscreenCanvas,
+        undefined,
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("falls back to default JPEG quality when blob encoding fails", async () => {
     const fallbackBlob = new Blob(["fallback"], { type: "image/jpeg" });
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});

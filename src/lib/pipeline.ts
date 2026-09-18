@@ -1,5 +1,9 @@
 import type { ProcessingOptions } from "./types";
 
+export type ProcessingCanvas = HTMLCanvasElement | OffscreenCanvas;
+export type ProcessingContext =
+  CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
 export const CRUSH_QUALITY_MIN = 0.5;
 export const CRUSH_QUALITY_MAX = 0.98;
 
@@ -65,18 +69,19 @@ const assertNotAborted = (signal?: AbortSignal) => {
 };
 
 export async function applyShake(
-  ctx: CanvasRenderingContext2D,
+  ctx: ProcessingContext,
   image: CanvasImageSource,
   options: ProcessingOptions["shake"] = DEFAULT_OPTIONS.shake,
   signal?: AbortSignal,
+  random: RandomSource = Math.random,
 ) {
   assertNotAborted(signal);
   const { width, height } = ctx.canvas;
   const { rotationRange, scaleRange } = options!;
 
   // More precise: use radians directly, sub-pixel precision
-  const angleRad = ((Math.random() * 2 - 1) * (rotationRange * Math.PI)) / 180;
-  const scale = scaleRange[0] + Math.random() * (scaleRange[1] - scaleRange[0]);
+  const angleRad = ((random() * 2 - 1) * (rotationRange * Math.PI)) / 180;
+  const scale = scaleRange[0] + random() * (scaleRange[1] - scaleRange[0]);
 
   // Explicit affine transformation matrix (more mathematically elegant)
   const cos = Math.cos(angleRad);
@@ -110,7 +115,7 @@ export async function applyShake(
 }
 
 export async function applyStir(
-  ctx: CanvasRenderingContext2D,
+  ctx: ProcessingContext,
   options: ProcessingOptions["stir"] = DEFAULT_OPTIONS.stir,
   signal?: AbortSignal,
   rng: GaussianNoiseSource = new GaussianRNG(),
@@ -119,23 +124,16 @@ export async function applyStir(
   const { width, height } = ctx.canvas;
   const { noiseAmplitude } = options!;
 
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  const pixelCount = width * height;
-
   // Scale so 3σ is roughly the configured amplitude.
   const stdDev = noiseAmplitude / 3;
-
-  const pixelsPerChunk = 65_536;
-  for (
-    let pixelStart = 0;
-    pixelStart < pixelCount;
-    pixelStart += pixelsPerChunk
-  ) {
-    const pixelEnd = Math.min(pixelStart + pixelsPerChunk, pixelCount);
-
-    for (let pixel = pixelStart; pixel < pixelEnd; pixel++) {
-      const i = pixel * 4;
+  // Read only a strip at a time: large images no longer need a second full RGBA buffer.
+  const rowsPerChunk = Math.max(1, Math.floor(65_536 / width));
+  for (let y = 0; y < height; y += rowsPerChunk) {
+    assertNotAborted(signal);
+    const chunkHeight = Math.min(rowsPerChunk, height - y);
+    const imageData = ctx.getImageData(0, y, width, chunkHeight);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
       data[i] = Math.max(0, Math.min(255, data[i] + rng.next(0, stdDev)));
       data[i + 1] = Math.max(
         0,
@@ -148,19 +146,15 @@ export async function applyStir(
       // Alpha channel (i + 3) remains unchanged.
     }
 
-    if (pixelEnd < pixelCount) {
-      assertNotAborted(signal);
-      await nextTick();
-    }
+    ctx.putImageData(imageData, 0, y);
+    await nextTick();
   }
 
   assertNotAborted(signal);
-  ctx.putImageData(imageData, 0, 0);
-  await nextTick();
 }
 
 export async function applyCrush(
-  canvas: HTMLCanvasElement,
+  canvas: ProcessingCanvas,
   options: ProcessingOptions["crush"] = DEFAULT_OPTIONS.crush,
   signal?: AbortSignal,
 ): Promise<Blob> {
@@ -189,7 +183,7 @@ const isAbortError = (error: unknown) =>
   error instanceof Error && error.name === "AbortError";
 
 const encodeCanvasAsJpegBlob = (
-  canvas: HTMLCanvasElement,
+  canvas: ProcessingCanvas,
   quality: number,
   signal?: AbortSignal,
 ) =>
@@ -229,6 +223,12 @@ const encodeCanvasAsJpegBlob = (
     signal?.addEventListener("abort", onAbort, { once: true });
 
     try {
+      if ("convertToBlob" in canvas) {
+        canvas
+          .convertToBlob({ type: "image/jpeg", quality })
+          .then(resolveOnce, rejectOnce);
+        return;
+      }
       canvas.toBlob(
         (blob) => {
           if (!blob) {

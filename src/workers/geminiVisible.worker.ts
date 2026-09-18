@@ -1,4 +1,6 @@
-import * as cvRuntime from "@techstark/opencv-js";
+import cvRuntime from "@techstark/opencv-js";
+import { geminiReadRegion, offsetDetection } from "../lib/engine/geminiRegion";
+import { cropRgba } from "../lib/engine/rgba";
 import {
   DEFAULT_GEMINI_DETECTION,
   GEMINI_SPATIAL_EARLY_EXIT_THRESHOLD,
@@ -137,6 +139,7 @@ const ctx = self as unknown as WorkerContext;
 let cvPromise: Promise<Cv> | null = null;
 let alphaMapsPromise: Promise<{ small: AlphaMap; large: AlphaMap }> | null =
   null;
+const templateCache = new Map<number, CvMat>();
 
 ctx.addEventListener("message", (event: MessageEvent<GeminiWorkerRequest>) => {
   void handleMessage(event.data);
@@ -196,7 +199,20 @@ function loadOpenCv() {
   if (cvPromise) return cvPromise;
 
   cvPromise = new Promise<Cv>((resolve, reject) => {
-    const runtime = resolveOpenCvRuntime();
+    const initialRuntime = resolveOpenCvRuntime();
+    // OpenCV 5 exports a Promise; older builds expose a runtime object.
+    if (initialRuntime instanceof Promise) {
+      initialRuntime.then((runtime) => {
+        try {
+          assertOpenCvCapabilities(runtime);
+          resolve(resolveWithoutThenableTrap(runtime as Cv));
+        } catch (error) {
+          reject(error);
+        }
+      }, reject);
+      return;
+    }
+    const runtime = initialRuntime;
 
     const finish = () => {
       try {
@@ -301,6 +317,8 @@ async function loadAlphaMap(path: string): Promise<AlphaMap> {
     canvas.width,
     canvas.height,
   );
+  canvas.width = 0;
+  canvas.height = 0;
   const alpha = new Float32Array(width * height);
 
   for (let pixel = 0; pixel < alpha.length; pixel++) {
@@ -312,6 +330,23 @@ async function loadAlphaMap(path: string): Promise<AlphaMap> {
 }
 
 function detectGeminiWatermark(
+  cv: Cv,
+  imageData: ImageData,
+  alphaMaps: { small: AlphaMap; large: AlphaMap },
+): GeminiDetectionResult {
+  if (imageData.width <= 0 || imageData.height <= 0)
+    return createDefaultDetection();
+  const region = geminiReadRegion(imageData.width, imageData.height);
+  const cropped =
+    region.x === 0 && region.y === 0 ? imageData : cropRgba(imageData, region);
+  return offsetDetection(
+    detectGeminiSearch(cv, cropped, alphaMaps),
+    region.x,
+    region.y,
+  );
+}
+
+function detectGeminiSearch(
   cv: Cv,
   imageData: ImageData,
   alphaMaps: { small: AlphaMap; large: AlphaMap },
@@ -345,16 +380,17 @@ function detectGeminiWatermark(
     let bestScore = -1;
     let bestRawNcc = -1;
     let bestLoc = { x: 0, y: 0 };
+    const match = track(mats, new cv.Mat());
 
     for (let scale = 16; scale < 120; scale += 2) {
       if (scale > searchRegion.rows || scale > searchRegion.cols) continue;
 
       const sourceAlpha = pickAlphaMapForSize(alphaMaps, scale);
-      const template = track(
-        mats,
-        alphaMapToMat(cv, sourceAlpha, scale, scale),
-      );
-      const match = track(mats, new cv.Mat());
+      let template = templateCache.get(scale);
+      if (!template) {
+        template = alphaMapToMat(cv, sourceAlpha, scale, scale);
+        templateCache.set(scale, template);
+      }
       cv.matchTemplate(searchRegion, template, match, cv.TM_CCOEFF_NORMED);
       const { maxVal, maxLoc } = cv.minMaxLoc(match);
       const weightedScore = maxVal * Math.min(1, Math.sqrt(scale / 96));
@@ -568,14 +604,16 @@ function inpaintResidual(
     );
     if (!gradWeight) return;
 
-    const rgba = track(mats, cv.matFromImageData(imageData));
+    const patch = cropRgba(imageData, {
+      x: px1,
+      y: py1,
+      width: paddedWidth,
+      height: paddedHeight,
+    });
+    const rgba = track(mats, cv.matFromImageData(patch));
     const rgb = track(mats, new cv.Mat());
     cv.cvtColor(rgba, rgb, cv.COLOR_RGBA2RGB);
 
-    const paddedRoi = track(
-      mats,
-      rgb.roi(new cv.Rect(px1, py1, paddedWidth, paddedHeight)),
-    );
     const mask = track(
       mats,
       cv.Mat.zeros(paddedHeight, paddedWidth, cv.CV_8UC1),
@@ -593,7 +631,7 @@ function inpaintResidual(
     }
 
     const inpainted = track(mats, new cv.Mat());
-    cv.inpaint(paddedRoi, mask, inpainted, inpaintRadius, cv.INPAINT_NS);
+    cv.inpaint(rgb, mask, inpainted, inpaintRadius, cv.INPAINT_NS);
 
     blendInpaintedRegion(imageData, inpainted, gradWeight, region, {
       paddedWidth,
