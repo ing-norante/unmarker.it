@@ -98,8 +98,22 @@ charge.dispute.closed
 4. Abilitare la destinazione webhook sopra e verificare una consegna `2xx`.
 5. Verificare il cron Vercel `/api/sponsors?action=reconcile` ogni 5 minuti:
    autorizzazione con `CRON_SECRET`, risposta 200 senza failures.
-6. Eseguire il primo acquisto reale con il titolare, verificare imposte, ricevuta,
-   pubblicazione e registrazione amministrativa. Non usare carte di test in live.
+6. Verificare il flusso pubblico fino al riepilogo del Checkout live, senza
+   inserire una carta o confermare un pagamento: controllare prezzo e imposte,
+   quindi annullare la sessione dal sito. Verificare la consegna firmata
+   `checkout.session.expired`, la risposta `2xx` e il rilascio dello slot.
+   Verificare anche una riconciliazione autenticata senza errori.
+7. Mantenere i test di pagamento completo, autenticazione, rimborso e dispute
+   nella sandbox della Preview. Stripe vieta di testare in live usando dati
+   reali dei metodi di pagamento; non fare auto-acquisti da rimborsare, neppure
+   per importi simbolici. [Documentazione Stripe sui test](https://docs.stripe.com/testing).
+   Alla prima vendita autentica controllare ricevuta, pubblicazione e
+   registrazione amministrativa. Il controllo senza addebito non certifica
+   l'intero percorso di un pagamento riuscito live.
+
+Il backend verifica un imponibile esatto di 500 EUR e l'assenza di sconti:
+un prezzo temporaneo da 1 EUR o un coupon non sono scorciatoie compatibili con
+l'integrazione. Non cambiare queste verifiche per simulare pagamenti live.
 
 La conferma contrattuale e la fattura restano gestite manualmente con la
 procedura del README e Fatture in Cloud, come concordato. Il progetto non
