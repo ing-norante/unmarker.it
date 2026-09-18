@@ -13,17 +13,17 @@ describe("imageAudit", () => {
 
     expect(audit.visibleWatermark.status).toBe("not-scanned");
     expect(audit.aiScore).toMatchObject({ kind: "incomplete", percentage: null });
-    expect(audit.hiddenWatermark.status).toBe("at-risk");
+    expect(audit.hiddenWatermark.status).toBe("unverified");
   });
 
-  it("marks hidden watermark postflight as neutralized but unverified", () => {
+  it("does not claim hidden watermark neutralization from completion alone", () => {
     const audit = buildImageAudit({
       stage: "postflight",
       metadataScan: emptyScan(),
       visibleDetection: notDetected(),
     });
 
-    expect(audit.hiddenWatermark.status).toBe("neutralized-unverified");
+    expect(audit.hiddenWatermark.status).toBe("unverified");
   });
 
   it("creates a before and after diff with partial postflight warnings", () => {
@@ -41,7 +41,7 @@ describe("imageAudit", () => {
       metadataAfterCount: null,
       visibleBefore: "detected",
       visibleAfter: null,
-      hiddenAfter: "neutralized-unverified",
+      hiddenAfter: "unverified",
       warnings: [message("workflow:warnings.postflightMetadata")],
     });
   });

@@ -2,17 +2,18 @@ import { describe, expect, it } from "vitest";
 import { inferAiProvenanceScore } from "./aiProvenanceScore";
 import type { MetadataScanResult } from "./types";
 import { message } from "@/i18n/messages";
+import { interpretManifestStore } from "./c2pa/interpret";
 
 describe("aiProvenanceScore", () => {
-  it("uses the strongest band for C2PA provenance", () => {
+  it("does not treat C2PA presence or an embedded vendor name as AI evidence", () => {
     const score = inferAiProvenanceScore(
       scanWithSignal("c2pa", "C2PA manifest", "c2pa openai"),
       null,
     );
 
-    expect(score.percentage).toBe(98);
-    expect(score.provider).toBe("OpenAI");
-    expect(score.confidence).toBe("high");
+    expect(score.percentage).toBeNull();
+    expect(score.kind).toBe("credentials");
+    expect(score.provider).toBeNull();
   });
 
   it("maps provider metadata markers to the medium band", () => {
@@ -21,12 +22,12 @@ describe("aiProvenanceScore", () => {
       null,
     );
 
-    expect(score.percentage).toBe(88);
+    expect(score.percentage).toBeNull();
     expect(score.provider).toBe("Midjourney");
     expect(score.confidence).toBe("medium");
   });
 
-  it("uses Gemini confidence when only a visible watermark was found", () => {
+  it("keeps logo confidence separate from AI provenance probability", () => {
     const score = inferAiProvenanceScore(emptyScan(), {
       detected: true,
       confidence: 0.97,
@@ -36,14 +37,15 @@ describe("aiProvenanceScore", () => {
       varianceScore: 1,
     });
 
-    expect(score.percentage).toBe(94);
+    expect(score.percentage).toBeNull();
+    expect(score.kind).toBe("visible");
     expect(score.provider).toBe("Google/Gemini");
   });
 
   it("does not claim human provenance when no local signals are found", () => {
     const score = inferAiProvenanceScore(emptyScan(), null, "not-detected");
 
-    expect(score.percentage).toBe(12);
+    expect(score.percentage).toBeNull();
     expect(score.kind).toBe("none");
     expect(score.provider).toBeNull();
   });
@@ -63,8 +65,27 @@ describe("aiProvenanceScore", () => {
 
   it("retains positive evidence while disclosing missing checks", () => {
     const score = inferAiProvenanceScore(scanWithSignal("c2pa", "C2PA", "openai"), null, "scan-failed");
-    expect(score.kind).toBe("strong");
+    expect(score.kind).toBe("credentials");
     expect(score.evidence).toContainEqual(message("workflow:audit.score.evidenceIncomplete"));
+  });
+
+  it.each(["photograph", "ai-generated", "composite"] as const)("uses explicit %s assertions rather than the credential container", (origin) => {
+    const scan = scanWithSignal("c2pa", "C2PA", "c2pa");
+    scan.c2pa = { presence: "present", origin, aiDisclosure: origin !== "photograph", integrity: "valid", verification: "local", trust: "unknown", reasons: ["trust-not-evaluated"] };
+    const score = inferAiProvenanceScore(scan, null, "not-detected");
+    expect(score).toMatchObject({ percentage: null, kind: origin === "photograph" ? "credentials" : "strong", provider: null });
+  });
+
+  it.each(["compositeCapture", "compositeSynthetic"])("keeps ordinary %s declarations out of the AI evidence category", (source) => {
+    const scan = scanWithSignal("c2pa", "C2PA", "c2pa");
+    scan.c2pa = interpretManifestStore({
+      active_manifest: "current", validation_state: "Valid",
+      manifests: { current: { assertions: [{ label: "c2pa.actions.v2", data: {
+        actions: [{ action: "c2pa.created", digitalSourceType: `http://cv.iptc.org/newscodes/digitalsourcetype/${source}` }],
+      } }] } },
+    });
+    expect(inferAiProvenanceScore(scan, null, "not-detected"))
+      .toMatchObject({ percentage: null, kind: "credentials", provider: null });
   });
 });
 

@@ -23,6 +23,9 @@ export const PNG_SIGNATURE = new Uint8Array([
 
 const PNG_TEXT_CHUNKS = new Set(["tEXt", "iTXt", "zTXt"]);
 const C2PA_PNG_CHUNKS = new Set(["caBX"]);
+export const PNG_TEXT_CHUNK_LIMIT = 1024 * 1024;
+export const PNG_TEXT_TOTAL_LIMIT = 4 * PNG_TEXT_CHUNK_LIMIT;
+type TextBudget = { remaining: number };
 
 interface PngChunk {
   type: string;
@@ -44,6 +47,7 @@ export async function scanPngMetadata(
   const signals: MetadataSignal[] = [];
   const warnings: MetadataWarning[] = [];
   const chunks = walkPngChunks(bytes, warnings);
+  const budget = { remaining: PNG_TEXT_TOTAL_LIMIT };
 
   for (const chunk of chunks) {
     if (C2PA_PNG_CHUNKS.has(chunk.type)) {
@@ -62,7 +66,7 @@ export async function scanPngMetadata(
       continue;
     }
 
-    const markers = await findPngTextMarkers(chunk, warnings);
+    const markers = await findPngTextMarkers(chunk, warnings, budget);
     if (markers.length > 0) {
       signals.push(
         createSignal(
@@ -90,13 +94,14 @@ export async function cleanPngMetadata(
   }
 
   const parts: Uint8Array[] = [bytes.subarray(0, PNG_SIGNATURE.length)];
+  const budget = { remaining: PNG_TEXT_TOTAL_LIMIT };
   let removedCount = 0;
 
   for (const chunk of chunks) {
     const removeC2pa = C2PA_PNG_CHUNKS.has(chunk.type);
     const removeText =
       PNG_TEXT_CHUNKS.has(chunk.type) &&
-      (await findPngTextMarkers(chunk, warnings)).length > 0;
+      (await findPngTextMarkers(chunk, warnings, budget)).length > 0;
 
     if (removeC2pa || removeText) {
       removedCount += 1;
@@ -112,8 +117,16 @@ export async function cleanPngMetadata(
 async function findPngTextMarkers(
   chunk: PngChunk,
   warnings: MetadataWarning[],
+  budget: TextBudget,
 ): Promise<string[]> {
-  const candidates = [chunk.data];
+  const limit = Math.min(PNG_TEXT_CHUNK_LIMIT, budget.remaining);
+  if (chunk.data.length > limit) {
+    addWarning(warnings, "png-text-limit");
+    return [];
+  }
+  budget.remaining -= chunk.data.length;
+  // Compressed bytes are not text; scan the bounded keyword separately.
+  const candidates = chunk.type === "tEXt" ? [chunk.data] : [];
   const keyEnd = chunk.data.indexOf(0);
 
   if (keyEnd > 0) {
@@ -121,10 +134,15 @@ async function findPngTextMarkers(
   }
 
   if (chunk.type === "zTXt" && keyEnd >= 0 && keyEnd + 2 < chunk.data.length) {
+    if (chunk.data[keyEnd + 1] !== 0) {
+      addWarning(warnings, "png-decode-partial", { type: "PNG zTXt" });
+      return [];
+    }
     const inflated = await inflatePngText(
       chunk.data.subarray(keyEnd + 2),
       warnings,
       "PNG zTXt",
+      budget,
     );
     if (inflated) {
       candidates.push(inflated);
@@ -132,6 +150,10 @@ async function findPngTextMarkers(
   }
 
   if (chunk.type === "iTXt") {
+    if (keyEnd < 0 || chunk.data[keyEnd + 1] > 1 || chunk.data[keyEnd + 2] !== 0) {
+      addWarning(warnings, "png-decode-partial", { type: "PNG iTXt" });
+      return [];
+    }
     const textBytes = getItxtTextBytes(chunk.data);
     if (textBytes) {
       if (textBytes.compressed) {
@@ -139,6 +161,7 @@ async function findPngTextMarkers(
           textBytes.bytes,
           warnings,
           "PNG iTXt",
+          budget,
         );
         if (inflated) {
           candidates.push(inflated);
@@ -176,6 +199,7 @@ async function inflatePngText(
   data: Uint8Array,
   warnings: MetadataWarning[],
   label: string,
+  budget: TextBudget,
 ): Promise<Uint8Array | null> {
   if (typeof DecompressionStream === "undefined") {
     addWarning(
@@ -186,11 +210,36 @@ async function inflatePngText(
     return null;
   }
 
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
     const stream = new Blob([toArrayBuffer(data)])
       .stream()
       .pipeThrough(new DecompressionStream("deflate"));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
+    reader = stream.getReader();
+    const limit = Math.min(PNG_TEXT_CHUNK_LIMIT, budget.remaining);
+    const parts: Uint8Array[] = [];
+    let length = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > limit) {
+        // Cancel while streaming; Response.arrayBuffer() would allocate the bomb.
+        budget.remaining = Math.max(0, budget.remaining - limit);
+        addWarning(warnings, "png-text-limit");
+        await reader.cancel();
+        return null;
+      }
+      parts.push(value);
+    }
+    budget.remaining -= length;
+    const output = new Uint8Array(length);
+    let offset = 0;
+    for (const part of parts) {
+      output.set(part, offset);
+      offset += part.length;
+    }
+    return output;
   } catch {
     addWarning(
       warnings,
@@ -198,6 +247,8 @@ async function inflatePngText(
       { type: label },
     );
     return null;
+  } finally {
+    reader?.releaseLock();
   }
 }
 
@@ -242,6 +293,9 @@ function walkPngChunks(bytes: Uint8Array, warnings: MetadataWarning[]): PngChunk
 
     if (type === "IEND") {
       sawIend = true;
+      if (length !== 0 || end !== bytes.length) {
+        addWarning(warnings, "malformed-png-table");
+      }
       break;
     }
   }

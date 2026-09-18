@@ -35,6 +35,7 @@ const AI_TEXT_MARKERS = [
   "openai",
   "firefly",
   "c2pa",
+  "dcterms:provenance",
   "trainedAlgorithmicMedia",
   "compositeSynthetic",
   "algorithmicMedia",
@@ -102,7 +103,7 @@ export function toScanResult(
   warnings: MetadataWarning[],
 ): MetadataScanResult {
   return {
-    hasAiMetadata: signals.length > 0,
+    hasAiMetadata: signals.some(isAiMetadataSignal),
     format,
     signals,
     warnings,
@@ -113,8 +114,14 @@ export function markersContainC2pa(markers: string[]) {
   return markers.some((marker) => marker.toLowerCase().includes("c2pa"));
 }
 
+/** C2PA describes provenance and also appears in ordinary camera photographs. */
+export function isAiMetadataSignal(signal: MetadataSignal) {
+  if (signal.type === "c2pa" || signal.type === "isobmff-box") return false;
+  return Boolean(signal.marker && !/^(?:c2pa(?: uuid)?|dcterms:provenance)$/i.test(signal.marker));
+}
+
 export function hasBlockingCleanWarning(warnings: MetadataWarning[]) {
-  return warnings.length > 0;
+  return warnings.some(({ code }) => code !== "box-item-coverage" && code !== "display-metadata-preserved");
 }
 
 function normalizeMarkerText(value: string) {

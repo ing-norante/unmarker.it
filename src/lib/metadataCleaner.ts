@@ -33,12 +33,24 @@ import type {
   MetadataImageFormat,
   MetadataScanResult,
 } from "./types";
+import { readLocalC2pa } from "./c2pa/runtime";
 
 export async function scanImageMetadata(
   file: File,
+  options: { signal?: AbortSignal } = {},
 ): Promise<MetadataScanResult> {
+  options.signal?.throwIfAborted();
   const bytes = new Uint8Array(await file.arrayBuffer());
-  return scanBytes(file, bytes);
+  const result = await scanBytes(file, bytes);
+  options.signal?.throwIfAborted();
+  const candidate = result.signals.some((signal) =>
+    signal.type === "c2pa" || signal.type === "isobmff-box" || /c2pa|dcterms:provenance/i.test(signal.marker ?? ""));
+  if (candidate) {
+    const presence = result.signals.some(({ type }) => type === "c2pa") ? "present" : "referenced";
+    result.c2pa = await readLocalC2pa(file, presence, options.signal);
+    result.hasAiMetadata ||= Boolean(result.c2pa.aiDisclosure);
+  }
+  return result;
 }
 
 export async function cleanImageMetadata(

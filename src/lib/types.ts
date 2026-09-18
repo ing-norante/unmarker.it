@@ -80,6 +80,9 @@ export type MetadataWarningCode =
   | "missing-png-end"
   | "png-compressed-scan-only"
   | "png-decode-partial"
+  | "png-text-limit"
+  | "display-metadata-preserved"
+  | "box-item-coverage"
   | "incomplete-box-table"
   | "incomplete-extended-box"
   | "malformed-box-length"
@@ -113,6 +116,19 @@ export interface MetadataScanResult {
   format: MetadataImageFormat;
   signals: MetadataSignal[];
   warnings: MetadataWarning[];
+  c2pa?: C2paAudit;
+}
+
+export interface C2paAudit {
+  presence: "present" | "referenced" | "not-found";
+  origin: "photograph" | "ai-generated" | "composite" | "unknown";
+  /** Composite capture or conventional synthetic media alone does not declare AI. */
+  aiDisclosure?: boolean;
+  integrity: "valid" | "invalid" | "unknown";
+  verification: "local" | "incomplete" | "failed";
+  /** No trust list or network certificate lookup is used by this local reader. */
+  trust: "unknown";
+  reasons: Array<"remote-disabled" | "trust-not-evaluated" | "invalid-manifest" | "reader-unavailable" | "read-failed" | "timeout">;
 }
 
 export interface MetadataCleanResult {
@@ -149,7 +165,7 @@ export interface HiddenWatermarkAudit {
 
 export interface AiProvenanceScore {
   percentage: number | null;
-  kind: "strong" | "metadata" | "visible" | "none" | "incomplete";
+  kind: "strong" | "metadata" | "visible" | "credentials" | "none" | "incomplete";
   provider: string | null;
   evidence: MessageDescriptor[];
   confidence: "high" | "medium" | "low";

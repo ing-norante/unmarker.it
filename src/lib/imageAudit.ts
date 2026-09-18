@@ -34,7 +34,7 @@ export function buildImageAudit({
     stage,
     metadataScan,
     visibleWatermark,
-    hiddenWatermark: createHiddenWatermarkAudit(stage),
+    hiddenWatermark: createHiddenWatermarkAudit(),
     aiScore: inferAiProvenanceScore(metadataScan, visibleDetection, visibleWatermark.status),
     warnings,
   };
@@ -55,7 +55,7 @@ export function createVerificationDiff(
     visibleBefore: preflightAudit.visibleWatermark.status,
     visibleAfter: postflightAudit?.visibleWatermark.status ?? null,
     hiddenAfter:
-      postflightAudit?.hiddenWatermark.status ?? "neutralized-unverified",
+      postflightAudit?.hiddenWatermark.status ?? "unverified",
     warnings,
   };
 }
@@ -95,16 +95,7 @@ function createVisibleWatermarkAudit(
   };
 }
 
-function createHiddenWatermarkAudit(
-  stage: ImageAuditStage,
-): HiddenWatermarkAudit {
-  if (stage === "postflight") {
-    return {
-      status: "neutralized-unverified",
-    };
-  }
-
-  return {
-    status: "at-risk",
-  };
+function createHiddenWatermarkAudit(): HiddenWatermarkAudit {
+  // Pixel processing cannot establish presence or successful removal without a detector.
+  return { status: "unverified" };
 }

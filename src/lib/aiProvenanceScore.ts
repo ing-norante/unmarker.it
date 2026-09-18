@@ -6,10 +6,10 @@ import type {
   VisibleWatermarkStatus,
 } from "@/lib/types";
 import { message } from "@/i18n/messages";
+import { isAiMetadataSignal } from "@/lib/metadata/markers";
 
 type ProviderMatch = {
   provider: string;
-  confidenceBand: "strong" | "provider";
 };
 
 const PROVIDER_PATTERNS: Array<[RegExp, string]> = [
@@ -25,10 +25,7 @@ const PROVIDER_PATTERNS: Array<[RegExp, string]> = [
 ];
 
 const STRONG_PROVENANCE_PATTERNS = [
-  /\bc2pa\b/i,
   /trainedalgorithmicmedia/i,
-  /algorithmicmedia/i,
-  /compositesynthetic/i,
   /compositewithtrainedalgorithmicmedia/i,
 ];
 
@@ -42,33 +39,36 @@ export function inferAiProvenanceScore(
   const signals = metadataScan?.signals ?? [];
   const evidence = createEvidence(signals, geminiDetection);
   const incomplete = !metadataScan || metadataScan.warnings.length > 0 ||
+    (metadataScan.c2pa && metadataScan.c2pa.verification !== "local") ||
     (visibleStatus !== "detected" && visibleStatus !== "not-detected");
   if (incomplete) {
     evidence.push(message("workflow:audit.score.evidenceIncomplete"));
   }
-  const providerMatch = findProvider(signals);
+  const aiSignals = signals.filter(isAiMetadataSignal);
+  const providerMatch = findProvider(aiSignals);
   const hasStrongProvenance =
-    signals.some((signal) => signal.type === "c2pa") ||
-    signals.some((signal) =>
+    metadataScan?.c2pa?.aiDisclosure ||
+    metadataScan?.c2pa?.origin === "ai-generated" ||
+    aiSignals.some((signal) =>
       STRONG_PROVENANCE_PATTERNS.some((pattern) =>
         pattern.test(signalText(signal)),
       ),
     );
-  const hasMetadataSignal = signals.length > 0;
+  const hasMetadataSignal = aiSignals.length > 0;
 
   if (hasStrongProvenance) {
     return {
-      percentage: providerMatch ? 98 : 96,
+      percentage: null,
       kind: "strong",
       provider: providerMatch?.provider ?? null,
       evidence,
-      confidence: "high",
+      confidence: metadataScan?.c2pa?.integrity === "invalid" ? "low" : "medium",
     };
   }
 
   if (providerMatch || hasMetadataSignal) {
     return {
-      percentage: providerMatch ? 88 : 78,
+      percentage: null,
       kind: "metadata",
       provider: providerMatch?.provider ?? null,
       evidence,
@@ -77,18 +77,17 @@ export function inferAiProvenanceScore(
   }
 
   if (geminiDetection?.detected) {
-    const percentage = Math.min(
-      94,
-      Math.max(35, Math.round(geminiDetection.confidence * 100)),
-    );
-
     return {
-      percentage,
+      percentage: null,
       kind: "visible",
       provider: "Google/Gemini",
       evidence,
       confidence: "medium",
     };
+  }
+
+  if (metadataScan?.c2pa || signals.some((signal) => signal.type === "c2pa" || /c2pa/i.test(signal.marker ?? ""))) {
+    return { percentage: null, kind: "credentials", provider: null, evidence, confidence: "low" };
   }
 
   if (incomplete) {
@@ -102,7 +101,7 @@ export function inferAiProvenanceScore(
   }
 
   return {
-    percentage: 12,
+    percentage: null,
     kind: "none",
     provider: null,
     evidence: [message("workflow:audit.score.evidenceNone")],
@@ -132,7 +131,6 @@ function findProvider(signals: MetadataSignal[]): ProviderMatch | null {
       if (pattern.test(text)) {
         return {
           provider,
-          confidenceBand: signal.type === "c2pa" ? "strong" : "provider",
         };
       }
     }

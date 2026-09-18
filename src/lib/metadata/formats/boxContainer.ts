@@ -7,6 +7,7 @@ import type {
 } from "@/lib/types";
 import {
   addWarning,
+  asciiBytes,
   buildCleanResult,
   bytesEqual,
   originalCleanResult,
@@ -14,7 +15,7 @@ import {
   readUint64,
   toDataView,
 } from "../binary";
-import { C2PA_UUID, createSignal, toScanResult } from "../markers";
+import { C2PA_UUID, createSignal, hasBlockingCleanWarning, toScanResult } from "../markers";
 
 export const JXL_CONTAINER_SIGNATURE = new Uint8Array([
   0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20, 0x0d, 0x0a, 0x87, 0x0a,
@@ -81,6 +82,7 @@ export function scanBoxContainerMetadata(
   }
 
   const boxes = walkBoxes(bytes, startOffset, warnings);
+  addCoverageWarning(boxes, warnings);
 
   for (const box of boxes) {
     const signal = getBoxSignal(box);
@@ -105,8 +107,9 @@ export function cleanBoxContainerMetadata(
   }
 
   const boxes = walkBoxes(bytes, startOffset, warnings);
+  addCoverageWarning(boxes, warnings);
 
-  if (boxes.length === 0 || warnings.length > 0) {
+  if (boxes.length === 0 || hasBlockingCleanWarning(warnings)) {
     return originalCleanResult(file, format, warnings);
   }
 
@@ -120,6 +123,12 @@ export function cleanBoxContainerMetadata(
   for (const box of boxes) {
     if (getBoxSignal(box)) {
       removedCount += 1;
+      // iloc/stco/co64 can address later payloads by absolute offset. Replacing
+      // a box with same-sized free space preserves all original byte positions.
+      const replacement = new Uint8Array(box.end - box.start);
+      replacement.set(bytes.subarray(box.start, box.dataStart));
+      replacement.set(asciiBytes("free"), 4);
+      parts.push(replacement);
       continue;
     }
 
@@ -127,6 +136,12 @@ export function cleanBoxContainerMetadata(
   }
 
   return buildCleanResult(file, format, parts, removedCount, warnings);
+}
+
+function addCoverageWarning(boxes: Box[], warnings: MetadataWarning[]) {
+  if (boxes.some(({ type }) => type === "meta" || type === "moov")) {
+    addWarning(warnings, "box-item-coverage");
+  }
 }
 
 function walkBoxes(

@@ -9,13 +9,12 @@ import {
   addWarning,
   asciiBytes,
   buildCleanResult,
-  concatUint8Arrays,
   originalCleanResult,
   readAscii,
   toDataView,
   writeUint32Le,
 } from "../binary";
-import { createSignal, findAiMarkers, toScanResult } from "../markers";
+import { createSignal, findAiMarkers, hasBlockingCleanWarning, toScanResult } from "../markers";
 
 export const RIFF_SIGNATURE = "RIFF";
 export const WEBP_SIGNATURE = "WEBP";
@@ -48,6 +47,7 @@ export function scanWebpMetadata(
     const signal = getWebpChunkSignal(chunk);
     if (signal) {
       signals.push(signal);
+      if (!signal.removable) addWarning(warnings, "display-metadata-preserved");
     }
   }
 
@@ -61,37 +61,52 @@ export function cleanWebpMetadata(
   const warnings: MetadataWarning[] = [];
   const chunks = walkRiffChunks(bytes, warnings);
 
-  if (chunks.length === 0 || warnings.length > 0) {
+  if (chunks.length === 0 || hasBlockingCleanWarning(warnings)) {
     return originalCleanResult(file, "webp", warnings);
   }
 
   const keptChunks: Uint8Array[] = [];
   let removedCount = 0;
+  const retainedTypes = new Set<string>();
 
   for (const chunk of chunks) {
-    if (getWebpChunkSignal(chunk)) {
+    const signal = getWebpChunkSignal(chunk);
+    if (signal?.removable) {
       removedCount += 1;
       continue;
     }
-
-    keptChunks.push(bytes.subarray(chunk.start, chunk.end));
+    if (signal) addWarning(warnings, "display-metadata-preserved");
+    retainedTypes.add(chunk.type);
+    keptChunks.push(chunk.type === "VP8X"
+      ? bytes.slice(chunk.start, chunk.end)
+      : bytes.subarray(chunk.start, chunk.end));
   }
 
   if (removedCount === 0) {
     return buildCleanResult(file, "webp", [bytes], 0, warnings);
   }
 
-  const body = concatUint8Arrays(keptChunks);
-  const output = new Uint8Array(12 + body.length);
-  output.set(asciiBytes(RIFF_SIGNATURE), 0);
-  writeUint32Le(output, 4, output.length - 8);
-  output.set(asciiBytes(WEBP_SIGNATURE), 8);
-  output.set(body, 12);
+  for (const chunk of keptChunks) {
+    // Recompute metadata bits only; retain alpha, animation and ICC features.
+    if (readAscii(chunk, 0, 4) === "VP8X" && chunk.length >= 18) {
+      chunk[8] = (chunk[8] & ~0x0c) |
+        (retainedTypes.has("EXIF") ? 0x08 : 0) |
+        (retainedTypes.has("XMP ") ? 0x04 : 0);
+    }
+  }
 
-  return buildCleanResult(file, "webp", [output], removedCount, warnings);
+  const header = new Uint8Array(12);
+  header.set(asciiBytes(RIFF_SIGNATURE), 0);
+  writeUint32Le(header, 4, 4 + keptChunks.reduce((total, chunk) => total + chunk.length, 0));
+  header.set(asciiBytes(WEBP_SIGNATURE), 8);
+
+  return buildCleanResult(file, "webp", [header, ...keptChunks], removedCount, warnings);
 }
 
 function getWebpChunkSignal(chunk: RiffChunk): MetadataSignal | null {
+  if (chunk.type === "C2PA") {
+    return createSignal("c2pa", "metadata:signals.webp", "WebP C2PA", "c2pa");
+  }
   if (chunk.type !== "EXIF" && chunk.type !== "XMP ") {
     return null;
   }
@@ -106,6 +121,7 @@ function getWebpChunkSignal(chunk: RiffChunk): MetadataSignal | null {
     "metadata:signals.webp",
     `WebP ${chunk.type.trim()}`,
     markers[0],
+    chunk.type !== "EXIF",
   );
 }
 
@@ -119,12 +135,16 @@ function walkRiffChunks(
   }
 
   const view = toDataView(bytes);
-  const riffEnd = Math.min(bytes.length, view.getUint32(4, true) + 8);
+  const riffEnd = view.getUint32(4, true) + 8;
   const chunks: RiffChunk[] = [];
   let offset = 12;
 
   if (riffEnd > bytes.length) {
     addWarning(warnings, "webp-size-exceeds-file");
+    return chunks;
+  }
+  if (riffEnd < 12 || riffEnd !== bytes.length) {
+    addWarning(warnings, "malformed-webp-table");
     return chunks;
   }
 
@@ -142,6 +162,10 @@ function walkRiffChunks(
 
     if (end > riffEnd) {
       addWarning(warnings, "malformed-webp-chunk", { type: type.trim() });
+      return chunks;
+    }
+    if (type === "VP8X" && size !== 10) {
+      addWarning(warnings, "malformed-webp-chunk", { type });
       return chunks;
     }
 
