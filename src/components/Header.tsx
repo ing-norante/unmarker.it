@@ -14,11 +14,25 @@ export function Header({ className }: { className?: string }) {
         className,
       )}
     >
-      <div className="flex justify-end"><LanguageSwitcher /></div>
+      <div className="flex justify-end">
+        <LanguageSwitcher />
+      </div>
       <div className="relative flex flex-col gap-3 2xl:gap-5">
         <h1 className="wide-hero-title text-foreground text-5xl leading-none font-black tracking-normal wrap-break-word sm:text-6xl lg:text-7xl xl:text-[5rem] 2xl:text-8xl">
-          <span className="font-mono block text-[min(1em,14cqi)] uppercase whitespace-nowrap">
-            Unmarker.it
+          <span className="flex items-baseline gap-[0.2em] font-mono text-[min(1em,12cqi)] whitespace-nowrap uppercase">
+            <img
+              src="/unmarker-logo.svg"
+              alt=""
+              width={147}
+              height={139}
+              className="h-[1cap] w-auto shrink-0"
+            />
+            <span>
+              Unmarker
+              <span className="text-primary-text ms-[-0.16em]">
+                <span className="inline-block w-[0.36em] text-center">.</span>it
+              </span>
+            </span>
           </span>
           <span className="locale-hero-subtitle text-primary-text block text-2xl leading-snug font-black text-balance sm:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl">
             {t("header.product")}
@@ -27,10 +41,10 @@ export function Header({ className }: { className?: string }) {
         <p className="locale-hero-copy text-muted-foreground max-w-[36ch] text-xl leading-snug font-bold text-pretty sm:text-2xl xl:text-3xl 2xl:text-4xl">
           {t("header.tagline")}
           <br />
-          <span className="text-primary-text">{t("header.clientSide")}</span>{" "}
-          <span className="text-muted-foreground">
-            {t("header.privacy")}
-          </span>
+          <span className="text-primary-text">
+            {t("header.clientSide")}
+          </span>{" "}
+          <span className="text-muted-foreground">{t("header.privacy")}</span>
         </p>
       </div>
 

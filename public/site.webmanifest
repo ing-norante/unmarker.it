@@ -3,19 +3,19 @@
   "short_name": "Unmarker",
   "icons": [
     {
-      "src": "/web-app-manifest-192x192.png",
-      "sizes": "192x192",
+      "src": "/android-chrome-192x192.png",
       "type": "image/png",
-      "purpose": "maskable"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
-      "src": "/web-app-manifest-512x512.png",
-      "sizes": "512x512",
+      "src": "/android-chrome-512x512.png",
       "type": "image/png",
-      "purpose": "maskable"
+      "sizes": "512x512",
+      "purpose": "any"
     }
   ],
   "theme_color": "#000000",
-  "background_color": "#ffffff",
+  "background_color": "#000000",
   "display": "standalone"
 }
