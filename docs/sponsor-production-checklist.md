@@ -1,6 +1,27 @@
 # Sponsor: checklist prima della produzione
 
-Aggiornata il 17 settembre 2026. Documento operativo da completare con il
+## Aggiornamento operativo — 18 settembre 2026
+
+La QA della Preview è stata confermata dall'utente, così come i testi legali
+inglesi v1.0.0 con efficacia 18 settembre 2026. Le pagine `/legal/*` esistono
+e hanno `noindex, follow`. Il blocco relativo ai testi non ancora pubblicabili
+è rimosso dal codice; rimangono l'abilitazione esplicita dei pagamenti live e
+la lista dei Paesi consentiti.
+
+L'account Stripe live, prodotto, chiave limitata, IVA, ricevute e webhook sono
+stati predisposti: vedere [stato e procedura di attivazione](./sponsor-live-setup.md).
+La riconciliazione ogni cinque minuti è definita in `vercel.json` e diventerà
+attiva al deployment Production. **Preparazione non significa deployment:**
+il webhook e i pagamenti restano disabilitati fino alla pubblicazione coordinata.
+
+Le sezioni sotto conservano la checklist iniziale: le voci su bozze italiane,
+assenza delle pagine legali, mancata Preview e assenza del cron descrivono lo
+stato del 17 settembre e sono superate dall'aggiornamento sopra. Restano utili
+per i controlli fiscali/amministrativi e per le attività future.
+
+## Checklist iniziale — 17 settembre 2026
+
+Documento operativo da completare con il
 commercialista e, per i contratti, con il consulente legale di NoMaDe S.r.l.
 Non costituisce un'attestazione di conformità fiscale o legale.
 
@@ -26,19 +47,19 @@ prima dell'assegnazione. Non è stato emesso alcun documento fiscale.
 Per le commissioni Stripe Giuseppe intende usare il processo TD17 già adottato
 da NoMaDe; la corretta classificazione dei documenti resta al commercialista.
 
-| Area             | Situazione nel codice                                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Acquisto         | Pagamento unico, 500 € imponibili più imposte, 720 ore dal pagamento confermato                                                   |
-| Rinnovo          | Nessun abbonamento o rinnovo automatico                                                                                    |
-| Managed Payments | Disabilitato esplicitamente nelle Checkout Session                                                                         |
-| IVA              | Stripe Tax sandbox; caso IT verificato 500 € + 110 € = 610 €; live da configurare                               |
-| Fatturazione     | Export amministrativo JSON disponibile; XML/FIC/SdI e registro fatture da completare                                                                |
-| Dati fiscali     | Passaggio B2B con anagrafica, indirizzo, Tax ID, CF italiano e recapiti SdI                  |
-| Documenti legali | Bozze segnalate; tre conferme, timestamp, versione e testo/hash conservati; nuovi acquisti live bloccati |
-| Analytics        | Consenso preventivo browser/server, revoca e preferenze; replay disabilitato                                               |
-| Cron             | Endpoint autenticato disponibile; nessuna pianificazione in `vercel.json`                                                  |
-| Rimborsi         | I parziali mantengono la campagna fino alla scadenza; il totale cumulativo integrale la rimuove                            |
-| Pausa vendite    | Nuovi acquisti live bloccati da documenti in bozza/paesi non approvati; pausa operativa ancora da aggiungere             |
+| Area             | Situazione nel codice                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| Acquisto         | Pagamento unico, 500 € imponibili più imposte, 720 ore dal pagamento confermato                              |
+| Rinnovo          | Nessun abbonamento o rinnovo automatico                                                                      |
+| Managed Payments | Disabilitato esplicitamente nelle Checkout Session                                                           |
+| IVA              | Stripe Tax sandbox; caso IT verificato 500 € + 110 € = 610 €; live da configurare                            |
+| Fatturazione     | Export amministrativo JSON disponibile; XML/FIC/SdI e registro fatture da completare                         |
+| Dati fiscali     | Passaggio B2B con anagrafica, indirizzo, Tax ID, CF italiano e recapiti SdI                                  |
+| Documenti legali | Bozze segnalate; tre conferme, timestamp, versione e testo/hash conservati; nuovi acquisti live bloccati     |
+| Analytics        | Consenso preventivo browser/server, revoca e preferenze; replay disabilitato                                 |
+| Cron             | Endpoint autenticato disponibile; nessuna pianificazione in `vercel.json`                                    |
+| Rimborsi         | I parziali mantengono la campagna fino alla scadenza; il totale cumulativo integrale la rimuove              |
+| Pausa vendite    | Nuovi acquisti live bloccati da documenti in bozza/paesi non approvati; pausa operativa ancora da aggiungere |
 
 Riferimenti implementativi: `server/sponsors/service.ts`,
 `server/sponsors/config.ts`, `server/sponsors/schema.sql`,

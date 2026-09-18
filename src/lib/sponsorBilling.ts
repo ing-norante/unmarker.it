@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { sponsorTaxIdTypes } from "./sponsorTaxIds.ts";
 
-// Approved text; live sales stay gated until the publication/operational checklist is closed.
+// English v1.0.0 terms approved for publication on 18 September 2026.
+// Live payments still require server opt-in and an approved country list.
 export const SPONSOR_TERMS_VERSION = "v1.0.0";
-export const SPONSOR_TERMS_PUBLISHED: boolean = false;
+export const SPONSOR_TERMS_PUBLISHED: boolean = true;
 export const SPONSOR_TAX_CODE = "txcd_10701000";
 export const EU_COUNTRIES = new Set(
   "AT BE BG HR CY CZ DE DK EE ES FI FR GR HU IE IT LT LU LV MT NL PL PT RO SE SI SK".split(

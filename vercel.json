@@ -1,5 +1,11 @@
 {
   "outputDirectory": "dist",
+  "crons": [
+    {
+      "path": "/api/sponsors?action=reconcile",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "functions": {
     "api/sponsors.ts": {
       "includeFiles": "docs/legal/sponsor-terms.en.md"

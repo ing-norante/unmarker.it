@@ -18,11 +18,13 @@ export function getConfig() {
     STRIPE_WEBHOOK_SECRET: webhookSecret,
   } = process.env;
   // A dedicated connection can isolate sponsor previews from Marketplace-managed defaults.
-  const databaseUrl = process.env.SPONSOR_DATABASE_URL || process.env.DATABASE_URL;
+  const databaseUrl =
+    process.env.SPONSOR_DATABASE_URL || process.env.DATABASE_URL;
   if (!key || !priceId || !databaseUrl || !secret || secret.length < 32)
     throw new SponsorError("unavailable", 503);
-  const live = key.startsWith("sk_live_");
-  if (!key.startsWith("sk_test_") && !live)
+  // Restricted backend keys use rk_; they must obey the same live-mode guard.
+  const live = /^(?:sk|rk)_live_/.test(key);
+  if (!/^(?:sk|rk)_test_/.test(key) && !live)
     throw new SponsorError("unavailable", 503);
   if (live && process.env.SPONSOR_ALLOW_LIVE_PAYMENTS !== "true")
     throw new SponsorError("unavailable", 503);
