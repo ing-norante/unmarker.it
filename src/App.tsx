@@ -1,8 +1,9 @@
+import { CookieConsent } from "@/components/CookieConsent";
 import { Suspense, useCallback, useState } from "react";
 import { ImageUploader } from "@/components/ImageUploader";
 import { Header } from "@/components/Header";
 import { HomepageFacts } from "@/components/HomepageFacts";
-import { DeferredFooter } from "@/components/DeferredFooter";
+import { Footer } from "@/components/Footer";
 import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
 import { ChunkReloadNotice } from "@/components/ChunkReloadNotice";
 import { lazyWithReload } from "@/lib/lazyWithReload";
@@ -21,6 +22,7 @@ import type { StatusMessage } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 import { translateMessage } from "@/i18n/messages";
 import { LocaleSuggestion } from "@/components/LocaleSuggestion";
+import { SponsorLayout } from "@/components/SponsorLayout";
 
 const WorkflowApp = lazyWithReload(
   "workflow-app",
@@ -28,6 +30,17 @@ const WorkflowApp = lazyWithReload(
 );
 
 function App() {
+  return (
+    <>
+      <SponsorLayout>
+        <AppContent />
+      </SponsorLayout>
+      <CookieConsent />
+    </>
+  );
+}
+
+function AppContent() {
   const { t } = useTranslation(["homepage", "workflow"]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [focusUploader, setFocusUploader] = useState(false);
@@ -121,7 +134,7 @@ function App() {
           <HomepageFacts />
         </div>
         <div className="px-(--page-gutter) pb-6 lg:pb-8">
-          <DeferredFooter />
+          <Footer />
         </div>
         <div translate="no">
           <LocaleSuggestion />

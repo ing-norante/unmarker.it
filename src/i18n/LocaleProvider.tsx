@@ -15,7 +15,8 @@ import {
   createDocumentMetadata,
 } from "@/i18n/documentMetadata";
 import {
-  localeConfigs,
+  pagePath,
+  resolvePageFromPathname,
   resolveLocaleFromPathname,
   type SupportedLocale,
 } from "@/i18n/locales";
@@ -74,14 +75,15 @@ export function LocaleProvider({
       await instance.changeLanguage(nextLocale);
       flushSync(() => setLocale(nextLocale));
 
-      if (
-        pushHistory &&
-        window.location.pathname !== localeConfigs[nextLocale].path
-      ) {
-        window.history.pushState({}, "", localeConfigs[nextLocale].path);
+      const page = resolvePageFromPathname(window.location.pathname);
+      const nextPath = pagePath(nextLocale, page);
+      if (pushHistory && window.location.pathname !== nextPath) {
+        window.history.pushState({}, "", nextPath);
       }
 
-      applyDocumentMetadataToDom(createDocumentMetadata(nextLocale, instance));
+      applyDocumentMetadataToDom(
+        createDocumentMetadata(nextLocale, instance, page),
+      );
       await registerAnalyticsLocale(nextLocale);
     },
     [instance],

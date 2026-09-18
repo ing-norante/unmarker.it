@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { ThemeProvider } from "next-themes";
 import { ImageUploader } from "@/components/ImageUploader";
 import { CrushQualityControl } from "@/components/CrushQualityControl";
 import { PipelineSteps } from "@/components/PipelineSteps";
@@ -7,7 +6,7 @@ import { Header } from "@/components/Header";
 import { ActionBar } from "@/components/ActionBar";
 import { ImageComparison } from "@/components/ImageComparison";
 import { HomepageFacts } from "@/components/HomepageFacts";
-import { DeferredFooter } from "@/components/DeferredFooter";
+import { Footer } from "@/components/Footer";
 import {
   FilePolicyDetails,
   WorkflowSummary,
@@ -91,12 +90,7 @@ function WorkflowApp({ initialFile, onResetToShell }: WorkflowAppProps) {
   };
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="light"
-      enableSystem={false}
-      storageKey="theme"
-    >
+    <>
       <WorkflowLayout
         statusMessage={statusMessage}
         originalImage={originalImage}
@@ -124,7 +118,7 @@ function WorkflowApp({ initialFile, onResetToShell }: WorkflowAppProps) {
       <div translate="no">
         <Toaster />
       </div>
-    </ThemeProvider>
+    </>
   );
 }
 
@@ -197,12 +191,14 @@ function WorkflowLayout({
                   <Separator className="flex-1" />
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-auto lg:overscroll-contain">
+                <div className="min-h-0 flex-1">
                   <div className="flex flex-col gap-4">
                     <WorkflowSummary
                       phase={state.phase}
                       hasWarnings={workflowWarnings.length > 0}
-                      verificationFailed={state.phase === "complete" && !state.postflightAudit}
+                      verificationFailed={
+                        state.phase === "complete" && !state.postflightAudit
+                      }
                     />
                     {state.phase !== "analysis-only" && (
                       <PipelineSteps steps={steps} />
@@ -217,7 +213,11 @@ function WorkflowLayout({
 
                     {workflowBusy && (
                       <div className="bg-card text-card-foreground flex flex-col gap-2 border p-3 text-sm sm:p-4 sm:text-base">
-                        <span>{t(`workflow:busy.${state.phase}`, { defaultValue: t("workflow:busy.fallback") })}</span>
+                        <span>
+                          {t(`workflow:busy.${state.phase}`, {
+                            defaultValue: t("workflow:busy.fallback"),
+                          })}
+                        </span>
                         <Skeleton className="h-1 w-full" />
                       </div>
                     )}
@@ -241,7 +241,9 @@ function WorkflowLayout({
                     <span>{translateMessage(t, statusMessage.title)}</span>
                   </AlertTitle>
                   <AlertDescription>
-                    <span>{translateMessage(t, statusMessage.description)}</span>
+                    <span>
+                      {translateMessage(t, statusMessage.description)}
+                    </span>
                   </AlertDescription>
                 </Alert>
               )}
@@ -278,7 +280,7 @@ function WorkflowLayout({
                     className="shrink-0"
                   />
 
-                  <div className="lg:min-h-0 lg:flex-1 lg:overflow-auto lg:overscroll-contain">
+                  <div className="lg:min-h-0 lg:flex-1">
                     <ImageComparison
                       originalImageUrl={originalImageUrl}
                       processedImageUrl={processedImageUrl}
@@ -299,7 +301,7 @@ function WorkflowLayout({
           <HomepageFacts />
         </div>
         <div className="px-(--page-gutter) pb-6 lg:pb-8">
-          <DeferredFooter />
+          <Footer />
         </div>
         <div translate="no">
           <LocaleSuggestion />

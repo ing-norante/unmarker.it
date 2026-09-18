@@ -1,6 +1,19 @@
 import type { BeforeSendFn, CaptureResult } from "posthog-js";
 
-import type { SupportedLocale } from "@/i18n/locales";
+import {
+  clearAnalyticsStorage,
+  getConsent,
+  hasAnalyticsConsent,
+  subscribeConsent,
+  syncSponsorConsent,
+} from "@/lib/cookieConsent";
+import {
+  pagePath,
+  resolvePageFromPathname,
+  type SupportedLocale,
+} from "@/i18n/locales";
+import { sponsorship } from "@/lib/sponsors";
+import { getSponsorAnalyticsContext } from "@/lib/sponsorAnalyticsContext";
 
 // Errors that browser extensions and in-app browsers inject, not our bundle.
 // Page-translation extensions mutate DOM nodes that React owns, so React
@@ -129,20 +142,88 @@ export function getSemanticEventName(action: TrackingAction) {
   return semanticEvents[action];
 }
 
+let activePostHog: typeof import("posthog-js").default | null = null;
+let consentGeneration = 0;
+let sdkInstanceNumber = 0;
+let analyticsRequests: AbortController | null = null;
+let consentListenerInstalled = false;
+let currentLocale: SupportedLocale = "en";
+let lastSponsorshipPageview: string | null = null;
+
+const consentBeforeSend: BeforeSendFn = (event) => {
+  if (!hasAnalyticsConsent()) return null;
+  const filtered = dropForeignScriptExceptions(event);
+  if (!filtered) return null;
+  // Include session-entry and nested initial URLs, not only the pageview URL.
+  for (const properties of [
+    filtered.properties,
+    filtered.properties?.$set,
+    filtered.properties?.$set_once,
+  ]) {
+    if (!properties || typeof properties !== "object") continue;
+    for (const [key, value] of Object.entries(properties)) {
+      if (
+        key !== "$referrer" &&
+        !key.endsWith("_url") &&
+        !key.endsWith("_referrer")
+      )
+        continue;
+      if (typeof value !== "string") continue;
+      try {
+        const url = new URL(value);
+        properties[key] = url.origin + url.pathname;
+      } catch {
+        delete properties[key];
+      }
+    }
+  }
+  return filtered;
+};
+
+function installConsentListener() {
+  if (consentListenerInstalled || typeof window === "undefined") return;
+  consentListenerInstalled = true;
+  const changed = () => {
+    consentGeneration++;
+    window.dispatchEvent(new Event("unmarker:analytics-pageview"));
+    if (!hasAnalyticsConsent()) {
+      // Abort before teardown: the SDK can otherwise retry previously queued requests.
+      analyticsRequests?.abort();
+      analyticsRequests = null;
+      activePostHog?.opt_out_capturing();
+      activePostHog?.stopSessionRecording();
+      activePostHog?.reset(true);
+      void activePostHog?.shutdown();
+      activePostHog = null;
+      clearAnalyticsStorage();
+    } else {
+      void capturePageview();
+    }
+    void syncSponsorConsent();
+  };
+  subscribeConsent(changed);
+  if (!hasAnalyticsConsent()) clearAnalyticsStorage();
+  void syncSponsorConsent();
+  window.addEventListener("online", () => {
+    void syncSponsorConsent();
+  });
+  window.addEventListener("pageshow", () => {
+    void syncSponsorConsent();
+  });
+}
+
 let posthogPromise: Promise<typeof import("posthog-js").default | null> | null =
   null;
 
 function isLocalhost() {
   const { hostname } = window.location;
   return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]"
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
   );
 }
 
 function getPostHog() {
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || !hasAnalyticsConsent()) {
     return Promise.resolve(null);
   }
 
@@ -161,37 +242,92 @@ function getPostHog() {
     return Promise.resolve(null);
   }
 
+  const generation = consentGeneration;
+  const consentAt = getConsent()?.updatedAt;
   posthogPromise ??= import("posthog-js")
-    .then(({ default: posthog }) => {
-      posthog.init(apiKey, {
-        ...(apiHost ? { api_host: apiHost } : {}),
-        ...(uiHost ? { ui_host: uiHost } : {}),
-        defaults: "2025-05-24",
-        capture_pageview: false,
-        capture_exceptions: true,
-        before_send: dropForeignScriptExceptions,
-        debug: import.meta.env.MODE === "development",
-      });
-
-      return posthog;
-    })
+    .then(({ default: posthog }) => posthog)
     .catch((error: unknown) => {
       posthogPromise = null;
-
-      if (import.meta.env.MODE === "development") {
+      if (import.meta.env.MODE === "development")
         console.warn("PostHog failed to initialize", error);
-      }
-
       return null;
     });
-
-  return posthogPromise;
+  return posthogPromise.then((posthog) => {
+    if (
+      !posthog ||
+      !hasAnalyticsConsent() ||
+      generation !== consentGeneration ||
+      consentAt !== getConsent()?.updatedAt
+    )
+      return null;
+    if (!activePostHog) {
+      analyticsRequests = new AbortController();
+      // PostHog forwards fetch_options to fetch. Keep each consent period on its
+      // own instance and aborted signal, including retries after a later opt-in.
+      const fetchOptions = {
+        cache: "no-store" as const,
+        signal: analyticsRequests.signal,
+      };
+      activePostHog =
+        posthog.init(
+          apiKey,
+          {
+            ...(apiHost ? { api_host: apiHost } : {}),
+            ...(uiHost ? { ui_host: uiHost } : {}),
+            defaults: "2025-05-24",
+            capture_pageview: false,
+            capture_pageleave: false,
+            capture_exceptions: true,
+            capture_performance: { web_vitals: true },
+            autocapture: false,
+            rageclick: false,
+            capture_heatmaps: false,
+            disable_session_recording: true,
+            enable_recording_console_log: false,
+            disable_surveys: true,
+            disable_product_tours: true,
+            disable_conversations: true,
+            ip: false,
+            advanced_disable_feature_flags: true,
+            person_profiles: "never",
+            persistence: "localStorage",
+            cross_subdomain_cookie: false,
+            opt_out_capturing_by_default: true,
+            opt_out_persistence_by_default: true,
+            cookieless_mode: undefined,
+            request_batching: false,
+            api_transport: "fetch",
+            disable_beacon: true,
+            fetch_options: fetchOptions,
+            disable_capture_url_hashes: true,
+            save_campaign_params: false,
+            save_referrer: false,
+            before_send: consentBeforeSend,
+            debug: import.meta.env.MODE === "development",
+          },
+          `unmarker_consent_${++sdkInstanceNumber}`,
+        ) ?? null;
+    }
+    if (activePostHog?.has_opted_out_capturing())
+      activePostHog.opt_in_capturing({ captureEventName: false });
+    activePostHog?.register({
+      locale: currentLocale,
+      consent_version: getConsent()?.version,
+    });
+    return activePostHog;
+  });
 }
 
 export async function initAnalytics(locale: SupportedLocale) {
+  currentLocale = locale;
+  installConsentListener();
+  const properties = getSponsorAnalyticsContext();
   const posthog = await getPostHog();
   posthog?.register({ locale });
-  posthog?.capture("$pageview");
+  if (hasAnalyticsConsent() && posthog) {
+    posthog.capture("$pageview", properties);
+    captureSponsorshipPageview(posthog);
+  }
 }
 
 export function trackAction(
@@ -199,10 +335,11 @@ export function trackAction(
   component: TrackingComponent,
   properties: AnalyticsProperties = {},
 ) {
+  const eventProperties = { ...getSponsorAnalyticsContext(), ...properties };
   // Keep analytics file-agnostic: action events must not include file names,
   // MIME types, dimensions, hashes, or other image-derived values.
   void getPostHog().then((posthog) => {
-    captureAction(posthog, action, component, properties);
+    captureAction(posthog, action, component, eventProperties);
   });
 }
 
@@ -212,7 +349,7 @@ function captureAction(
   component: TrackingComponent,
   properties: AnalyticsProperties,
 ) {
-  if (!posthog) return;
+  if (!posthog || !hasAnalyticsConsent()) return;
 
   const eventProperties = {
     ...properties,
@@ -232,17 +369,60 @@ function captureAction(
 
 export async function captureException(error: unknown) {
   const posthog = await getPostHog();
-  posthog?.captureException(error);
+  if (hasAnalyticsConsent()) posthog?.captureException(error);
 }
 
 export async function registerAnalyticsLocale(locale: SupportedLocale) {
+  currentLocale = locale;
   const posthog = await getPostHog();
   posthog?.register({ locale });
 }
 
 export async function capturePageview() {
+  if (typeof window !== "undefined")
+    window.dispatchEvent(new Event("unmarker:analytics-pageview"));
+  const properties = getSponsorAnalyticsContext();
   const posthog = await getPostHog();
-  posthog?.capture("$pageview");
+  if (hasAnalyticsConsent() && posthog) {
+    posthog.capture("$pageview", properties);
+    captureSponsorshipPageview(posthog);
+  }
+}
+
+export type SponsorEvent =
+  | "sponsor_impression"
+  | "sponsor_clicked"
+  | "sponsor_advertise_opened"
+  | "sponsor_checkout_clicked"
+  | "sponsorship_link_clicked"
+  | "sponsorship_page_viewed";
+
+/** New sponsor events do not use the legacy action_clicked envelope. */
+export function trackSponsorEvent(
+  event: SponsorEvent,
+  properties: AnalyticsProperties,
+) {
+  const eventProperties = {
+    ...getSponsorAnalyticsContext(),
+    ...properties,
+    analytics_schema_version: ANALYTICS_SCHEMA_VERSION,
+    sponsor_tracking_version: 1,
+    component: "sponsors",
+  };
+  const capture = (posthog: typeof activePostHog) => {
+    if (hasAnalyticsConsent()) posthog?.capture(event, eventProperties);
+  };
+  // Dispatch navigation clicks before leaving the document when the SDK is ready.
+  // Its unbatched fetch transport already uses keepalive; consent can still abort it.
+  if (activePostHog) capture(activePostHog);
+  else void getPostHog().then(capture);
+}
+
+export async function getSponsorAnalyticsId() {
+  const posthog = await getPostHog();
+  return hasAnalyticsConsent() && posthog && !posthog.has_opted_out_capturing()
+    ? posthog.get_distinct_id()
+    : null;
 }
 
 export async function trackLocaleAction(
@@ -256,4 +436,76 @@ export async function trackLocaleAction(
 ) {
   const posthog = await getPostHog();
   captureAction(posthog, action, component, properties);
+}
+
+export type SponsorshipLinkLocation =
+  | "desktop_left_card"
+  | "desktop_right_card"
+  | "desktop_controls"
+  | "mobile_controls"
+  | "language_switcher";
+
+/** Only bounded UI metadata: never form values, URLs with queries or billing data. */
+export function trackSponsorshipLink(
+  location: SponsorshipLinkLocation,
+  locale: SupportedLocale,
+  interaction: {
+    button: number;
+    metaKey: boolean;
+    ctrlKey: boolean;
+    shiftKey: boolean;
+  },
+  availableSpots?: number,
+) {
+  if (typeof window === "undefined" || interaction.button > 1) return;
+  const properties: AnalyticsProperties = {
+    link_location: location,
+    source_path: pagePath(
+      currentLocale,
+      resolvePageFromPathname(window.location.pathname),
+    ),
+    destination_path: pagePath(locale, "sponsorship"),
+    destination_locale: locale,
+    activation:
+      interaction.button === 1
+        ? "middle_click"
+        : interaction.metaKey || interaction.ctrlKey || interaction.shiftKey
+          ? "modified_click"
+          : "click",
+    ...(availableSpots === undefined
+      ? {}
+      : { available_spots: availableSpots }),
+  };
+  trackSponsorEvent("sponsorship_link_clicked", properties);
+  // Preserve existing Advertise insights; language changes aren't new Advertise clicks.
+  if (location !== "language_switcher") {
+    trackSponsorEvent("sponsor_advertise_opened", {
+      ...properties,
+      price_eur: sponsorship.priceEur,
+      duration_days: sponsorship.durationDays,
+      legacy_compatibility_event: true,
+    });
+  }
+}
+
+function captureSponsorshipPageview(
+  posthog: NonNullable<typeof activePostHog>,
+) {
+  const page = resolvePageFromPathname(window.location.pathname);
+  if (page !== "sponsorship") {
+    lastSponsorshipPageview = null;
+    return;
+  }
+  const path = pagePath(currentLocale, page);
+  // Analytics bootstrap, consent acceptance and repeated effects can coincide.
+  if (lastSponsorshipPageview === path) return;
+  lastSponsorshipPageview = path;
+  posthog.capture("sponsorship_page_viewed", {
+    ...getSponsorAnalyticsContext(),
+    page_path: path,
+    locale: currentLocale,
+    analytics_schema_version: ANALYTICS_SCHEMA_VERSION,
+    sponsor_tracking_version: 1,
+    component: "sponsorship_page",
+  });
 }

@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { writeLegalPages } from "./legal-pages.ts";
 
 const rootDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -11,30 +12,59 @@ const serverDir = path.join(distDir, "server");
 const indexPath = path.join(distDir, "index.html");
 const serverEntry = path.join(serverDir, "entry-server.js");
 
-const [{ render, applyDocumentMetadataToHtml }, template] = await Promise.all([
+const [{ render, applyDocumentMetadataToHtml }, template, manifestJson] = await Promise.all([
   import(pathToFileURL(serverEntry).href),
   readFile(indexPath, "utf8"),
+  readFile(path.join(distDir, ".vite/manifest.json"), "utf8"),
 ]);
+const manifest = JSON.parse(manifestJson);
+
+// Start the selected route with the document; never preload the other route
+// or the billing step. Follow static imports only, leaving dynamic imports lazy.
+function preloadRoute(html, page) {
+  const seen = new Set();
+  const links = [];
+  function visit(key) {
+    if (seen.has(key)) return;
+    seen.add(key);
+    const chunk = manifest[key];
+    if (!chunk) throw new Error(`Missing route chunk: ${key}`);
+    const href = `/${chunk.file}`;
+    if (!html.includes(`"${href}"`)) {
+      links.push(`<link rel="modulepreload" crossorigin href="${href}">`);
+    }
+    for (const dependency of chunk.imports ?? []) visit(dependency);
+  }
+  visit(page === "sponsorship" ? "src/SponsorshipPage.tsx" : "src/App.tsx");
+  return html.replace("</head>", `${links.join("\n")}\n</head>`);
+}
 
 for (const locale of ["en", "zh-Hans"]) {
-  const { appHtml, documentMetadata } = await render(locale);
-  let prerendered = template.replace(
-    '<div id="root"></div>',
-    `<div id="root">${appHtml}</div>`,
-  );
-  prerendered = applyDocumentMetadataToHtml(prerendered, documentMetadata);
+  for (const page of ["home", "sponsorship"]) {
+    const { appHtml, documentMetadata } = await render(locale, page);
+    let prerendered = template.replace(
+      '<div id="root"></div>',
+      `<div id="root">${appHtml}</div>`,
+    );
+    prerendered = applyDocumentMetadataToHtml(prerendered, documentMetadata);
+    prerendered = preloadRoute(prerendered, page);
 
-  if (!prerendered.includes("Dark mode initialization")) {
-    throw new Error(`Theme initialization script was lost for ${locale}`);
-  }
-  if (/(?:src|href)=["'](?:\.\/)?assets\//i.test(prerendered)) {
-    throw new Error(`Relative asset URL found in prerendered ${locale} HTML`);
-  }
+    if (!prerendered.includes('<meta name="color-scheme" content="dark"')) {
+      throw new Error(`Dark color scheme was lost for ${locale}`);
+    }
+    if (/(?:src|href)=["'](?:\.\/)?assets\//i.test(prerendered)) {
+      throw new Error(`Relative asset URL found in prerendered ${locale} HTML`);
+    }
 
-  const outputPath = locale === "en"
-    ? indexPath
-    : path.join(distDir, "zh-hans", "index.html");
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, prerendered);
+    const outputPath = path.join(
+      distDir,
+      locale === "en" ? "" : "zh-hans",
+      page === "home" ? "" : "sponsorship",
+      "index.html",
+    );
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, prerendered);
+  }
 }
+await writeLegalPages(distDir, template);
 await rm(serverDir, { recursive: true, force: true });

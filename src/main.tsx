@@ -1,27 +1,45 @@
 import { StrictMode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
 import "./index.css";
-import App from "./App";
+import { loadChunk } from "@/lib/lazyWithReload";
 import { initAnalytics } from "@/lib/analytics";
 import { I18nextProvider } from "react-i18next";
 import { initializeClientI18n } from "@/i18n/createI18n";
-import { resolveLocaleFromPathname } from "@/i18n/locales";
+import {
+  resolveLocaleFromPathname,
+  resolvePageFromPathname,
+} from "@/i18n/locales";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { applyDocumentMetadataToDom, createDocumentMetadata } from "@/i18n/documentMetadata";
+import {
+  applyDocumentMetadataToDom,
+  createDocumentMetadata,
+} from "@/i18n/documentMetadata";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppErrorFallback } from "@/components/AppErrorFallback";
 
 async function bootstrap() {
   const locale = resolveLocaleFromPathname(window.location.pathname);
-  const instance = await initializeClientI18n(locale);
-  applyDocumentMetadataToDom(createDocumentMetadata(locale, instance));
+  const page = resolvePageFromPathname(window.location.pathname);
+  const [instance, pageModule] = await Promise.all([
+    initializeClientI18n(locale),
+    // Separate loaders keep Vite from preloading both sides of the route choice.
+    (page === "sponsorship"
+      ? loadChunk("sponsorship", () => import("./SponsorshipPage"))
+      : loadChunk("home", () => import("./App"))
+    ).catch((error: unknown) => {
+      console.error("Page loading failed", error);
+      return null;
+    }),
+  ]);
+  const Page = pageModule?.default ?? AppErrorFallback;
+  applyDocumentMetadataToDom(createDocumentMetadata(locale, instance, page));
 
   const app = (
     <StrictMode>
       <I18nextProvider i18n={instance}>
         <LocaleProvider instance={instance} initialLocale={locale}>
           <ErrorBoundary fallback={<AppErrorFallback />}>
-            <App />
+            <Page />
           </ErrorBoundary>
         </LocaleProvider>
       </I18nextProvider>
@@ -29,7 +47,7 @@ async function bootstrap() {
   );
   const root = document.getElementById("root")!;
 
-  if (root.hasChildNodes()) hydrateRoot(root, app);
+  if (root.hasChildNodes() && pageModule) hydrateRoot(root, app);
   else createRoot(root).render(app);
 
   // Optional analytics must not gate hydration or file selection.

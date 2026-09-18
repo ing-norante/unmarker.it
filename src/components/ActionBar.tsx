@@ -1,5 +1,6 @@
 import { Button } from "./ui/button";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowClockwiseIcon,
   DownloadSimpleIcon,
@@ -13,6 +14,15 @@ import { trackAction } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import type { WorkflowPhase } from "@/lib/types";
 import { useTranslation } from "react-i18next";
+
+const mobileQuery = "(max-width: 1023px)";
+const subscribeToViewport = (notify: () => void) => {
+  const query = window.matchMedia(mobileQuery);
+  query.addEventListener("change", notify);
+  return () => query.removeEventListener("change", notify);
+};
+const isMobileViewport = () => window.matchMedia(mobileQuery).matches;
+const serverViewport = () => false;
 
 interface ActionBarProps {
   fileName: string;
@@ -48,6 +58,29 @@ export function ActionBar({
   className,
 }: ActionBarProps) {
   const { t } = useTranslation("common");
+  const mobile = useSyncExternalStore(
+    subscribeToViewport,
+    isMobileViewport,
+    serverViewport,
+  );
+  const actionsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!mobile || !actionsRef.current) return;
+    const root = document.documentElement;
+    const updateHeight = () => {
+      root.style.setProperty(
+        "--workflow-toolbar-height",
+        `${actionsRef.current?.getBoundingClientRect().height ?? 0}px`,
+      );
+    };
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(actionsRef.current);
+    updateHeight();
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--workflow-toolbar-height");
+    };
+  }, [mobile]);
   const fileNameRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     fileNameRef.current?.focus({ preventScroll: true });
@@ -85,69 +118,95 @@ export function ActionBar({
     trackAction("download_processed", "action_bar");
   };
 
+  const canDownload = !!processedImageUrl && hasProcessedImage;
+  const metadataAction = canCleanMetadata && (
+    <Button
+      variant={!canProcess && !canDownload ? "default" : "outline"}
+      onClick={onDownloadCleanMetadata}
+      disabled={isBusy || isMetadataCleaning}
+    >
+      {isMetadataCleaning ? (
+        <Spinner data-icon="inline-start" />
+      ) : (
+        <FileSearchIcon data-icon="inline-start" />
+      )}
+      {t("actions.cleanMetadata")}
+    </Button>
+  );
+  const actions = (
+    <div
+      ref={actionsRef}
+      role="group"
+      aria-label={t("actions.imageActions")}
+      className={cn(
+        "workflow-actions",
+        mobile ? "workflow-actions-mobile" : "flex min-w-0 flex-wrap gap-2",
+      )}
+    >
+      <Button variant="outline" onClick={handleReset} disabled={isBusy}>
+        <ArrowClockwiseIcon data-icon="inline-start" />
+        {t("actions.reset")}
+      </Button>
+      {canCancel && (
+        <Button variant="destructive" onClick={handleCancel}>
+          <XCircleIcon data-icon="inline-start" />
+          {t("actions.cancel")}
+        </Button>
+      )}
+      {canRetry && (
+        <Button
+          variant={canDownload ? "outline" : "default"}
+          onClick={handleRetry}
+        >
+          <LightningIcon data-icon="inline-start" />
+          {t("actions.retry")}
+        </Button>
+      )}
+      {canReprocess && (
+        <Button variant="outline" onClick={handleReprocess}>
+          <LightningIcon data-icon="inline-start" />
+          {t("actions.reprocess")}
+        </Button>
+      )}
+      {canDownload && (
+        <Button asChild>
+          <a
+            href={processedImageUrl!}
+            download={processedFileName ?? undefined}
+            onClick={handleDownload}
+            aria-label={t("actions.downloadJpeg")}
+          >
+            <DownloadSimpleIcon data-icon="inline-start" />
+            {t(mobile ? "actions.download" : "actions.downloadJpeg")}
+          </a>
+        </Button>
+      )}
+      {(!mobile || !canProcess) && metadataAction}
+    </div>
+  );
+
   return (
     <div
       className={cn(
-        "bg-card/95 text-card-foreground flex flex-col justify-between gap-4 border p-4 lg:sticky lg:top-0 lg:z-10 @min-[52rem]/workspace:flex-row @min-[52rem]/workspace:items-center",
+        "workflow-action-bar bg-card text-card-foreground flex flex-col justify-between gap-4 border p-4 lg:sticky lg:z-30 @min-[52rem]/workspace:flex-row @min-[52rem]/workspace:items-center",
         className,
       )}
     >
       <div className="flex min-w-0 items-center gap-2 text-sm font-medium sm:text-base">
-        <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center border">
-          <FileImageIcon className="size-4" weight="bold" />
+        <FileImageIcon
+          className="text-muted-foreground size-5 shrink-0"
+          weight="bold"
+        />
+        <span
+          ref={fileNameRef}
+          tabIndex={-1}
+          className="focus-visible:outline-ring truncate focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+        >
+          {fileName}
         </span>
-        <span ref={fileNameRef} tabIndex={-1} className="truncate focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">{fileName}</span>
       </div>
-      <div className="grid min-w-0 grid-cols-1 gap-2 @min-[28rem]/workspace:flex @min-[28rem]/workspace:flex-wrap *:data-[slot=button]:h-auto *:data-[slot=button]:min-h-8 *:data-[slot=button]:max-w-full *:data-[slot=button]:py-2 *:data-[slot=button]:whitespace-normal *:data-[slot=button]:wrap-anywhere">
-        {canCancel && (
-          <Button variant="destructive" onClick={handleCancel}>
-            <XCircleIcon data-icon="inline-start" />
-            {t("actions.cancel")}
-          </Button>
-        )}
-        <Button variant="outline" onClick={handleReset} disabled={isBusy}>
-          <ArrowClockwiseIcon data-icon="inline-start" />
-          {t("actions.reset")}
-        </Button>
-        {canRetry && (
-          <Button onClick={handleRetry} className="font-black">
-            <LightningIcon data-icon="inline-start" />
-            {t("actions.retry")}
-          </Button>
-        )}
-        {canReprocess && (
-          <Button onClick={handleReprocess} className="font-black">
-            <LightningIcon data-icon="inline-start" />
-            {t("actions.reprocess")}
-          </Button>
-        )}
-        {processedImageUrl && hasProcessedImage && (
-          <Button asChild>
-            <a
-              href={processedImageUrl}
-              download={processedFileName ?? undefined}
-              onClick={handleDownload}
-            >
-              <DownloadSimpleIcon data-icon="inline-start" />
-              {t("actions.downloadJpeg")}
-            </a>
-          </Button>
-        )}
-        {canCleanMetadata && (
-          <Button
-            variant="outline"
-            onClick={onDownloadCleanMetadata}
-            disabled={isBusy || isMetadataCleaning}
-          >
-            {isMetadataCleaning ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <FileSearchIcon data-icon="inline-start" />
-            )}
-            {t("actions.cleanMetadata")}
-          </Button>
-        )}
-      </div>
+      {mobile ? createPortal(actions, document.body) : actions}
+      {mobile && canProcess && metadataAction}
     </div>
   );
 }

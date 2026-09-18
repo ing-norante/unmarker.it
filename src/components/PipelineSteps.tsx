@@ -30,14 +30,12 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
           size="sm"
           className={cn(
             "bg-card/95 overflow-visible border py-0 transition-colors",
-            step.status === "running"
-              ? "border-primary bg-primary/10"
-              : "hover:bg-muted/40",
+            step.status === "running" && "border-primary bg-primary/10",
           )}
         >
           <CardContent className="flex flex-col gap-2 p-3 lg:p-3.5">
             <div className="flex items-start gap-2.5 sm:gap-3">
-              <div className="bg-muted text-foreground flex size-12 shrink-0 items-center justify-center border">
+              <div className="text-muted-foreground flex size-8 shrink-0 items-center justify-center">
                 <StepGlyph id={step.id} status={step.status} />
               </div>
 
@@ -49,12 +47,15 @@ export const PipelineSteps: React.FC<PipelineStepsProps> = ({ steps }) => {
                     </span>
                     {step.status === "done" && (
                       <CheckIcon
-                        className="text-completion-text size-4 shrink-0"
+                        className="text-primary-text size-4 shrink-0"
                         weight="bold"
                       />
                     )}
                   </div>
-                  <StatusBadge status={step.status} label={t(`stepStatus.${step.status}`)} />
+                  <StatusBadge
+                    status={step.status}
+                    label={t(`stepStatus.${step.status}`)}
+                  />
                 </div>
                 <p className="text-muted-foreground text-ui-body text-pretty wrap-break-word">
                   {t(`steps.${step.id}.description`)}
@@ -105,51 +106,24 @@ function StepGlyph({
   }
 }
 
-function StatusBadge({ status, label }: { status: PipelineStepState["status"]; label: string }) {
-  switch (status) {
-    case "done":
-      return (
-        <Badge className="border-chart-2/20 bg-chart-2/10 text-completion-text text-ui-caption shrink-0 font-bold uppercase">
-          <span className="bg-chart-2 size-1.5" />
-          {label}
-        </Badge>
-      );
-    case "skipped":
-      return (
-        <Badge
-          variant="outline"
-          className="bg-muted text-muted-foreground text-ui-caption shrink-0 font-bold uppercase"
-        >
-          <span className="bg-muted-foreground/40 size-1.5" />
-          {label}
-        </Badge>
-      );
-    case "running":
-      return (
-        <Badge className="border-primary/30 bg-primary/10 text-primary-text text-ui-caption shrink-0 font-bold uppercase">
-          <Spinner data-icon="inline-start" />
-          {label}
-        </Badge>
-      );
-    case "error":
-      return (
-        <Badge
-          variant="destructive"
-          className="text-ui-caption shrink-0 font-bold uppercase"
-        >
-          <span className="bg-destructive size-1.5" />
-          {label}
-        </Badge>
-      );
-    default:
-      return (
-        <Badge
-          variant="outline"
-          className="bg-muted/60 text-muted-foreground text-ui-caption shrink-0 font-bold uppercase"
-        >
-          <span className="bg-muted-foreground/30 size-1.5" />
-          {label}
-        </Badge>
-      );
-  }
+function StatusBadge({
+  status,
+  label,
+}: {
+  status: PipelineStepState["status"];
+  label: string;
+}) {
+  const variant =
+    status === "error"
+      ? "destructive"
+      : status === "done" || status === "running"
+        ? "default"
+        : "secondary";
+
+  return (
+    <Badge variant={variant}>
+      {status === "running" && <Spinner data-icon="inline-start" />}
+      {label}
+    </Badge>
+  );
 }

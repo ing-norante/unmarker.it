@@ -23,6 +23,7 @@
     <link id="meta-hreflang-3" rel="alternate" hreflang="x-default" href="https://www.unmarker.it/" />
     <meta id="meta-robots" name="robots" content="index,follow" />
     <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
     <!-- Open Graph / Facebook -->
     <meta id="meta-og-title" property="og:title" content="Unmarker.it - AI Watermark Tools" />
     <meta
@@ -133,17 +134,6 @@
     </script>
   </head>
   <body>
-    <script>
-      // Dark mode initialization - runs before React to avoid FOUC
-      // Default to light mode unless explicitly set to dark
-      (function () {
-        try {
-          if (localStorage.getItem("theme") === "dark") {
-            document.documentElement.classList.add("dark");
-          }
-        } catch { /* Use the default theme when storage is unavailable. */ }
-      })();
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

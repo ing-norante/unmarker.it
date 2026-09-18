@@ -1,12 +1,48 @@
 {
   "outputDirectory": "dist",
+  "crons": [
+    {
+      "path": "/api/sponsors?action=reconcile",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "functions": {
+    "api/sponsors.ts": {
+      "includeFiles": "docs/legal/sponsor-terms.en.md"
+    }
+  },
   "redirects": [
-    { "source": "/zh-hans", "destination": "/zh-hans/", "statusCode": 301 },
-    { "source": "/zh-Hans", "destination": "/zh-hans/", "statusCode": 301 },
-    { "source": "/zh-Hans/", "destination": "/zh-hans/", "statusCode": 301 },
-    { "source": "/zh-hans/index.html", "destination": "/zh-hans/", "statusCode": 301 }
+    {
+      "source": "/zh-hans",
+      "destination": "/zh-hans/",
+      "statusCode": 301
+    },
+    {
+      "source": "/zh-Hans",
+      "destination": "/zh-hans/",
+      "statusCode": 301
+    },
+    {
+      "source": "/zh-Hans/",
+      "destination": "/zh-hans/",
+      "statusCode": 301
+    },
+    {
+      "source": "/zh-hans/index.html",
+      "destination": "/zh-hans/",
+      "statusCode": 301
+    }
   ],
   "headers": [
+    {
+      "source": "/legal/:path*",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [
@@ -31,6 +67,32 @@
           "value": "camera=(), microphone=(), geolocation=(), payment=()"
         }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/sponsorship",
+      "destination": "/sponsorship/index.html"
+    },
+    {
+      "source": "/zh-hans/sponsorship",
+      "destination": "/zh-hans/sponsorship/index.html"
+    },
+    {
+      "source": "/legal/sponsorship-terms",
+      "destination": "/legal/sponsorship-terms/index.html"
+    },
+    {
+      "source": "/legal/privacy",
+      "destination": "/legal/privacy/index.html"
+    },
+    {
+      "source": "/legal/cookies",
+      "destination": "/legal/cookies/index.html"
+    },
+    {
+      "source": "/legal/cancellations-refunds",
+      "destination": "/legal/cancellations-refunds/index.html"
     }
   ]
 }
