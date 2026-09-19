@@ -83,11 +83,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
               `workflow:audit.hidden.${audit.stage === "postflight" ? "neutralized" : "risk"}.description`,
             )}
             tone="neutral"
-            badge={
-              audit.stage === "postflight"
-                ? t("common:generic.processed")
-                : t("common:generic.pending")
-            }
+            badge={t("workflow:verification.status.unverified")}
           />
         </CardContent>
       </Card>

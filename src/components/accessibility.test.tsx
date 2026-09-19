@@ -80,6 +80,35 @@ describe.each(["en", "zh-Hans"] as const)(
       },
     );
 
+    it.each(["preflight", "postflight"] as const)(
+      "labels hidden watermark evidence as unverified after completion, including %s analysis",
+      async (stage) => {
+        const audit = buildImageAudit({
+          stage,
+          metadataScan: null,
+          visibleScan: { status: "not-scanned" },
+        });
+        const { html, i18n } = await renderLocalized(
+          <AnalysisPanel audit={audit} phase="complete" />,
+          locale,
+        );
+        const badges = Array.from(
+          html.matchAll(/<span[^>]+data-slot="badge"[^>]*>([^<]+)<\/span>/g),
+          (match) => match[1],
+        );
+        expect(badges).toContain(
+          i18n.t("workflow:verification.status.unverified"),
+        );
+        expect(badges).not.toContain(i18n.t("common:generic.pending"));
+        expect(badges).not.toContain(i18n.t("common:generic.processed"));
+        expect(html).toContain(
+          i18n.t(
+            `workflow:audit.hidden.${stage === "postflight" ? "neutralized" : "risk"}.description`,
+          ),
+        );
+      },
+    );
+
     it("distinguishes unavailable metadata from a scan with no signals", async () => {
       const { html, i18n } = await renderLocalized(
         <MetadataSignalsList scanResult={null} />,
