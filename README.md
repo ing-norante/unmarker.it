@@ -16,9 +16,13 @@ results stay attached to their file; other entries can continue.
 - Download individual JPEGs or a ZIP of completed outputs plus `report.json`.
   The archive uses unique, sanitized names, stores already-compressed JPEGs
   without recompressing them, and is assembled in a dedicated worker.
-- ZIP export pauses the queue and is available when no image is active. It can
+- ZIP export reserves the workspace and is available when no image is active. It can
   be cancelled. Download actions start a browser download; they do not confirm
   that the user saved the file.
+- Metadata cleanup and ZIP export reserve the workspace while they run. New
+  admissions, retries and queue resume wait until that operation finishes;
+  switching the selected preview remains available. The user's pause state is
+  preserved, and cancelling an operation releases its resources.
 - No queue is persisted across page reloads. Remove entries or start over to
   release their retained originals and outputs.
 
@@ -44,6 +48,9 @@ Shake, Stir and JPEG encoding run in an OffscreenCanvas worker when supported.
 The fallback yields between noise strips to keep cancellation responsive. This
 reduces main-thread work; it does not eliminate the temporary memory needed for
 large image decoding. No WASM threads or cross-origin isolation are required.
+Worker and fallback execution share the same pixel stages. Their runtime helpers
+settle each operation once and release timers and listeners on success, failure
+or cancellation.
 
 ### Processing and evidence
 
@@ -74,11 +81,17 @@ are disabled. No remote credential URL is followed. Signer trust is reported as
 unknown, even if local integrity checks pass. Unsupported, unavailable or timed
 out reads are incomplete rather than negative (30-second local-read timeout).
 The SDK starts only when container inspection finds credential candidates.
+All markers found in one metadata segment are retained as evidence: a provider
+name cannot hide a Content Credentials reference in the same segment. The
+display label remains a projection of that evidence, not the input to detection.
 
 Original-format metadata cleanup remains a secondary download action:
 
 - PNG compressed text is bounded to 1 MiB per chunk and 4 MiB per file. Partial
   inspection is reported explicitly.
+- Metadata searches use bounded text blocks and cooperative cancellation. A scan
+  permits at most 16 MiB of searchable metadata and 100,000 structural entries;
+  reaching a limit reports incomplete coverage and preserves the original file.
 - JPEG C2PA APP11 continuations are removed together. EXIF and display-relevant
   XMP are preserved where removing them could change orientation.
 - WebP chunk sizes, RIFF length and VP8X metadata flags stay consistent. EXIF
@@ -111,6 +124,9 @@ Tests cover parser boundaries, credential interpretation and offline settings,
 worker recovery, real OpenCV 5 detection/restoration on a synthetic fixture,
 engine cancellation, queue sequencing and ZIP byte integrity. See
 [implementation and manual checks](docs/engine-optimization.md) for browser QA.
+The [refactoring review](docs/refactoring-review-2026-09-19.md) records the follow-up
+audit. Its image, workflow and build changes are implemented separately from the
+excluded sponsor work; see the implementation notes for scope and validation.
 
 ## Quick Start
 
