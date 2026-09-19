@@ -6,16 +6,23 @@ import type { ImageEngineControls } from "@/lib/engine/types";
 import { DEFAULT_OPTIONS } from "@/lib/pipeline";
 const file = (name = "image.png") =>
   new File(["test"], name, { type: "image/png" });
-const result = (bytes = 1) =>
-  ({
-    output: new Blob(["x".repeat(bytes)]),
-    outputName: "engine.jpg",
-    outcome: "completed",
-    warnings: [],
-    canCleanMetadata: false,
-    preflight: buildImageAudit({ stage: "preflight", metadataScan: null }),
-    postflight: null,
-  }) as ImageEngineResult;
+const result = (bytes = 1): ImageEngineResult => ({
+  output: new Blob(["x".repeat(bytes)]),
+  outputName: "engine.jpg",
+  outcome: "completed",
+  warnings: [],
+  canCleanMetadata: false,
+  preflight: buildImageAudit({
+    stage: "preflight",
+    metadataScan: null,
+    visibleScan: { status: "not-scanned" },
+  }),
+  postflight: buildImageAudit({
+    stage: "postflight",
+    metadataScan: null,
+    visibleScan: { status: "not-scanned" },
+  }),
+});
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 describe("sequential batch", () => {
   it("keeps the whole job sequential and isolates errors", async () => {
@@ -125,6 +132,69 @@ describe("sequential batch", () => {
     expect(uniqueOutputName("photo.jpg", reserved)).toBe(
       "photo-unmarker-2.jpg",
     );
+  });
+  it("guards image operations during an exclusive lease and preserves user pause", async () => {
+    const process = vi.fn<ImageProcessor>(async () => result());
+    const queue = new BatchQueue(process);
+    queue.pause();
+    queue.add([file()], DEFAULT_OPTIONS);
+    const release = queue.acquireOperation();
+    expect(release).not.toBeNull();
+    expect(queue.acquireOperation()).toBeNull();
+    const before = queue.getSnapshot().items;
+    expect(queue.add([file("blocked.png")], DEFAULT_OPTIONS)).toBe(false);
+    expect(queue.resume()).toBe(false);
+    queue.retry("1");
+    queue.cancel("1");
+    queue.cancelAll();
+    queue.remove("1");
+    expect(queue.getSnapshot().items).toBe(before);
+    expect(queue.getSnapshot()).toMatchObject({
+      operationLocked: true,
+      paused: true,
+    });
+    await tick();
+    expect(process).not.toHaveBeenCalled();
+    release!();
+    release!();
+    expect(queue.getSnapshot()).toMatchObject({
+      operationLocked: false,
+      paused: true,
+    });
+    await tick();
+    expect(process).not.toHaveBeenCalled();
+    queue.resume();
+    await tick();
+    expect(process).toHaveBeenCalledOnce();
+    expect(queue.getSnapshot().items[0].status).toBe("completed");
+    queue.dispose();
+  });
+  it("rejects lease acquisition during an image job and ignores obsolete releases", async () => {
+    let finish!: (value: ImageEngineResult) => void;
+    const queue = new BatchQueue(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    queue.add([file()], DEFAULT_OPTIONS);
+    await tick();
+    expect(queue.acquireOperation()).toBeNull();
+    finish(result());
+    await tick();
+    const first = queue.acquireOperation();
+    first!();
+    const second = queue.acquireOperation();
+    first!();
+    expect(queue.getSnapshot().operationLocked).toBe(true);
+    queue.dispose();
+    second!();
+    expect(queue.getSnapshot()).toMatchObject({
+      operationLocked: false,
+      activeId: null,
+      items: [],
+    });
+    expect(queue.acquireOperation()).toBeNull();
   });
   it("ignores late progress and completion from a removed active image, then continues", async () => {
     const pending: Array<{

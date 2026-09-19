@@ -19,15 +19,27 @@ export interface ImageEngineControls {
   onProgress?: (progress: ImageEngineProgress) => void;
 }
 
-export interface ImageEngineResult {
-  output: Blob | null;
-  outputName: string | null;
+interface ImageEngineResultBase {
   preflight: ImageAuditResult;
-  postflight: ImageAuditResult | null;
-  outcome: "completed" | "completed-with-warnings" | "analysis-only";
   warnings: MessageDescriptor[];
   canCleanMetadata: boolean;
 }
+
+export type ImageEngineProcessedResult = ImageEngineResultBase & {
+  output: Blob;
+  outputName: string;
+  postflight: ImageAuditResult;
+} & ({ outcome: "completed" } | { outcome: "completed-with-warnings" });
+
+export type ImageEngineAnalysisResult = ImageEngineResultBase & {
+  outcome: "analysis-only";
+  output: null;
+  outputName: null;
+  postflight: null;
+};
+
+export type ImageEngineResult =
+  ImageEngineProcessedResult | ImageEngineAnalysisResult;
 
 export class ImageEngineError extends Error {
   readonly code: "invalid-file" | "decode-failed" | "processing-failed";
