@@ -23,10 +23,13 @@ vi.mock("@/lib/geminiWorkerClient", () => ({
 vi.mock("./pixels", () => ({ processPixels: mocks.pixels }));
 vi.mock("./canvas", () => ({
   decodeImage: mocks.decode,
+
+  ImageResolutionError: class extends Error {},
+}));
+vi.mock("@/lib/canvas", () => ({
   createProcessingCanvas: mocks.createCanvas,
   getProcessingContext: () => ({ drawImage: vi.fn() }),
   releaseCanvas: mocks.releaseCanvas,
-  ImageResolutionError: class extends Error {},
 }));
 import { processImage } from "./processImage";
 
@@ -148,6 +151,37 @@ describe("autonomous image engine", () => {
     ).rejects.toMatchObject({ name: "AbortError" });
     expect(mocks.releaseCanvas).toHaveBeenCalledOnce();
     expect(mocks.scan).toHaveBeenCalledOnce();
+  });
+  it("waits for the cooperative metadata scan to stop before finishing cancellation", async () => {
+    const controller = new AbortController();
+    let finishScan!: (value: MetadataScanResult) => void;
+    mocks.scan.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishScan = resolve;
+        }),
+    );
+    const file = input();
+    const job = processImage(file, {}, { signal: controller.signal });
+    let settled = false;
+    const observed = job.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+    controller.abort();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(mocks.scan).toHaveBeenCalledWith(file, {
+      signal: controller.signal,
+    });
+    finishScan(metadata);
+    await expect(job).rejects.toMatchObject({ name: "AbortError" });
+    await observed;
+    expect(mocks.decode).not.toHaveBeenCalled();
   });
 
   it("releases decoded resources if canvas creation fails", async () => {

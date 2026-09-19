@@ -1,9 +1,6 @@
-import { applyCrush, applyShake, applyStir } from "../lib/pipeline";
-import type {
-  PixelRequest,
-  PixelResponse,
-  PixelPhase,
-} from "../lib/engine/pixelProtocol";
+import { getProcessingContext, releaseCanvas } from "../lib/canvas";
+import { executePixelPipeline } from "../lib/pixelPipeline";
+import type { PixelRequest, PixelResponse } from "../lib/engine/pixelProtocol";
 
 const scope = self as unknown as {
   onmessage: ((event: MessageEvent<PixelRequest>) => void) | null;
@@ -12,19 +9,24 @@ const scope = self as unknown as {
 
 scope.onmessage = async ({ data: { bitmap, options } }) => {
   let canvas: OffscreenCanvas | null = null;
-  const progress = (phase: PixelPhase) =>
-    scope.postMessage({ type: "progress", phase });
+  let sourceReleased = false;
+  const releaseSource = () => {
+    if (!sourceReleased) {
+      sourceReleased = true;
+      bitmap.close();
+    }
+  };
   try {
     canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) throw new Error("Could not create pixel worker canvas");
-    progress("shake");
-    await applyShake(context, bitmap, options.shake);
-    bitmap.close();
-    progress("stir");
-    await applyStir(context, options.stir);
-    progress("crush");
-    const output = await applyCrush(canvas, options.crush);
+    const output = await executePixelPipeline(
+      bitmap,
+      getProcessingContext(canvas),
+      options,
+      {
+        onPhase: (phase) => scope.postMessage({ type: "progress", phase }),
+        onSourceConsumed: releaseSource,
+      },
+    );
     scope.postMessage({ type: "done", output });
   } catch (error) {
     scope.postMessage({
@@ -33,10 +35,7 @@ scope.onmessage = async ({ data: { bitmap, options } }) => {
         error instanceof Error ? error.message : "Pixel processing failed",
     });
   } finally {
-    bitmap.close();
-    if (canvas) {
-      canvas.width = 0;
-      canvas.height = 0;
-    }
+    releaseSource();
+    if (canvas) releaseCanvas(canvas);
   }
 };

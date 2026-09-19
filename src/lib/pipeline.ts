@@ -1,8 +1,11 @@
 import type { ProcessingOptions } from "./types";
 
-export type ProcessingCanvas = HTMLCanvasElement | OffscreenCanvas;
-export type ProcessingContext =
-  CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+import type { ProcessingCanvas, ProcessingContext } from "./canvas";
+import {
+  assertNotAborted,
+  createAbortError,
+  isAbortError,
+} from "./runtime/abort";
 
 export const CRUSH_QUALITY_MIN = 0.5;
 export const CRUSH_QUALITY_MAX = 0.98;
@@ -55,18 +58,6 @@ export class GaussianRNG implements GaussianNoiseSource {
 }
 
 const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-const createAbortError = () => {
-  const error = new Error("Processing cancelled");
-  error.name = "AbortError";
-  return error;
-};
-
-const assertNotAborted = (signal?: AbortSignal) => {
-  if (signal?.aborted) {
-    throw createAbortError();
-  }
-};
 
 export async function applyShake(
   ctx: ProcessingContext,
@@ -178,9 +169,6 @@ export async function applyCrush(
     return await encodeCanvasAsJpegBlob(canvas, 0.92, signal);
   }
 }
-
-const isAbortError = (error: unknown) =>
-  error instanceof Error && error.name === "AbortError";
 
 const encodeCanvasAsJpegBlob = (
   canvas: ProcessingCanvas,

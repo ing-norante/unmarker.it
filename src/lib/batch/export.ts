@@ -1,11 +1,13 @@
 import { BATCH_LIMITS, type BatchItem } from "./queue";
 import { createBatchReport } from "./archive";
+import { assertNotAborted } from "../runtime/abort";
+import { runJob } from "../runtime/job";
 
 export function exportBatch(
   items: readonly BatchItem[],
   signal?: AbortSignal,
 ): Promise<Blob> {
-  signal?.throwIfAborted();
+  assertNotAborted(signal);
   const entries = items.flatMap((item) =>
     item.result?.output
       ? [{ name: item.outputName, blob: item.result.output }]
@@ -15,70 +17,70 @@ export function exportBatch(
     !entries.length ||
     entries.reduce((sum, entry) => sum + entry.blob.size, 0) >
       BATCH_LIMITS.outputBytes
-  )
+  ) {
     return Promise.reject(new Error("Invalid archive size"));
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(
-      new URL("../../workers/batchExport.worker.ts", import.meta.url),
-      { type: "module" },
-    );
-    const parts: ArrayBuffer[] = [];
-    let size = 0;
-    let settled = false;
-    const cleanup = () => {
-      worker.terminate();
-      signal?.removeEventListener("abort", abort);
-      clearTimeout(timeout);
-    };
-    const fail = (error: Error) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      parts.length = 0;
-      reject(error);
-    };
-    const abort = () => fail(new DOMException("Aborted", "AbortError"));
-    const timeout = setTimeout(
-      () => fail(new Error("Archive timed out")),
-      120_000,
-    );
-    signal?.addEventListener("abort", abort, { once: true });
-    worker.onerror = () => fail(new Error("Archive worker failed"));
-    worker.onmessageerror = () => fail(new Error("Archive message failed"));
-    worker.onmessage = ({
-      data,
-    }: MessageEvent<{
-      bytes?: Uint8Array<ArrayBuffer>;
-      final?: boolean;
-      error?: boolean;
-    }>) => {
-      if (settled) return;
-      if (data.error || !data.bytes) {
-        fail(new Error("Archive failed"));
-        return;
-      }
-      size += data.bytes.byteLength;
-      if (size > BATCH_LIMITS.outputBytes + 2 * 1024 ** 2) {
-        fail(new Error("Archive size limit"));
-        return;
-      }
-      parts.push(data.bytes.buffer);
-      if (data.final) {
-        try {
-          const blob = new Blob(parts, { type: "application/zip" });
-          settled = true;
-          cleanup();
-          parts.length = 0;
-          resolve(blob);
-        } catch {
-          fail(new Error("Archive allocation failed"));
+  }
+  let worker: Worker | undefined;
+  const parts: ArrayBuffer[] = [];
+  let size = 0;
+  return runJob<Blob>(
+    {
+      signal,
+      timeoutMs: 120_000,
+      timeoutMessage: "Archive timed out",
+      cleanup: () => {
+        worker?.terminate();
+        parts.length = 0;
+      },
+    },
+    (job) => {
+      worker = new Worker(
+        new URL("../../workers/batchExport.worker.ts", import.meta.url),
+        { type: "module" },
+      );
+      worker.onerror = () => job.reject(new Error("Archive worker failed"));
+      worker.onmessageerror = () =>
+        job.reject(new Error("Archive message failed"));
+      worker.onmessage = ({ data }: MessageEvent<unknown>) => {
+        if (job.settled) return;
+        if (
+          !data ||
+          typeof data !== "object" ||
+          ("error" in data && data.error === true) ||
+          !("bytes" in data) ||
+          !(data.bytes instanceof Uint8Array) ||
+          !("final" in data) ||
+          typeof data.final !== "boolean"
+        ) {
+          job.reject(new Error("Archive failed: invalid response"));
+          return;
         }
+        size += data.bytes.byteLength;
+        if (size > BATCH_LIMITS.outputBytes + 2 * 1024 ** 2) {
+          job.reject(new Error("Archive size limit"));
+          return;
+        }
+        // Worker sends owned chunks; slicing a foreign view also keeps this boundary safe.
+        const bytes =
+          data.bytes.byteOffset === 0 &&
+          data.bytes.byteLength === data.bytes.buffer.byteLength &&
+          data.bytes.buffer instanceof ArrayBuffer
+            ? data.bytes.buffer
+            : data.bytes.slice().buffer;
+        parts.push(bytes);
+        if (data.final) {
+          try {
+            job.resolve(new Blob(parts, { type: "application/zip" }));
+          } catch {
+            job.reject(new Error("Archive allocation failed"));
+          }
+        }
+      };
+      try {
+        worker.postMessage({ entries, report: createBatchReport(items) });
+      } catch {
+        job.reject(new Error("Archive dispatch failed"));
       }
-    };
-    try {
-      worker.postMessage({ entries, report: createBatchReport(items) });
-    } catch {
-      fail(new Error("Archive dispatch failed"));
-    }
-  });
+    },
+  );
 }

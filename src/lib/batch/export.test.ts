@@ -40,8 +40,16 @@ function items(): BatchItem[] {
         outcome: "completed",
         warnings: [],
         canCleanMetadata: false,
-        preflight: buildImageAudit({ stage: "preflight", metadataScan: null }),
-        postflight: null,
+        preflight: buildImageAudit({
+          stage: "preflight",
+          metadataScan: null,
+          visibleScan: { status: "not-scanned" },
+        }),
+        postflight: buildImageAudit({
+          stage: "postflight",
+          metadataScan: null,
+          visibleScan: { status: "not-scanned" },
+        }),
       },
     },
   ];
@@ -76,6 +84,32 @@ describe("batch export worker lifecycle", () => {
   it("discards buffered chunks on cancellation and ignores a late final response", async () => {
     const controller = new AbortController();
     const pending = exportBatch(items(), controller.signal);
+    expect(workers[0].postMessage).toHaveBeenCalledWith({
+      entries: [{ name: "photo-unmarker.jpg", blob: expect.any(Blob) }],
+      report: {
+        version: 1,
+        scope: expect.any(String),
+        images: [
+          {
+            name: "photo.png",
+            status: "completed",
+            output: "photo-unmarker.jpg",
+            warnings: [],
+            error: null,
+            checks: {
+              before: expect.objectContaining({
+                visibleMark: "not-scanned",
+                hiddenMark: "unverified",
+              }),
+              after: expect.objectContaining({
+                visibleMark: "not-scanned",
+                hiddenMark: "unverified",
+              }),
+            },
+          },
+        ],
+      },
+    });
     workers[0].emit({ bytes: new Uint8Array([1, 2]), final: false });
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
@@ -134,5 +168,28 @@ describe("batch export worker lifecycle", () => {
     await rejected;
     expect(workers[0].terminate).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
+  });
+  it.each([
+    null,
+    {},
+    { bytes: "invalid", final: true },
+    { bytes: new Uint8Array([1]) },
+  ])("rejects malformed archive messages: %j", async (response) => {
+    const pending = exportBatch(items());
+    workers[0].emit(response as WorkerReply);
+    await expect(pending).rejects.toThrow("invalid response");
+    expect(workers[0].terminate).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("includes only the owned bytes of an incoming view", async () => {
+    const pending = exportBatch(items());
+    workers[0].emit({
+      bytes: new Uint8Array([99, 80, 75, 99]).subarray(1, 3),
+      final: true,
+    });
+    const output = await pending;
+    expect(Array.from(new Uint8Array(await output.arrayBuffer()))).toEqual([
+      80, 75,
+    ]);
   });
 });

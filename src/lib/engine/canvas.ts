@@ -1,6 +1,9 @@
 import { MAX_MEGAPIXELS } from "@/lib/fileValidation";
-import type { ProcessingCanvas, ProcessingContext } from "@/lib/pipeline";
-import { abortable, assertNotAborted, createAbortError } from "./abort";
+import {
+  abortable,
+  assertNotAborted,
+  createAbortError,
+} from "../runtime/abort";
 
 export interface DecodedImage {
   source: CanvasImageSource;
@@ -10,34 +13,6 @@ export interface DecodedImage {
 }
 
 export class ImageResolutionError extends Error {}
-
-export function createProcessingCanvas(
-  width: number,
-  height: number,
-): ProcessingCanvas {
-  const canvas =
-    typeof OffscreenCanvas !== "undefined"
-      ? new OffscreenCanvas(width, height)
-      : document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
-}
-
-export function getProcessingContext(
-  canvas: ProcessingCanvas,
-): ProcessingContext {
-  const context = canvas.getContext("2d", {
-    willReadFrequently: true,
-  }) as ProcessingContext | null;
-  if (!context) throw new Error("Could not create image canvas");
-  return context;
-}
-
-export function releaseCanvas(canvas: ProcessingCanvas) {
-  canvas.width = 0;
-  canvas.height = 0;
-}
 
 export function assertImageDimensions(width: number, height: number) {
   if (width <= 0 || height <= 0) throw new Error("Empty image dimensions");

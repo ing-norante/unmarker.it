@@ -1,6 +1,7 @@
 import type { ProcessingOptions } from "@/lib/types";
 
-export type PixelPhase = "shake" | "stir" | "crush";
+import type { PixelPhase } from "../pixelPipeline";
+export type { PixelPhase } from "../pixelPipeline";
 export interface PixelRequest {
   bitmap: ImageBitmap;
   options: ProcessingOptions;

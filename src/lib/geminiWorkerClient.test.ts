@@ -235,6 +235,35 @@ describe("geminiWorkerClient", () => {
     await expect(task).rejects.toThrow();
     expect(context.putImageData).not.toHaveBeenCalled();
   });
+  it("rejects malformed responses and recovers with a fresh runtime", async () => {
+    const { detectGeminiVisibleWatermark } =
+      await import("./geminiWorkerClient");
+    const failed = detectGeminiVisibleWatermark(makeImageData());
+    workers[0].emitMessage({ type: "detected", jobId: getJobId(workers[0]) });
+    await expect(failed).rejects.toThrow("Invalid Gemini worker response");
+    const next = detectGeminiVisibleWatermark(makeImageData());
+    workers[1].emitMessage({
+      type: "detected",
+      jobId: getJobId(workers[1]),
+      detection: makeDetection(),
+    });
+    await next;
+    expect(workers[0].terminate).toHaveBeenCalledOnce();
+  });
+  it("invalidates every pending job when the shared runtime is interrupted", async () => {
+    const { detectGeminiVisibleWatermark } =
+      await import("./geminiWorkerClient");
+    const controller = new AbortController();
+    const first = detectGeminiVisibleWatermark(makeImageData(), {
+      signal: controller.signal,
+    });
+    const second = detectGeminiVisibleWatermark(makeImageData());
+    controller.abort();
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    await expect(second).rejects.toMatchObject({ name: "AbortError" });
+    expect(workers).toHaveLength(1);
+    expect(workers[0].terminate).toHaveBeenCalledOnce();
+  });
 });
 
 function makeImageData() {

@@ -1,22 +1,14 @@
 import {
-  applyCrush,
-  applyShake,
-  applyStir,
-  type ProcessingCanvas,
-} from "@/lib/pipeline";
-import type { ProcessingOptions } from "@/lib/types";
-import {
-  abortable,
-  assertNotAborted,
-  createAbortError,
-  isAbortError,
-} from "./abort";
-import {
   createProcessingCanvas,
   getProcessingContext,
   releaseCanvas,
-} from "./canvas";
-import type { PixelPhase, PixelRequest, PixelResponse } from "./pixelProtocol";
+  type ProcessingCanvas,
+} from "@/lib/canvas";
+import { executePixelPipeline } from "@/lib/pixelPipeline";
+import type { ProcessingOptions } from "@/lib/types";
+import { abortable, assertNotAborted, isAbortError } from "@/lib/runtime/abort";
+import { runJob, asError } from "@/lib/runtime/job";
+import type { PixelPhase, PixelRequest } from "./pixelProtocol";
 
 export interface PixelControls {
   signal?: AbortSignal;
@@ -38,10 +30,11 @@ export async function processPixels(
     try {
       return await processInWorker(canvas, options, controls);
     } catch (error) {
-      if (isAbortError(error)) throw error;
+      if (isAbortError(error) || controls.signal?.aborted) throw error;
       controls.onFallback();
     }
   }
+  assertNotAborted(controls.signal);
   return processOnCanvas(canvas, options, controls);
 }
 
@@ -50,6 +43,7 @@ async function processInWorker(
   options: ProcessingOptions,
   controls: PixelControls,
 ): Promise<Blob> {
+  // A worker gets its own bitmap; the source canvas stays intact for fallback.
   const bitmap = await abortable(
     createImageBitmap(canvas),
     controls.signal,
@@ -66,42 +60,55 @@ async function processInWorker(
     bitmap.close();
     throw error;
   }
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (error?: Error, output?: Blob) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      controls.signal?.removeEventListener("abort", onAbort);
-      worker.terminate();
-      bitmap.close();
-      if (error) reject(error);
-      else if (output) resolve(output);
-    };
-    const onAbort = () => finish(createAbortError());
-    const timeout = setTimeout(
-      () => finish(new Error("Pixel worker timed out")),
-      120_000,
-    );
-    controls.signal?.addEventListener("abort", onAbort, { once: true });
-    worker.onmessage = ({ data }: MessageEvent<PixelResponse>) => {
-      if (settled) return;
-      if (data.type === "progress") controls.onPhase(data.phase);
-      else if (data.type === "error") finish(new Error(data.reason));
-      else finish(undefined, data.output);
-    };
-    worker.onerror = () => finish(new Error("Pixel worker failed"));
-    worker.onmessageerror = () =>
-      finish(new Error("Pixel worker response could not be read"));
-    try {
-      assertNotAborted(controls.signal);
+  return runJob<Blob>(
+    {
+      signal: controls.signal,
+      timeoutMs: 120_000,
+      timeoutMessage: "Pixel worker timed out",
+      cleanup: () => {
+        worker.terminate();
+        bitmap.close();
+      },
+    },
+    (job) => {
+      worker.onmessage = ({ data }: MessageEvent<unknown>) => {
+        if (job.settled) return;
+        if (!data || typeof data !== "object" || !("type" in data)) {
+          job.reject(new Error("Invalid pixel worker response"));
+          return;
+        }
+        if (
+          data.type === "progress" &&
+          "phase" in data &&
+          typeof data.phase === "string" &&
+          ["shake", "stir", "crush"].includes(data.phase)
+        ) {
+          try {
+            controls.onPhase(data.phase as PixelPhase);
+          } catch (error) {
+            job.reject(asError(error));
+          }
+        } else if (
+          data.type === "done" &&
+          "output" in data &&
+          data.output instanceof Blob &&
+          data.output.size > 0
+        ) {
+          job.resolve(data.output);
+        } else if (
+          data.type === "error" &&
+          "reason" in data &&
+          typeof data.reason === "string"
+        ) {
+          job.reject(new Error(data.reason));
+        } else job.reject(new Error("Invalid pixel worker response"));
+      };
+      worker.onerror = () => job.reject(new Error("Pixel worker failed"));
+      worker.onmessageerror = () =>
+        job.reject(new Error("Pixel worker response could not be read"));
       worker.postMessage({ bitmap, options } satisfies PixelRequest, [bitmap]);
-    } catch (error) {
-      finish(
-        error instanceof Error ? error : new Error("Pixel worker unavailable"),
-      );
-    }
-  });
+    },
+  );
 }
 
 async function processOnCanvas(
@@ -111,15 +118,20 @@ async function processOnCanvas(
 ) {
   const context = getProcessingContext(canvas);
   const snapshot = createProcessingCanvas(canvas.width, canvas.height);
+  let released = false;
+  const releaseSource = () => {
+    if (!released) {
+      released = true;
+      releaseCanvas(snapshot);
+    }
+  };
   try {
     getProcessingContext(snapshot).drawImage(canvas, 0, 0);
-    controls.onPhase("shake");
-    await applyShake(context, snapshot, options.shake, controls.signal);
+    return await executePixelPipeline(snapshot, context, options, {
+      ...controls,
+      onSourceConsumed: releaseSource,
+    });
   } finally {
-    releaseCanvas(snapshot);
+    releaseSource();
   }
-  controls.onPhase("stir");
-  await applyStir(context, options.stir, controls.signal);
-  controls.onPhase("crush");
-  return applyCrush(canvas, options.crush, controls.signal);
 }

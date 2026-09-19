@@ -10,13 +10,19 @@ import {
 } from "@/lib/geminiWorkerClient";
 import { buildImageAudit } from "@/lib/imageAudit";
 import { canCleanMetadata, scanImageMetadata } from "@/lib/metadataCleaner";
-import { DEFAULT_OPTIONS, type ProcessingCanvas } from "@/lib/pipeline";
+import { DEFAULT_OPTIONS } from "@/lib/pipeline";
+import {
+  createProcessingCanvas,
+  getProcessingContext,
+  releaseCanvas,
+  type ProcessingCanvas,
+} from "@/lib/canvas";
 import {
   createInitialPipelineSteps,
   updateGeminiProgress,
 } from "@/lib/pipelineSteps";
 import type {
-  GeminiDetectionResult,
+  VisibleScanResult,
   ImageAuditResult,
   MetadataScanResult,
   PipelineStepId,
@@ -24,15 +30,8 @@ import type {
   ProcessingOptions,
 } from "@/lib/types";
 import { generateCameraLikeFilename } from "@/lib/utils";
-import { abortable, assertNotAborted, isAbortError } from "./abort";
-import {
-  createProcessingCanvas,
-  decodeImage,
-  getProcessingContext,
-  ImageResolutionError,
-  releaseCanvas,
-  type DecodedImage,
-} from "./canvas";
+import { assertNotAborted, isAbortError } from "../runtime/abort";
+import { decodeImage, ImageResolutionError, type DecodedImage } from "./canvas";
 import { processPixels } from "./pixels";
 import { geminiReadRegion, offsetDetection } from "./geminiRegion";
 import {
@@ -119,8 +118,7 @@ export async function processImage(
           : message("workflow:messages.decodeFailed.description"),
       );
     }
-    let detection: GeminiDetectionResult | null = null;
-    let visibleScanStatus: "scanned" | "not-scanned" | "failed" = "not-scanned";
+    let visibleScan: VisibleScanResult = { status: "not-scanned" };
     if (decoded) {
       canvas = createProcessingCanvas(decoded.width, decoded.height);
       const context = getProcessingContext(canvas);
@@ -129,17 +127,17 @@ export async function processImage(
       decoded = null;
       updateStep("gemini-detect", { status: "running", progress: 10 });
       try {
-        detection = await detectGeminiOnCanvas(context, {
+        const detection = await detectGeminiOnCanvas(context, {
           signal,
           onProgress: (stage) => {
             if (stage !== "done") updateGeminiProgress(stage, updateStep);
           },
         });
-        visibleScanStatus = "scanned";
+        visibleScan = { status: "scanned", detection };
         updateStep("gemini-detect", { status: "done", progress: 100 });
       } catch (error) {
         if (isAbortError(error)) throw error;
-        visibleScanStatus = "failed";
+        visibleScan = { status: "failed" };
         warnings.push(message("workflow:warnings.visibleScan"));
         updateStep("gemini-detect", {
           status: "error",
@@ -152,8 +150,7 @@ export async function processImage(
     preflight = buildImageAudit({
       stage: "preflight",
       metadataScan,
-      visibleDetection: detection,
-      visibleScanStatus,
+      visibleScan,
       warnings: [...warnings],
     });
     const canClean = canCleanMetadata(metadataScan);
@@ -174,13 +171,13 @@ export async function processImage(
     emit();
     // Reuse both positive and negative detections. Failure is explicitly reported,
     // but does not prevent independent pixel transforms and metadata cleaning.
-    if (visibleScanStatus === "scanned") {
+    if (visibleScan.status === "scanned") {
       try {
         const result = await restoreGeminiOnCanvas(
           getProcessingContext(canvas),
           {
             signal,
-            detectionHint: detection,
+            detectionHint: visibleScan.detection,
             onProgress: (stage) => updateGeminiProgress(stage, updateStep),
           },
         );
@@ -264,7 +261,7 @@ async function scanMetadata(
   signal?: AbortSignal,
 ): Promise<MetadataScanResult | null> {
   try {
-    const result = await abortable(scanImageMetadata(file, { signal }), signal);
+    const result = await scanImageMetadata(file, { signal });
     if (
       result.warnings.length ||
       (result.c2pa && result.c2pa.verification !== "local") ||
@@ -291,8 +288,7 @@ async function auditOutput(
 ): Promise<ImageAuditResult> {
   const warnings: MessageDescriptor[] = [];
   const metadataScan = await scanMetadata(file, "postflight", warnings, signal);
-  let detection: GeminiDetectionResult | null = null;
-  let visibleScanStatus: "scanned" | "failed" = "failed";
+  let visibleScan: VisibleScanResult = { status: "failed" };
   let decoded: DecodedImage | null = null;
   let canvas: ProcessingCanvas | null = null;
   try {
@@ -313,12 +309,12 @@ async function auditOutput(
     );
     decoded.release();
     decoded = null;
-    detection = offsetDetection(
+    const detection = offsetDetection(
       await detectGeminiOnCanvas(context, { signal }),
       region.x,
       region.y,
     );
-    visibleScanStatus = "scanned";
+    visibleScan = { status: "scanned", detection };
   } catch (error) {
     if (isAbortError(error)) throw error;
     warnings.push(message("workflow:warnings.postflightVisible"));
@@ -329,8 +325,7 @@ async function auditOutput(
   return buildImageAudit({
     stage: "postflight",
     metadataScan,
-    visibleDetection: detection,
-    visibleScanStatus,
+    visibleScan,
     warnings,
   });
 }
