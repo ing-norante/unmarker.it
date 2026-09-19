@@ -1,0 +1,160 @@
+html[data-locale="zh-Hans"] {
+  --locale-font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --locale-font-heading: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  line-break: strict;
+  word-break: normal;
+}
+
+html[data-locale="zh-Hans"] body { line-height: 1.65; }
+html[data-locale="zh-Hans"] .uppercase:not(.font-mono) { text-transform: none; }
+html[data-locale="zh-Hans"] .wide-hero-title { font-size: clamp(3rem, 6vw, 6.5rem); line-height: 1.08; }
+html[data-locale="zh-Hans"] .locale-hero-subtitle { font-size: clamp(1.5rem, 3vw, 3rem); line-height: 1.25; }
+html[data-locale="zh-Hans"] .locale-hero-copy { font-size: clamp(1.125rem, 2vw, 1.875rem); line-height: 1.5; }
+html[data-locale="zh-Hans"] .locale-facts-heading { font-size: clamp(1.25rem, 2.5vw, 2.25rem); line-height: 1.4; }
+html[data-locale="zh-Hans"] .locale-fact-title { font-size: clamp(1.125rem, 1.4vw, 1.25rem); line-height: 1.45; }
+html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-description"], [data-slot="alert-description"], [data-slot="empty-description"]) { line-height: 1.7; max-inline-size: 36ic; }
+
+@media (min-width: 1536px) {
+  html {
+    font-size: 106.25%;
+  }
+}
+
+@media (min-width: 1439px) and (min-height: 700px) {
+  .sticky-uploader-column {
+    position: sticky;
+    top: var(--page-gutter);
+    z-index: 30;
+    align-self: start;
+  }
+}
+
+/* Keep compact pointer controls, with physical tap targets on touch devices. */
+@media (any-pointer: coarse), (max-width: 639px) {
+  [data-slot="button"] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  [data-slot="slider"][data-orientation="horizontal"] {
+    min-height: 44px;
+    width: calc(100% - 16px);
+    margin-inline: 8px;
+  }
+
+  [data-slot="slider-thumb"]::after {
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.locale-suggestion {
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  max-height: calc(100svh - 2rem - env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+/* The image stays visible; only its frame acknowledges the loaded preview. */
+.result-preview-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--primary-text);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.result-preview-frame[data-ready="true"]::after {
+  opacity: 0.75;
+}
+
+.image-dropzone[data-dragging="true"] .dropzone-boundary,
+.image-dropzone:has(> button:focus-visible) .dropzone-boundary {
+  border-color: var(--primary-text);
+  border-style: solid;
+}
+
+.image-dropzone[data-dragging="true"] .dropzone-icon,
+.image-dropzone:has(> button:focus-visible) .dropzone-icon {
+  background-color: var(--accent);
+  border-color: var(--primary-text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dropzone-boundary,
+  .dropzone-icon {
+    transition: border-color 120ms ease-out, background-color 120ms ease-out;
+  }
+
+  .dropzone-icon {
+    transition: border-color 120ms ease-out, background-color 120ms ease-out,
+      transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .image-dropzone[data-dragging="true"] .dropzone-icon {
+    transform: scale(0.94);
+  }
+
+  .result-preview-frame[data-ready="true"]::after {
+    animation: preview-frame-arrival 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes preview-frame-arrival {
+  0% { clip-path: inset(0 100% 0 0); opacity: 0.75; }
+  70% { clip-path: inset(0); opacity: 0.75; }
+  100% { clip-path: inset(0); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer utilities {
+  /* Stable labels for workflow steps and controls. */
+  .text-ui-title {
+    @apply text-base leading-snug font-extrabold text-balance 2xl:text-lg;
+  }
+
+  /* Instructions and explanations retain a readable floor on phones. */
+  .text-ui-body {
+    @apply max-w-[65ch] text-base leading-relaxed font-medium text-pretty;
+  }
+
+  .text-reading {
+    @apply max-w-[65ch] text-base leading-relaxed font-medium text-pretty 2xl:text-lg;
+  }
+
+  /* Badges, hints, fine print — replaces ~0.64rem (~10px) */
+  .text-ui-caption {
+    @apply text-xs font-medium sm:text-sm 2xl:text-base;
+  }
+
+  /* Section overlines and eyebrow labels */
+  .text-ui-overline {
+    @apply text-xs font-black uppercase sm:text-sm 2xl:text-base;
+  }
+}
+
+@media (min-width: 1800px) {
+  .wide-display-grid {
+    grid-template-columns: minmax(52rem, 48%) minmax(0, 1fr);
+  }
+
+  .wide-hero-title {
+    font-size: var(--text-9xl);
+    line-height: var(--text-9xl--line-height);
+  }
+}

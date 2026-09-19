@@ -1,41 +1,36 @@
 import { inferAiProvenanceScore } from "@/lib/aiProvenanceScore";
 import type { MessageDescriptor } from "@/i18n/messages";
 import type {
-  GeminiDetectionResult,
   HiddenWatermarkAudit,
   ImageAuditResult,
   ImageAuditStage,
   ImageVerificationDiff,
   MetadataScanResult,
   VisibleWatermarkAudit,
+  VisibleScanResult,
 } from "@/lib/types";
 
 type BuildImageAuditOptions = {
   stage: ImageAuditStage;
   metadataScan: MetadataScanResult | null;
-  visibleDetection?: GeminiDetectionResult | null;
-  visibleScanStatus?: "scanned" | "not-scanned" | "failed";
+  visibleScan: VisibleScanResult;
   warnings?: MessageDescriptor[];
 };
 
 export function buildImageAudit({
   stage,
   metadataScan,
-  visibleDetection = null,
-  visibleScanStatus = "scanned",
+  visibleScan,
   warnings = [],
 }: BuildImageAuditOptions): ImageAuditResult {
-  const visibleWatermark = createVisibleWatermarkAudit(
-    visibleDetection,
-    visibleScanStatus,
-  );
+  const visibleWatermark = createVisibleWatermarkAudit(visibleScan);
 
   return {
     stage,
     metadataScan,
     visibleWatermark,
-    hiddenWatermark: createHiddenWatermarkAudit(stage),
-    aiScore: inferAiProvenanceScore(metadataScan, visibleDetection, visibleWatermark.status),
+    hiddenWatermark: createHiddenWatermarkAudit(),
+    aiScore: inferAiProvenanceScore(metadataScan, visibleWatermark.detection, visibleWatermark.status),
     warnings,
   };
 }
@@ -55,16 +50,15 @@ export function createVerificationDiff(
     visibleBefore: preflightAudit.visibleWatermark.status,
     visibleAfter: postflightAudit?.visibleWatermark.status ?? null,
     hiddenAfter:
-      postflightAudit?.hiddenWatermark.status ?? "neutralized-unverified",
+      postflightAudit?.hiddenWatermark.status ?? "unverified",
     warnings,
   };
 }
 
 function createVisibleWatermarkAudit(
-  detection: GeminiDetectionResult | null,
-  scanStatus: "scanned" | "not-scanned" | "failed",
+  scan: VisibleScanResult,
 ): VisibleWatermarkAudit {
-  if (scanStatus === "not-scanned") {
+  if (scan.status === "not-scanned") {
     return {
       status: "not-scanned",
       detection: null,
@@ -72,7 +66,7 @@ function createVisibleWatermarkAudit(
     };
   }
 
-  if (scanStatus === "failed") {
+  if (scan.status === "failed") {
     return {
       status: "scan-failed",
       detection: null,
@@ -80,7 +74,10 @@ function createVisibleWatermarkAudit(
     };
   }
 
-  if (detection?.detected) {
+  if (scan.status !== "scanned") throw new TypeError("Visible scan status is required");
+  const { detection } = scan;
+  if (!detection) throw new TypeError("A completed visible scan requires its detection result");
+  if (detection.detected) {
     return {
       status: "detected",
       detection,
@@ -91,20 +88,11 @@ function createVisibleWatermarkAudit(
   return {
     status: "not-detected",
     detection,
-    confidence: detection?.confidence ?? 0,
+    confidence: detection.confidence,
   };
 }
 
-function createHiddenWatermarkAudit(
-  stage: ImageAuditStage,
-): HiddenWatermarkAudit {
-  if (stage === "postflight") {
-    return {
-      status: "neutralized-unverified",
-    };
-  }
-
-  return {
-    status: "at-risk",
-  };
+function createHiddenWatermarkAudit(): HiddenWatermarkAudit {
+  // Pixel processing cannot establish presence or successful removal without a detector.
+  return { status: "unverified" };
 }

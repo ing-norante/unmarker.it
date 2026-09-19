@@ -49,6 +49,11 @@ export const metadata = {
     jumbf: "JUMBF 元数据框",
   },
   warnings: {
+    scanLimit: "元数据检查已达到本地资源限制并停止；文件保持不变。",
+    pngTextLimit: "压缩 PNG 文本超出本地读取限制，元数据检查不完整。",
+    displayMetadataPreserved: "已保留方向或显示所需的元数据，部分标记可能仍然存在。",
+    boxItemCoverage: "未完整检查图像项目中存储的元数据，容器清理仅为部分清理。",
+
     unsupportedClean: "不支持此格式，已禁用文件清理。",
     unsupportedScan: "不支持此格式；仅按字节特征扫描，且已禁用清理。",
     malformedWebpHeader: "WebP RIFF 文件头格式异常。",

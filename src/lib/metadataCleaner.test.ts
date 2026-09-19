@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { cleanImageMetadata, scanImageMetadata } from "./metadataCleaner";
+import { deflateSync } from "node:zlib";
+import { PNG_TEXT_CHUNK_LIMIT } from "./metadata/formats/png";
+import { inferAiProvenanceScore } from "./aiProvenanceScore";
 
 const PNG_SIGNATURE = bytes([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const C2PA_UUID = bytes([
@@ -53,6 +56,8 @@ describe("metadataCleaner scanner", () => {
         expect.objectContaining({ type: "c2pa", location: "PNG caBX" }),
       ]),
     );
+    expect(result.hasAiMetadata).toBe(false);
+    expect(result.c2pa).toMatchObject({ presence: "present", verification: "incomplete", origin: "unknown" });
   });
 
   it("returns no signals for a clean PNG", async () => {
@@ -185,13 +190,14 @@ describe("metadataCleaner cleaner", () => {
     expect(containsSequence(cleaned, idat)).toBe(true);
   });
 
-  it("removes AI JPEG APP segments and preserves SOS compressed payload", async () => {
+  it("removes C2PA but preserves EXIF and ICC that can control image display", async () => {
     const compressedPayload = bytes([0x11, 0x22, 0xff, 0x00, 0x33, 0xff, 0xd9]);
     const file = fixtureFile(
       "ai.jpg",
       "image/jpeg",
       makeJpeg([
         jpegSegment(0xe1, textBytes("Exif\0\0Software=stable_diffusion")),
+        jpegSegment(0xe2, textBytes("ICC_PROFILE\0profile")),
         jpegSegment(0xeb, concat([C2PA_UUID, textBytes("c2pa")])),
         jpegSosWithPayload(compressedPayload),
       ]),
@@ -200,8 +206,10 @@ describe("metadataCleaner cleaner", () => {
     const result = await cleanImageMetadata(file);
     const cleaned = new Uint8Array(await result.blob.arrayBuffer());
 
-    expect(result.removedCount).toBe(2);
-    expect(ascii(cleaned)).not.toContain("stable_diffusion");
+    expect(result.removedCount).toBe(1);
+    expect(ascii(cleaned)).toContain("stable_diffusion");
+    expect(ascii(cleaned)).toContain("ICC_PROFILE");
+    expect(result.warnings).toContainEqual({ code: "display-metadata-preserved" });
     expect(containsSequence(cleaned, compressedPayload)).toBe(true);
   });
 
@@ -244,6 +252,10 @@ describe("metadataCleaner cleaner", () => {
     expect(ascii(cleaned)).not.toContain("uuid");
     expect(ascii(cleaned)).toContain("mdat");
     expect(containsSequence(cleaned, mdatPayload)).toBe(true);
+    expect(cleaned.length).toBe(file.size);
+    expect(ascii(cleaned)).toContain("free");
+    const original = new Uint8Array(await file.arrayBuffer());
+    expect(ascii(cleaned).indexOf("mdat")).toBe(ascii(original).indexOf("mdat"));
   });
 
   it("does not crash on unsupported or malformed files", async () => {
@@ -257,6 +269,146 @@ describe("metadataCleaner cleaner", () => {
     const result = await cleanImageMetadata(file);
 
     expect(scan.warnings.length).toBeGreaterThan(0);
+    expect(result.removedCount).toBe(0);
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+});
+
+describe("metadata parser resource and container safeguards", () => {
+  it.each(["png", "jpeg", "webp"])("retains every %s segment marker for provider, AI declaration and remote provenance", async (format) => {
+    for (const text of ["parameters openai trainedAlgorithmicMedia dcterms:provenance", "dcterms:provenance trainedAlgorithmicMedia openai parameters"]) {
+      const payload = textBytes(text);
+      const data = format === "png" ? makePng([pngChunk("tEXt", concat([textBytes("Comment\0"), payload])), pngChunk("IEND", bytes([]))])
+        : format === "jpeg" ? makeJpeg([jpegSegment(0xe1, concat([textBytes("http://ns.adobe.com/xap/1.0/\0"), payload])), jpegSosWithPayload(bytes([1, 2, 0xff, 0xd9]))])
+          : makeWebp([riffChunk("VP8 ", bytes([1, 2, 3, 4])), riffChunk("XMP ", payload)]);
+      const file = fixtureFile(`combined.${format}`, `image/${format}`, data);
+      const scan = await scanImageMetadata(file);
+      expect(scan.signals).toHaveLength(1);
+      expect(scan.signals[0].marker).toBe("parameters");
+      expect(scan.signals[0].markers).toEqual(expect.arrayContaining(["parameters", "openai", "trainedAlgorithmicMedia", "dcterms:provenance"]));
+      expect(scan.c2pa?.presence).toBe("referenced");
+      expect(inferAiProvenanceScore(scan, null, "not-detected")).toMatchObject({ kind: "strong", provider: "OpenAI", percentage: null });
+      expect((await cleanImageMetadata(file)).removedCount).toBe(1);
+    }
+  });
+
+  it("keeps the report-v1 representative marker when the complete evidence includes another provider", async () => {
+    const file = fixtureFile("provider.png", "image/png", makePng([pngChunk("tEXt", textBytes("prompt\0midjourney")), pngChunk("IEND", bytes([]))]));
+    const scan = await scanImageMetadata(file);
+    expect(scan.signals[0]).toMatchObject({ marker: "prompt", markers: ["prompt", "midjourney"] });
+    expect(inferAiProvenanceScore(scan, null, "not-detected").provider).toBe("Midjourney");
+  });
+
+  it("uses the same conservative budget policy for scans and cleaning", async () => {
+    const data = makePng([pngChunk("caBX", textBytes("c2pa")), pngChunk("tEXt", textBytes("Comment\0openai and additional metadata")), pngChunk("IEND", bytes([]))]);
+    const file = fixtureFile("limited.png", "image/png", data);
+    const options = { budget: { metadataBytesRemaining: 8 } };
+    const scan = await scanImageMetadata(file, options);
+    const clean = await cleanImageMetadata(file, options);
+    expect(scan.warnings).toContainEqual({ code: "metadata-scan-limit" });
+    expect(clean.warnings).toEqual(scan.warnings);
+    expect(clean.blob).toBe(file);
+    expect(clean.removedCount).toBe(0);
+  });
+
+  it("does not apply a known C2PA removal when later text decompression fails", async () => {
+    const file = fixtureFile("partial.png", "image/png", makePng([
+      pngChunk("caBX", textBytes("c2pa")),
+      pngChunk("zTXt", concat([textBytes("Comment\0"), bytes([0, 42, 42])])),
+      pngChunk("IEND", bytes([])),
+    ]));
+    const scan = await scanImageMetadata(file);
+    const result = await cleanImageMetadata(file);
+    expect(result.warnings).toEqual(scan.warnings);
+    expect(result.warnings).toContainEqual({ code: "png-decode-partial", values: { type: "PNG zTXt" } });
+    expect(result.blob).toBe(file);
+    expect(result.removedCount).toBe(0);
+  });
+
+  it("removes all APP11 fragments of a C2PA instance without dropping unrelated JUMBF", async () => {
+    const file = fixtureFile("fragmented.jpg", "image/jpeg", makeJpeg([
+      jpegSegment(0xeb, concat([bytes([0x4a, 0x50, 0, 7, 0, 0, 0, 1]), textBytes("c2pa manifest")])),
+      jpegSegment(0xeb, concat([bytes([0x4a, 0x50, 0, 7, 0, 0, 0, 2]), textBytes("private continuation")])),
+      jpegSegment(0xeb, concat([bytes([0x4a, 0x50, 0, 8, 0, 0, 0, 1]), textBytes("unrelated JUMBF")])),
+      jpegSosWithPayload(bytes([1, 2, 3, 0xff, 0xd9])),
+    ]));
+    const result = await cleanImageMetadata(file);
+    expect(result.removedCount).toBe(2);
+    const output = ascii(new Uint8Array(await result.blob.arrayBuffer()));
+    expect(output).not.toContain("private continuation");
+    expect(output).toContain("unrelated JUMBF");
+  });
+
+  it("bounds zTXt expansion before allocating a full decompression bomb", async () => {
+    const compressed = deflateSync(new Uint8Array(PNG_TEXT_CHUNK_LIMIT + 1).fill(65));
+    const file = fixtureFile("bomb.png", "image/png", makePng([
+      pngChunk("IHDR", bytes(13)),
+      pngChunk("zTXt", concat([textBytes("Comment\0"), bytes([0]), compressed])),
+      pngChunk("IEND", bytes([])),
+    ]));
+    const result = await scanImageMetadata(file);
+    expect(result.warnings).toContainEqual({ code: "png-text-limit" });
+    expect(result.hasAiMetadata).toBe(false);
+  });
+
+  it("applies a total text budget across individually acceptable PNG chunks", async () => {
+    const compressed = deflateSync(new Uint8Array(PNG_TEXT_CHUNK_LIMIT - 100).fill(65));
+    const file = fixtureFile("many.png", "image/png", makePng([
+      pngChunk("IHDR", bytes(13)),
+      ...Array.from({ length: 5 }, () => pngChunk("zTXt", concat([textBytes("Comment\0"), bytes([0]), compressed]))),
+      pngChunk("IEND", bytes([])),
+    ]));
+    expect((await scanImageMetadata(file)).warnings).toContainEqual({ code: "png-text-limit" });
+  });
+
+  it("clears removed XMP's VP8X bit without changing alpha, animation, ICC or retained EXIF", async () => {
+    const file = fixtureFile("features.webp", "image/webp", makeWebp([
+      riffChunk("VP8X", bytes([0x3e, 0, 0, 0, 1, 0, 0, 1, 0, 0])),
+      riffChunk("ICCP", textBytes("profile")),
+      riffChunk("EXIF", textBytes("Exif orientation=6")),
+      riffChunk("XMP ", textBytes("openai")),
+      riffChunk("VP8 ", bytes([1, 2, 3])),
+    ]));
+    const cleaned = new Uint8Array(await (await cleanImageMetadata(file)).blob.arrayBuffer());
+    expect(cleaned[20]).toBe(0x3a);
+    expect(ascii(cleaned)).toContain("ICCP");
+    expect(ascii(cleaned)).toContain("EXIF");
+  });
+
+  it("refuses a RIFF length that extends past the actual file", async () => {
+    const data = makeWebp([riffChunk("XMP ", textBytes("openai"))]);
+    new DataView(data.buffer).setUint32(4, data.length + 100, true);
+    const file = fixtureFile("truncated.webp", "image/webp", data);
+    const result = await cleanImageMetadata(file);
+    expect(result.blob).toBe(file);
+    expect(result.warnings).toContainEqual({ code: "webp-size-exceeds-file" });
+  });
+
+  it("preserves AVIF item offsets and explicitly discloses unscanned nested metadata", async () => {
+    const data = concat([
+      box("ftyp", concat([textBytes("avif"), bytes([0, 0, 0, 0])])),
+      box("meta", concat([bytes(4), box("iloc", bytes([1, 2, 3, 4]))])),
+      box("uuid", concat([C2PA_UUID, textBytes("private manifest")])),
+      box("mdat", bytes([8, 6, 7, 5])),
+    ]);
+    const file = fixtureFile("offsets.avif", "image/avif", data);
+    const result = await cleanImageMetadata(file);
+    const output = new Uint8Array(await result.blob.arrayBuffer());
+    expect(result.removedCount).toBe(1);
+    expect(result.warnings).toContainEqual({ code: "box-item-coverage" });
+    expect(output.length).toBe(data.length);
+    expect(ascii(output).indexOf("mdat")).toBe(ascii(data).indexOf("mdat"));
+    expect(ascii(output)).not.toContain("private manifest");
+    expect(output.slice(ascii(data).indexOf("meta") - 4, ascii(data).indexOf("uuid") - 4))
+      .toEqual(data.slice(ascii(data).indexOf("meta") - 4, ascii(data).indexOf("uuid") - 4));
+  });
+
+  it.each(["png", "jpeg"])("refuses partial edits to malformed %s container tables", async (format) => {
+    const data = format === "png" ? makePng([pngChunk("caBX", textBytes("c2pa")), bytes([0, 1])])
+      : makeJpeg([jpegSegment(0xeb, textBytes("c2pa")), bytes([0xff, 0xe1, 0, 40])]);
+    const file = fixtureFile(`broken.${format}`, `image/${format}`, data);
+    const result = await cleanImageMetadata(file);
+    expect(result.blob).toBe(file);
     expect(result.removedCount).toBe(0);
     expect(result.warnings.length).toBeGreaterThan(0);
   });

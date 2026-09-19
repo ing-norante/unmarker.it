@@ -54,21 +54,66 @@ describe("accessible progress", () => {
 describe.each(["en", "zh-Hans"] as const)(
   "%s workflow accessibility",
   (locale) => {
-    it.each(["failed", "not-scanned"] as const)("hides the evidence meter when the visible scan is %s", async (visibleScanStatus) => {
-      const audit = buildImageAudit({
-        stage: "preflight",
-        metadataScan: { format: "jpeg", signals: [], warnings: [], hasAiMetadata: false },
-        visibleScanStatus,
-      });
-      const { html, i18n } = await renderLocalized(<AnalysisPanel audit={audit} phase="analysis-only" />, locale);
-      expect(html).toContain(i18n.t("workflow:audit.score.incomplete.label"));
-      expect(html).not.toContain('role="meter"');
-      expect(html).not.toContain("12%");
-      expect(html).not.toContain(i18n.t("workflow:audit.score.none.description"));
-    });
+    it.each(["failed", "not-scanned"] as const)(
+      "hides the evidence meter when the visible scan is %s",
+      async (visibleScanStatus) => {
+        const audit = buildImageAudit({
+          stage: "preflight",
+          metadataScan: {
+            format: "jpeg",
+            signals: [],
+            warnings: [],
+            hasAiMetadata: false,
+          },
+          visibleScan: { status: visibleScanStatus },
+        });
+        const { html, i18n } = await renderLocalized(
+          <AnalysisPanel audit={audit} phase="analysis-only" />,
+          locale,
+        );
+        expect(html).toContain(i18n.t("workflow:audit.score.incomplete.label"));
+        expect(html).not.toContain('role="meter"');
+        expect(html).not.toContain("12%");
+        expect(html).not.toContain(
+          i18n.t("workflow:audit.score.none.description"),
+        );
+      },
+    );
+
+    it.each(["preflight", "postflight"] as const)(
+      "labels hidden watermark evidence as unverified after completion, including %s analysis",
+      async (stage) => {
+        const audit = buildImageAudit({
+          stage,
+          metadataScan: null,
+          visibleScan: { status: "not-scanned" },
+        });
+        const { html, i18n } = await renderLocalized(
+          <AnalysisPanel audit={audit} phase="complete" />,
+          locale,
+        );
+        const badges = Array.from(
+          html.matchAll(/<span[^>]+data-slot="badge"[^>]*>([^<]+)<\/span>/g),
+          (match) => match[1],
+        );
+        expect(badges).toContain(
+          i18n.t("workflow:verification.status.unverified"),
+        );
+        expect(badges).not.toContain(i18n.t("common:generic.pending"));
+        expect(badges).not.toContain(i18n.t("common:generic.processed"));
+        expect(html).toContain(
+          i18n.t(
+            `workflow:audit.hidden.${stage === "postflight" ? "neutralized" : "risk"}.description`,
+          ),
+        );
+      },
+    );
 
     it("distinguishes unavailable metadata from a scan with no signals", async () => {
-      const { html, i18n } = await renderLocalized(<MetadataSignalsList scanResult={null} />, locale);
+      const { html, i18n } = await renderLocalized(
+        <MetadataSignalsList scanResult={null} />,
+        locale,
+      );
       expect(html).toContain(i18n.t("metadata:panel.unavailable"));
       expect(html).not.toContain(i18n.t("metadata:panel.empty"));
     });
@@ -80,7 +125,9 @@ describe.each(["en", "zh-Hans"] as const)(
       );
       const thumb = html.match(/<[^>]+role="slider"[^>]*>/)?.[0];
       expect(thumb).toBeTruthy();
-      expect(thumb).toContain(`aria-label="${i18n.t("workflow:quality.aria")}"`);
+      expect(thumb).toContain(
+        `aria-label="${i18n.t("workflow:quality.aria")}"`,
+      );
       expect(thumb).toContain('aria-valuetext="85%"');
       const descriptionId = thumb?.match(/aria-describedby="([^"]+)"/)?.[1];
       expect(descriptionId).toBeTruthy();
@@ -90,24 +137,61 @@ describe.each(["en", "zh-Hans"] as const)(
     it.each(["failed", "not-scanned", "scanned"] as const)(
       "reports output check completeness when visible scanning is %s",
       async (visibleScanStatus) => {
-        const scan = { format: "jpeg" as const, hasAiMetadata: false, signals: [], warnings: [] };
-        const preflightAudit = buildImageAudit({ stage: "preflight", metadataScan: scan });
-        const postflightAudit = buildImageAudit({ stage: "postflight", metadataScan: scan, visibleScanStatus });
+        const scan = {
+          format: "jpeg" as const,
+          hasAiMetadata: false,
+          signals: [],
+          warnings: [],
+        };
+        const preflightAudit = buildImageAudit({
+          stage: "preflight",
+          metadataScan: scan,
+          visibleScan: { status: "not-scanned" },
+        });
+        const postflightAudit = buildImageAudit({
+          stage: "postflight",
+          metadataScan: scan,
+          visibleScan:
+            visibleScanStatus === "scanned"
+              ? {
+                  status: "scanned",
+                  detection: {
+                    detected: false,
+                    confidence: 0,
+                    region: { x: 0, y: 0, width: 48, height: 48 },
+                    spatialScore: 0,
+                    gradientScore: 0,
+                    varianceScore: 0,
+                  },
+                }
+              : { status: visibleScanStatus },
+        });
         const { html, i18n } = await renderLocalized(
-          <VerificationDiff preflightAudit={preflightAudit} postflightAudit={postflightAudit} warnings={[]} />,
+          <VerificationDiff
+            preflightAudit={preflightAudit}
+            postflightAudit={postflightAudit}
+            warnings={[]}
+          />,
           locale,
         );
-        const badge = html.match(/<span[^>]+data-slot="badge"[^>]*>([^<]+)<\/span>/)?.[1];
-        expect(badge).toBe(i18n.t(`workflow:verification.${visibleScanStatus === "scanned" ? "verified" : "partial"}`));
+        const badge = html.match(
+          /<span[^>]+data-slot="badge"[^>]*>([^<]+)<\/span>/,
+        )?.[1];
+        expect(badge).toBe(
+          i18n.t(
+            `workflow:verification.${visibleScanStatus === "scanned" ? "verified" : "partial"}`,
+          ),
+        );
       },
     );
 
     it("exposes one named image-selection action with associated instructions", async () => {
       const { html, i18n } = await renderLocalized(
-        <ImageUploader onImageSelect={() => {}} />,
+        <ImageUploader onImagesSelect={() => {}} />,
         locale,
       );
       expect(html.match(/<button\b/g)).toHaveLength(1);
+      expect(html).toMatch(/<input\b[^>]*multiple=""/);
       expect(html).not.toContain('role="button"');
       expect(html).toContain(
         `aria-label="${i18n.t("common:actions.chooseImage")}"`,
@@ -120,7 +204,7 @@ describe.each(["en", "zh-Hans"] as const)(
 
     it("disables both the image-selection action and its file input", async () => {
       const { html } = await renderLocalized(
-        <ImageUploader disabled onImageSelect={() => {}} />,
+        <ImageUploader disabled onImagesSelect={() => {}} />,
         locale,
       );
       expect(html).toMatch(/<button\b[^>]*disabled=""/);

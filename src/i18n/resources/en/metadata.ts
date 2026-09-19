@@ -49,6 +49,11 @@ export const metadata = {
     jumbf: "JUMBF metadata box",
   },
   warnings: {
+    scanLimit: "Metadata inspection stopped at the local resource limit; the file was preserved.",
+    pngTextLimit: "Compressed PNG text exceeded the local reading limit; metadata inspection is incomplete.",
+    displayMetadataPreserved: "Metadata needed for orientation or display was preserved; some markers may remain.",
+    boxItemCoverage: "Metadata stored in image items was not fully inspected. Container cleanup is partial.",
+
     unsupportedClean: "Unsupported format; cleaning is disabled for this file.",
     unsupportedScan: "Unsupported format; scan is byte-signature only and cleaning is disabled.",
     malformedWebpHeader: "Malformed WebP RIFF header.",

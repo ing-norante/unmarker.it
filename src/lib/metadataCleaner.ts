@@ -1,22 +1,18 @@
 import {
-  cleanBoxContainerMetadata,
   inferBoxContainerFormat,
-  scanBoxContainerMetadata,
+  inspectBoxContainerMetadata,
 } from "@/lib/metadata/formats/boxContainer";
 import {
-  cleanJpegMetadata,
   isJpegBytes,
-  scanJpegMetadata,
+  inspectJpegMetadata,
 } from "@/lib/metadata/formats/jpeg";
 import {
-  cleanPngMetadata,
   isPngBytes,
-  scanPngMetadata,
+  inspectPngMetadata,
 } from "@/lib/metadata/formats/png";
 import {
-  cleanWebpMetadata,
   isWebpBytes,
-  scanWebpMetadata,
+  inspectWebpMetadata,
 } from "@/lib/metadata/formats/webp";
 import {
   getLowerExtension,
@@ -26,6 +22,7 @@ import {
   createSignal,
   findAiMarkers,
   hasBlockingCleanWarning,
+  hasC2paEvidence,
   toScanResult,
 } from "@/lib/metadata/markers";
 import type {
@@ -33,36 +30,44 @@ import type {
   MetadataImageFormat,
   MetadataScanResult,
 } from "./types";
+import { readLocalC2pa } from "./c2pa/runtime";
+import { createParseContext, type MetadataParseOptions, type ParseContext } from "./metadata/context";
+import type { FormatInspection } from "./metadata/inspection";
 
 export async function scanImageMetadata(
   file: File,
+  options: MetadataParseOptions = {},
 ): Promise<MetadataScanResult> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  return scanBytes(file, bytes);
+  const context = createParseContext(options);
+  // Drop the binary plan immediately; scans never retain image bytes in results.
+  const { scan: result } = await inspectFile(file, context);
+  context.checkpoint();
+  if (result.signals.some(hasC2paEvidence)) {
+    const presence = result.signals.some(({ type }) => type === "c2pa") ? "present" : "referenced";
+    result.c2pa = await readLocalC2pa(file, presence, context.signal);
+    context.checkpoint();
+    result.hasAiMetadata ||= Boolean(result.c2pa.aiDisclosure);
+  }
+  return result;
 }
 
 export async function cleanImageMetadata(
   file: File,
+  options: MetadataParseOptions = {},
 ): Promise<MetadataCleanResult> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const format = inferFormat(file, bytes);
+  const context = createParseContext(options);
+  const inspection = await inspectFile(file, context);
+  // All format-specific classification/decompression runs exactly once. C2PA
+  // enrichment is independent of binary removal and is unnecessary here.
+  context.checkpoint();
+  return inspection.apply(file, context);
+}
 
-  switch (format) {
-    case "png":
-      return cleanPngMetadata(file, bytes);
-    case "jpeg":
-      return cleanJpegMetadata(file, bytes);
-    case "webp":
-      return cleanWebpMetadata(file, bytes);
-    case "avif":
-    case "heif":
-    case "jxl":
-      return cleanBoxContainerMetadata(file, bytes, format);
-    default:
-      return originalCleanResult(file, format, [
-        { code: "unsupported-clean" },
-      ]);
-  }
+async function inspectFile(file: File, context: ParseContext): Promise<FormatInspection> {
+  context.checkpoint();
+  const buffer = await file.arrayBuffer();
+  context.checkpoint(); // Blob reads themselves cannot be aborted; do not start parsing afterwards.
+  return inspectBytes(file, new Uint8Array(buffer), context);
 }
 
 export function canCleanMetadata(result: MetadataScanResult | null) {
@@ -72,44 +77,38 @@ export function canCleanMetadata(result: MetadataScanResult | null) {
   );
 }
 
-function scanBytes(file: File, bytes: Uint8Array): Promise<MetadataScanResult> {
+function inspectBytes(file: File, bytes: Uint8Array, context: ParseContext): Promise<FormatInspection> {
   const format = inferFormat(file, bytes);
-
   switch (format) {
-    case "png":
-      return scanPngMetadata(bytes, format);
-    case "jpeg":
-      return Promise.resolve(scanJpegMetadata(bytes, format));
-    case "webp":
-      return Promise.resolve(scanWebpMetadata(bytes, format));
+    case "png": return inspectPngMetadata(bytes, format, context);
+    case "jpeg": return inspectJpegMetadata(bytes, format, context);
+    case "webp": return inspectWebpMetadata(bytes, format, context);
     case "avif":
     case "heif":
-    case "jxl":
-      return Promise.resolve(scanBoxContainerMetadata(bytes, format));
-    default:
-      return Promise.resolve(scanUnknown(bytes, format));
+    case "jxl": return inspectBoxContainerMetadata(bytes, format, context);
+    default: return Promise.resolve(inspectUnknown(bytes, format, context));
   }
 }
 
-function scanUnknown(
-  bytes: Uint8Array,
-  format: MetadataImageFormat,
-): MetadataScanResult {
-  const warnings = [
-    { code: "unsupported-scan" as const },
-  ];
-  const markers = findAiMarkers(bytes);
-  const signals = markers.map((marker) =>
-    createSignal(
-      marker === "C2PA UUID" ? "c2pa" : "binary-marker",
-      "metadata:signals.binary",
-      "file bytes",
-      marker,
-      false,
-    ),
-  );
-
-  return toScanResult(format, signals, warnings);
+async function inspectUnknown(bytes: Uint8Array, format: MetadataImageFormat, context: ParseContext): Promise<FormatInspection> {
+  const warnings: MetadataScanResult["warnings"] = [{ code: "unsupported-scan" }];
+  const markers = await findAiMarkers(bytes, context, warnings);
+  // In an unknown container the UUID cannot establish ownership of surrounding
+  // text. Keep credential structure separate from independent AI/provider clues.
+  const signals = markers.includes("C2PA UUID") ? [createSignal(
+    "c2pa", "metadata:signals.binary", "file bytes", "C2PA UUID", false,
+  )] : [];
+  const textMarkers = markers.filter((marker) => marker !== "C2PA UUID");
+  if (textMarkers.length > 0) signals.push(createSignal(
+    "binary-marker", "metadata:signals.binary", "file bytes", textMarkers, false,
+  ));
+  return {
+    scan: toScanResult(format, signals, warnings),
+    apply(file, applyContext) {
+      applyContext.checkpoint();
+      return originalCleanResult(file, format, [...warnings, { code: "unsupported-clean" }]);
+    },
+  };
 }
 
 function inferFormat(file: File, bytes: Uint8Array): MetadataImageFormat {

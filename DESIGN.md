@@ -174,7 +174,7 @@ The tool uses square controls and flat charcoal panels. Muted petrol blue marks 
 - A broad image workspace with compact, inspectable evidence panels.
 - Sponsor placements at the edges of the tool and a narrow booking form.
 
-This record refreshes the previously chosen Image Workbench language from `src/index.css`, `src/App.tsx`, `src/WorkflowApp.tsx`, `src/SponsorshipPage.tsx`, and `src/components/`. No local dev-server session was launched. Frontmatter tokens are normative; prose explains use and responsive exceptions.
+This record refreshes the previously chosen Image Workbench language from `src/index.css`, `src/App.tsx`, `src/WorkflowApp.tsx`, `src/SponsorshipPage.tsx`, and `src/components/`. The image queue extension was reviewed in local Chromium at desktop and mobile sizes in both locales. Frontmatter tokens are normative; prose explains use and responsive exceptions.
 
 ## Colors
 
@@ -229,13 +229,13 @@ The image tool fills available width with a gutter of `clamp(1.25rem, 3vw, 1cm)`
 
 The upload region stays tall (`min(62vh, 50rem)` on small screens, rising at larger widths). Result panels use container queries: comparison previews split at a 40rem container, analysis panels at 52rem, and verification cells at 48rem. Image previews use `object-fit: contain` and bounded height. Long evidence and action labels may wrap.
 
-After image selection, the file bar stays in the workspace. Below 1024px, action buttons move into a fixed bottom toolbar, with space reserved in page scroll padding. If a mobile sponsor strip is present, the toolbar sits above it; consent and locale overlays move above both. On larger screens, actions stay in a sticky workspace bar.
+After image selection, the queue and batch actions stay in normal document flow. The left column groups the header, queue, ZIP export/reset and JPEG quality; the right column holds the selected result and individual actions. Mobile stacks these groups in the same DOM order, keeping batch export before the long result report. Sponsor strips retain their existing safe-area behavior.
 
 Sponsor rails appear on both sides from 1440px, each about 12–13rem wide, and narrow the center. Below that width, sponsors appear in top and/or bottom strips with safe-area padding; controls sit in page flow. The booking page uses a maximum 36rem content column inside a wider header/footer shell. Static legal documents use a separate 78ch reading column. These are surface-specific compositions, not a universal container width.
 
 ## Elevation & Depth
 
-The working interface is mostly flat. Tonal separation, one-pixel borders, card rings, and strong typography define layers. Cast shadows are reserved for floating surfaces: the consent banner, mobile action toolbar, locale suggestion, and select overlays. The preview frame traces in for 460ms when the processed image is ready; the image remains visible. Sponsor cards may flip on desktop, and mobile sponsor strips scroll; both pause for interaction and resolve to static content under reduced motion.
+The working interface is mostly flat. Tonal separation, one-pixel borders, card rings, and strong typography define layers. Cast shadows are reserved for floating surfaces: the consent banner, locale suggestion, and select overlays. The preview frame traces in for 460ms when the processed image is ready; the image remains visible. Sponsor cards may flip on desktop, and mobile sponsor strips scroll; both pause for interaction and resolve to static content under reduced motion.
 
 **The Flat Work Surface Rule.** Keep task panels flat at rest. Use borders and fill before cast shadow; reserve shadow for content floating over the page.
 
@@ -253,7 +253,7 @@ Sponsor cards and mobile chips use a local 0.5rem radius. The advertising placeh
 
 - Default buttons are square, 2rem high, and use filled petrol blue with pale text. Hover retains about 95% of the fill; keyboard focus draws a two-pixel outline; pressing moves the control down one pixel.
 - Outline and secondary variants share a petrol border, page background, blue text, and a 10% petrol hover fill. Ghost and link variants use underlined blue text, with stronger underline on hover. Destructive uses coral text over a translucent coral fill.
-- Sizes range from 1.5rem to 2.25rem before application overrides. Narrow screens and coarse pointers give buttons at least a 44px hit target. Workflow actions allow wrapped labels; the mobile toolbar uses compact text and hides icons.
+- Sizes range from 1.5rem to 2.25rem before application overrides. Narrow screens and coarse pointers give buttons at least a 44px hit target. Workflow actions wrap as groups and preserve named text controls on mobile.
 
 ### Cards / Containers
 
@@ -279,7 +279,7 @@ Sponsor cards and mobile chips use a local 0.5rem radius. The advertising placeh
 ### Image selection and comparison
 
 - The entire uploader is one labeled file-selection button. Drag and focus strengthen its boundary; the central visual action is decorative. The processing view retains a file label, before/after contained previews, and grouped evidence panels.
-- The result action bar provides reset, cancel, retry, reprocess, download, and metadata actions according to workflow state. Its fixed mobile form reserves space below content and stays above any sponsor strip.
+- Batch controls provide pause, cancel unfinished, ZIP download and reset. The selected result provides cancel, retry, reprocess, JPEG download and metadata-copy actions according to its state. Actions stay in normal document flow on mobile and desktop.
 
 ## Do's and Don'ts
 
@@ -289,7 +289,7 @@ Sponsor cards and mobile chips use a local 0.5rem radius. The advertising placeh
 - Do keep the workbench square while allowing the documented rounded sponsor cards and chips.
 - Do preserve locale-aware typography, 44px touch targets, and visible focus.
 - Do let evidence, long translations, and action labels wrap without clipping.
-- Do position fixed workflow actions, sponsor strips, and consent overlays with their observed safe-area offsets.
+- Do respect the existing safe-area offsets of sponsor strips and consent overlays. Keep workflow controls in flow.
 
 ### Don't:
 
@@ -297,3 +297,41 @@ Sponsor cards and mobile chips use a local 0.5rem radius. The advertising placeh
 - Don't crop image comparisons or let sponsor placements displace the image action.
 - Don't make sponsor motion necessary to read a link or use the flip effect under reduced motion.
 - Don't infer rounded task cards from rounded sponsor placements.
+
+## Image queue extension
+
+The processing view extends the existing workbench without changing tokens,
+branding or sponsor framing. The left column contains a compact selectable file
+list, queue controls and quality for new attempts. The right column contains the
+selected result and its actions. On mobile, queue, ZIP/reset and quality precede the selected
+result in matching DOM and visual order; actions remain in flow rather than covering content. File rows use text
+status plus color, visible focus and 44px removal targets. Progress announces
+finished counts and the active filename, without a fabricated overall percentage.
+
+C2PA evidence uses a definition list for declared origin, local integrity and
+signer trust. Origin evidence is categorical, with no AI probability meter.
+No new raster imagery is introduced by this extension.
+
+## Workflow composition and async actions
+
+`WorkspaceFrame` owns the common tool grid and footer for idle, loading and batch
+views. It preserves each view's existing spacing and DOM order. `SponsorLayout`
+remains mounted above that boundary; sponsor placements and checkout are unchanged.
+The shared dark tokens live in `src/styles/theme.css`; locale typography, touch
+targets, image feedback and workspace utilities live in `src/styles/workspace.css`.
+Sponsor and legal rules remain in `src/index.css` with the existing overlay offsets.
+The removed mobile workflow toolbar has no remaining styles or reserved height.
+
+Metadata-copy creation and ZIP export reserve the queue through one operation
+controller. While reserved, add, retry, remove, resume, reset and another heavy
+action are unavailable. Selecting and inspecting an existing result remains
+available. A metadata cleanup shows the source filename and a cancel action in
+the batch controls, so it stays reachable after a selection change. Cancellation
+keeps the reservation until work settles and suppresses late downloads. An
+operation never changes the user's queue pause choice.
+
+Action notices retain message descriptors and translate on render, including
+metadata warnings, so changing language updates an existing notice. Exhaustive
+presentation selectors map queue and scan states to controls and labels;
+unavailable or partial output checks remain visibly incomplete, and hidden
+watermark results remain unverified.

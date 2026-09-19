@@ -13,9 +13,12 @@ export function buildCleanResult(
   removedCount: number,
   warnings: MetadataWarning[],
 ): MetadataCleanResult {
-  const output = concatUint8Arrays(parts);
   return {
-    blob: new Blob([toArrayBuffer(output)], {
+    // Blob snapshots each view. Avoid first concatenating and copying the whole
+    // file twice, which is particularly costly for lossless batch processing.
+    blob: new Blob(parts.map((part) => part.buffer instanceof ArrayBuffer
+      ? new Uint8Array(part.buffer, part.byteOffset, part.byteLength)
+      : toArrayBuffer(part)), {
       type: getMimeType(file, format),
     }),
     fileName: getCleanFileName(file, format),

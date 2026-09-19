@@ -7,3 +7,6 @@ allowBuilds:
 ignoredBuiltDependencies:
   - core-js
   - protobufjs
+minimumReleaseAgeExclude:
+  - '@contentauth/c2pa-wasm@0.13.0'
+  - '@contentauth/c2pa-web@0.15.1'

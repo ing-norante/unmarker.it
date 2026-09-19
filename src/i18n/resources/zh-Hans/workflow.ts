@@ -1,8 +1,10 @@
+import { batch, c2pa } from "./batch";
 export const workflow = {
+  batch, c2pa,
   phase: {
     idle: { title: "就绪", label: "空闲", description: "选择图片以开始分析和处理。" },
     "preflight-scanning": { title: "正在分析", label: "分析中", description: "正在读取元数据并检查可见的 Gemini 风格标记。" },
-    "analysis-only": { title: "仅分析", label: "仅分析", description: "此浏览器无法处理这张图片，但仍可在下方查看元数据分析结果。" },
+    "analysis-only": { title: "仅分析", label: "仅分析", description: "此浏览器无法解码图像像素。请查看下方可用的元数据结果及覆盖范围警告。" },
     processing: { title: "正在处理图片", label: "处理中", description: "正在调整图片，并尝试移除检测到的 Gemini 闪光标记。" },
     "postflight-scanning": { title: "正在检查输出", label: "检查中", description: "正在检查 JPEG 的元数据和可见 Gemini 标记，无法确认隐形水印是否已移除。" },
     complete: {
@@ -38,7 +40,7 @@ export const workflow = {
   },
   comparison: {
     previewUnavailable: "无法显示预览",
-    originalPreviewUnavailable: "此浏览器无法显示图片，但仍可查看分析结果。",
+    originalPreviewUnavailable: "此浏览器无法显示图片。下方会显示可用的分析结果。",
     processedPreviewUnavailable: "预览未能加载，但仍可下载 JPEG。",
     original: "原图",
     originalDescription: "你选择的图片。",
@@ -69,7 +71,7 @@ export const workflow = {
   },
   audit: {
     visible: {
-      notScanned: { label: "未扫描", description: "此浏览器无法读取图像像素，因此仅分析了元数据。" },
+      notScanned: { label: "未扫描", description: "此浏览器无法读取图像像素。请查看元数据部分是否有可用结果。" },
       failed: { label: "扫描未完成", description: "Gemini 水印检查未完成，无法确认是否存在该标记。" },
       detected: { label: "检测到 Gemini 水印", description: "在图像像素中检测到 Gemini 风格的闪光水印。" },
       clear: { label: "未检测到 Gemini 水印", description: "扫描未发现 Gemini 闪光标记。本工具不检查其他可见水印。" },
@@ -79,7 +81,8 @@ export const workflow = {
       risk: { label: "可能存在隐形水印", description: "即使没有元数据标记，图片中仍可能存在隐形 AI 水印信号。" },
     },
     score: {
-      strong: { label: "发现强 AI 来源线索", description: "文件中发现了本地来源信息或 C2PA 风格的 AI 元数据。" },
+      credentials: { label: "发现内容凭证", description: "凭证本身不能证明 AI 来源。请查看下方声明的来源和本地验证。" },
+      strong: { label: "发现强 AI 来源线索", description: "本地发现了明确的 AI 生成或编辑声明。这是声明，并不能证明像素的实际创作方式。" },
       metadata: { label: "发现 AI 元数据信号", description: "本地元数据标记表明此图片可能经过 AI 生成流程。" },
       visible: { label: "发现可见 AI 水印线索", description: "本地检测到 Gemini 风格的可见水印，但未发现强元数据来源信息。" },
       none: { label: "未发现本地 AI 信号", description: "这不能证明图片由人类创作；只表示本地元数据和可见水印检查未发现 AI 信号。" },
@@ -153,6 +156,14 @@ export const workflow = {
     cleanupFailed: "无法清理元数据。",
   },
   warnings: {
+    pixelDecodeUnavailable: "无法读取图像像素进行处理。元数据分析也可能不完整；请查看下方详情。可尝试其他文件，或重新导出为 PNG 或 JPEG。",
+    preflightMetadata: "无法完整检查输入元数据。",
+    visibleRestore: "Gemini 修复未完成，已继续处理图像。",
+    pixelWorkerFallback: "后台处理不可用，此图像使用了浏览器后备处理。",
+    residualVisible: "输出中仍检测到 Gemini 标记。使用前请检查图像。",
+    residualMetadata: "输出中仍有元数据信号。请查看输出分析。",
+    metadataCoverage: "元数据检查不完整，部分结构未能全面检查。",
+
     postflightMetadata: "未能完成输出文件的元数据检查。",
     postflightVisible: "未能完成输出图片的 Gemini 水印检查。",
     visibleScan: "未能完成图片的 Gemini 水印检查。",

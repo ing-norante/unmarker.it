@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 
 interface ImageUploaderProps {
-  onImageSelect: (file: File) => void;
+  onImagesSelect: (files: File[]) => void;
   className?: string;
   disabled?: boolean;
   accept?: string;
@@ -21,7 +21,7 @@ interface ImageUploaderProps {
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
-  onImageSelect,
+  onImagesSelect,
   className,
   disabled = false,
   accept = "image/*",
@@ -38,11 +38,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [isDragging, setIsDragging] = useState(false);
 
   const selectFile = useCallback(
-    (file: File) => {
+    (files: File[]) => {
       trackAction("upload_image", "uploader");
-      onImageSelect(file);
+      onImagesSelect(files);
     },
-    [onImageSelect],
+    [onImagesSelect],
   );
 
   const openFileDialog = useCallback(() => {
@@ -85,7 +85,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
-        selectFile(files[0]);
+        selectFile(files);
       }
     },
     [selectFile, disabled],
@@ -94,11 +94,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (disabled) return;
-      const file = e.currentTarget.files?.[0];
+      const files = Array.from(e.currentTarget.files ?? []);
       // Permit selecting the same file again after a validation error.
       e.currentTarget.value = "";
-      if (file) {
-        selectFile(file);
+      if (files.length) {
+        selectFile(files);
       }
     },
     [selectFile, disabled],
@@ -139,6 +139,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           ref={fileInputRef}
           id={fileInputId}
           type="file"
+          multiple
           className="hidden"
           accept={accept}
           onChange={handleFileChange}

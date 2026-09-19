@@ -25,7 +25,7 @@ export function Header({ className }: { className?: string }) {
               alt=""
               width={147}
               height={139}
-              className="h-[1cap] w-auto shrink-0"
+              className="h-[1.2cap] w-auto shrink-0"
             />
             <span>
               Unmarker

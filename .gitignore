@@ -34,3 +34,6 @@ dist-ssr
 research/
 docs/audits/
 docs/legal-it/
+
+# Local rendered design-review evidence (never application assets)
+.impeccable/review/

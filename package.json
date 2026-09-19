@@ -33,7 +33,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist/server && node --import tsx scripts/prerender.mjs && node scripts/verify-localization.mjs && node scripts/verify-route-bundles.mjs",
+    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist/server && node --import tsx scripts/prerender.mjs && node scripts/verify-localization.mjs && node --import tsx scripts/verify-route-bundles.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview",
@@ -51,13 +51,15 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
+    "@contentauth/c2pa-web": "0.15.1",
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-form": "1.33.5",
-    "@techstark/opencv-js": "4.12.0-release.1",
+    "@techstark/opencv-js": "5.0.0-release.1",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.3.0",
+    "fflate": "0.8.3",
     "i18next": "^26.4.2",
     "pg": "8.23.0",
     "posthog-js": "^1.433.9",
@@ -67,7 +69,6 @@
     "react-i18next": "^17.0.14",
     "shadcn": "^4.21.0",
     "sharp": "0.35.4",
-    "sonner": "^2.0.8",
     "stripe": "22.6.2",
     "tailwindcss": "^4.3.3",
     "zod": "4.6.5"
@@ -95,5 +96,8 @@
     "vite": "8.3.0",
     "vitest": "^4.1.11"
   },
-  "packageManager": "pnpm@12.4.2"
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=22.12.0"
+  }
 }

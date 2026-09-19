@@ -1,3 +1,4 @@
+import { showsResultPanel } from "@/lib/workflow/presentation";
 import { useState } from "react";
 import {
   Card,
@@ -38,10 +39,7 @@ export function ImageComparison({
   workflowWarnings,
 }: ImageComparisonProps) {
   const { t } = useTranslation("workflow");
-  const showResultPanel =
-    phase === "processing" ||
-    phase === "postflight-scanning" ||
-    phase === "complete";
+  const showResultPanel = showsResultPanel(phase);
 
   return (
     <div className="@container/comparison flex min-w-0 flex-col gap-4 pb-2">
@@ -69,7 +67,9 @@ export function ImageComparison({
           <Card className="bg-card/95 overflow-hidden">
             <CardHeader className="border-b px-4 py-3">
               <CardTitle>
-                {processedImageUrl ? t("comparison.processed") : t("comparison.processing")}
+                {processedImageUrl
+                  ? t("comparison.processed")
+                  : t("comparison.processing")}
               </CardTitle>
               <CardDescription>
                 {processedImageUrl
@@ -124,20 +124,29 @@ export function ImageComparison({
   );
 }
 
-function ImagePreview({ src, alt, errorDescription, processed = false }: {
+function ImagePreview({
+  src,
+  alt,
+  errorDescription,
+  processed = false,
+}: {
   src: string;
   alt: string;
   errorDescription: string;
   processed?: boolean;
 }) {
   const { t } = useTranslation("workflow");
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
 
   if (status === "error") {
     return (
       <Empty role="status">
         <EmptyHeader>
-          <EmptyMedia variant="icon"><ImageSquareIcon /></EmptyMedia>
+          <EmptyMedia variant="icon">
+            <ImageSquareIcon />
+          </EmptyMedia>
           <EmptyTitle>{t("comparison.previewUnavailable")}</EmptyTitle>
           <EmptyDescription>{errorDescription}</EmptyDescription>
         </EmptyHeader>
@@ -146,7 +155,10 @@ function ImagePreview({ src, alt, errorDescription, processed = false }: {
   }
 
   return (
-    <div className={`${processed ? "result-preview-frame " : ""}relative flex max-w-full`} data-ready={status === "ready"}>
+    <div
+      className={`${processed ? "result-preview-frame" : ""}relative flex max-w-full`}
+      data-ready={status === "ready"}
+    >
       <img
         src={src}
         alt={alt}

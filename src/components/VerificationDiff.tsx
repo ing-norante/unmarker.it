@@ -12,6 +12,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  presentVerification,
+  presentVisible,
+  signalCount,
+} from "@/lib/workflow/presentation";
 import { createVerificationDiff } from "@/lib/imageAudit";
 import type { ImageAuditResult } from "@/lib/types";
 import type { MessageDescriptor } from "@/i18n/messages";
@@ -30,8 +35,6 @@ export function VerificationDiff({
   warnings,
 }: VerificationDiffProps) {
   const { t } = useTranslation("workflow");
-  const translate = (key: string, options?: Record<string, number>) =>
-    String(t(key as never, options as never));
   const diff = createVerificationDiff(
     preflightAudit,
     postflightAudit,
@@ -42,22 +45,21 @@ export function VerificationDiff({
     return null;
   }
 
-  const visibleChecked = diff.visibleAfter === "detected" || diff.visibleAfter === "not-detected";
-  const metadataChecked = diff.metadataAfterCount !== null && postflightAudit?.metadataScan?.warnings.length === 0;
-  const checksComplete = visibleChecked && metadataChecked && postflightAudit?.warnings.length === 0;
+  const { visibleChecked, metadataChecked, checksComplete } =
+    presentVerification(postflightAudit);
 
   return (
-    <Card className="@container/verification min-w-0 bg-card/95">
+    <Card className="bg-card/95 @container/verification min-w-0">
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3 [&>div]:min-w-0 [&>div]:flex-1 [&>div]:basis-48">
           <div>
             <CardTitle>{t("verification.title")}</CardTitle>
-            <CardDescription>
-              {t("verification.description")}
-            </CardDescription>
+            <CardDescription>{t("verification.description")}</CardDescription>
           </div>
           <Badge variant={checksComplete ? "default" : "outline"}>
-            {checksComplete ? t("verification.verified") : t("verification.partial")}
+            {checksComplete
+              ? t("verification.verified")
+              : t("verification.partial")}
           </Badge>
         </div>
       </CardHeader>
@@ -65,16 +67,24 @@ export function VerificationDiff({
         <DiffTile
           icon="metadata"
           label={t("verification.metadata")}
-          before={formatCount(diff.metadataBeforeCount, translate)}
-          after={formatCount(diff.metadataAfterCount, translate)}
+          before={translateMessage(t, signalCount(diff.metadataBeforeCount))}
+          after={translateMessage(t, signalCount(diff.metadataAfterCount))}
           partial={!metadataChecked}
         />
         <DiffTile
           icon="visible"
           label={t("verification.visible")}
-          before={formatStatus(diff.visibleBefore, translate)}
+          before={translateMessage(
+            t,
+            presentVisible(diff.visibleBefore).verification,
+          )}
           after={
-            diff.visibleAfter ? formatStatus(diff.visibleAfter, translate) : t("verification.partial")
+            diff.visibleAfter
+              ? translateMessage(
+                  t,
+                  presentVisible(diff.visibleAfter).verification,
+                )
+              : t("verification.partial")
           }
           partial={!visibleChecked}
         />
@@ -82,17 +92,15 @@ export function VerificationDiff({
           icon="hidden"
           label={t("verification.hidden")}
           before={t("verification.possible")}
-          after={
-            diff.hiddenAfter === "neutralized-unverified"
-              ? t("verification.neutralized")
-              : formatStatus(diff.hiddenAfter, translate)
-          }
+          after={t("verification.status.unverified")}
           partial={false}
         />
 
         {diff.warnings.length > 0 && (
           <div className="bg-muted/40 text-muted-foreground border p-3 text-base leading-relaxed @min-[48rem]/verification:col-span-3">
-            {diff.warnings.map((warning) => translateMessage(t, warning)).join(" ")}
+            {diff.warnings
+              .map((warning) => translateMessage(t, warning))
+              .join(" ")}
           </div>
         )}
       </CardContent>
@@ -125,14 +133,18 @@ function DiffTile({
     <div className="bg-muted/35 flex min-w-0 flex-col gap-3 border p-3">
       <div className="flex items-center justify-between gap-3">
         <Icon
-          className={partial || icon === "hidden" ? "text-muted-foreground" : "text-primary-text"}
+          className={
+            partial || icon === "hidden"
+              ? "text-muted-foreground"
+              : "text-primary-text"
+          }
           weight="bold"
         />
         {partial && <WarningCircleIcon className="text-muted-foreground" />}
       </div>
       <div>
         <p className="text-ui-overline text-muted-foreground">{label}</p>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-base leading-normal tabular-nums wrap-anywhere">
+        <div className="mt-2 grid grid-cols-2 gap-2 text-base leading-normal wrap-anywhere tabular-nums">
           <div>
             <p className="text-muted-foreground text-xs font-bold uppercase">
               {t("verification.before")}
@@ -149,16 +161,4 @@ function DiffTile({
       </div>
     </div>
   );
-}
-
-function formatCount(count: number | null, t: (key: string, options?: Record<string, number>) => string) {
-  if (count === null) {
-    return t("verification.partial");
-  }
-
-  return t("verification.signal", { count });
-}
-
-function formatStatus(value: string, t: (key: string) => string) {
-  return t(`verification.status.${value}`);
 }

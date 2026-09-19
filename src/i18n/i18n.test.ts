@@ -48,7 +48,7 @@ describe("translation resources", () => {
   it("contains no denied English UI phrases", () => {
     const allChinese = [...flatten(resources["zh-Hans"]).values()].join("\n");
     for (const phrase of [
-      "Add an image", "WORKFLOW", "Needs attention", "Core facts",
+      "Add images", "WORKFLOW", "Needs attention", "Core facts",
       "Analyze, process, and check", "Built with", "No cleanup needed", "Failed",
     ]) expect(allChinese).not.toContain(phrase);
   });
@@ -72,10 +72,10 @@ describe("isolated SSR i18n instances", () => {
     const firstEn = await render("en");
     const zh = await render("zh-Hans");
     const secondEn = await render("en");
-    expect(firstEn.appHtml).toContain("Add an image");
+    expect(firstEn.appHtml).toContain("Add images");
     expect(zh.appHtml).toContain("添加图片");
-    expect(zh.appHtml).not.toContain("Add an image");
-    expect(secondEn.appHtml).toContain("Add an image");
+    expect(zh.appHtml).not.toContain("Add images");
+    expect(secondEn.appHtml).toContain("Add images");
   });
 });
 
