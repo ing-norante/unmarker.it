@@ -2,6 +2,8 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { writeLegalPages } from "./legal-pages.ts";
+import { supportedLocales } from "../src/i18n/locales.ts";
+import { prerenderedPath, staticDependencies } from "./build-artifacts.ts";
 
 const rootDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -22,24 +24,19 @@ const manifest = JSON.parse(manifestJson);
 // Start the selected route with the document; never preload the other route
 // or the billing step. Follow static imports only, leaving dynamic imports lazy.
 function preloadRoute(html, page) {
-  const seen = new Set();
   const links = [];
-  function visit(key) {
-    if (seen.has(key)) return;
-    seen.add(key);
+  const entry = page === "sponsorship" ? "src/SponsorshipPage.tsx" : "src/App.tsx";
+  for (const key of staticDependencies(manifest, entry)) {
     const chunk = manifest[key];
-    if (!chunk) throw new Error(`Missing route chunk: ${key}`);
     const href = `/${chunk.file}`;
     if (!html.includes(`"${href}"`)) {
       links.push(`<link rel="modulepreload" crossorigin href="${href}">`);
     }
-    for (const dependency of chunk.imports ?? []) visit(dependency);
   }
-  visit(page === "sponsorship" ? "src/SponsorshipPage.tsx" : "src/App.tsx");
   return html.replace("</head>", `${links.join("\n")}\n</head>`);
 }
 
-for (const locale of ["en", "zh-Hans"]) {
+for (const locale of supportedLocales) {
   for (const page of ["home", "sponsorship"]) {
     const { appHtml, documentMetadata } = await render(locale, page);
     let prerendered = template.replace(
@@ -58,9 +55,7 @@ for (const locale of ["en", "zh-Hans"]) {
 
     const outputPath = path.join(
       distDir,
-      locale === "en" ? "" : "zh-hans",
-      page === "home" ? "" : "sponsorship",
-      "index.html",
+      prerenderedPath(locale, page),
     );
     await mkdir(path.dirname(outputPath), { recursive: true });
     await writeFile(outputPath, prerendered);
