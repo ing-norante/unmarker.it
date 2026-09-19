@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scanImageMetadata } from "./metadataCleaner";
 import { readLocalC2pa } from "./c2pa/runtime";
 import { interpretManifestStore } from "./c2pa/interpret";
+import { C2PA_UUID } from "./metadata/markers";
+import { inferAiProvenanceScore } from "./aiProvenanceScore";
 
 vi.mock("./c2pa/runtime", () => ({ readLocalC2pa: vi.fn() }));
 beforeEach(() => vi.mocked(readLocalC2pa).mockReset());
@@ -17,6 +19,30 @@ function png(withCredentials: boolean) {
 }
 
 describe("C2PA metadata integration", () => {
+  it("preserves independent AI/provider evidence next to a UUID in an unknown format", async () => {
+    vi.mocked(readLocalC2pa).mockResolvedValue({ presence: "present", origin: "unknown", aiDisclosure: false, integrity: "unknown", trust: "unknown", verification: "incomplete", reasons: ["reader-unavailable", "trust-not-evaluated"] });
+    const file = new File([C2PA_UUID, new TextEncoder().encode(" openai trainedAlgorithmicMedia ")], "unknown.bin");
+    const result = await scanImageMetadata(file);
+    expect(result.hasAiMetadata).toBe(true);
+    expect(result.signals).toEqual([
+      expect.objectContaining({ type: "c2pa", markers: ["C2PA UUID"], removable: false }),
+      expect.objectContaining({ type: "binary-marker", markers: expect.arrayContaining(["openai", "trainedAlgorithmicMedia"]), removable: false }),
+    ]);
+    expect(result.c2pa?.aiDisclosure).toBe(false);
+    expect(inferAiProvenanceScore(result, null, "not-detected"))
+      .toMatchObject({ kind: "strong", provider: "OpenAI", percentage: null });
+    expect(readLocalC2pa).toHaveBeenCalledWith(file, "present", undefined);
+  });
+
+  it("does not infer AI from a standalone credential UUID in an unknown format", async () => {
+    vi.mocked(readLocalC2pa).mockResolvedValue({ presence: "present", origin: "unknown", aiDisclosure: false, integrity: "unknown", trust: "unknown", verification: "incomplete", reasons: ["reader-unavailable", "trust-not-evaluated"] });
+    const result = await scanImageMetadata(new File([C2PA_UUID], "unknown.bin"));
+    expect(result.hasAiMetadata).toBe(false);
+    expect(result.signals).toHaveLength(1);
+    expect(inferAiProvenanceScore(result, null, "not-detected"))
+      .toMatchObject({ kind: "credentials", provider: null, percentage: null });
+  });
+
   it("never initializes the SDK for an image without provenance candidates", async () => {
     expect((await scanImageMetadata(png(false))).c2pa).toBeUndefined();
     expect(readLocalC2pa).not.toHaveBeenCalled();

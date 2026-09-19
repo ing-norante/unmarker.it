@@ -93,10 +93,15 @@ function inspectBytes(file: File, bytes: Uint8Array, context: ParseContext): Pro
 async function inspectUnknown(bytes: Uint8Array, format: MetadataImageFormat, context: ParseContext): Promise<FormatInspection> {
   const warnings: MetadataScanResult["warnings"] = [{ code: "unsupported-scan" }];
   const markers = await findAiMarkers(bytes, context, warnings);
-  const signals = markers.length ? [createSignal(
-    markers.includes("C2PA UUID") ? "c2pa" : "binary-marker",
-    "metadata:signals.binary", "file bytes", markers, false,
+  // In an unknown container the UUID cannot establish ownership of surrounding
+  // text. Keep credential structure separate from independent AI/provider clues.
+  const signals = markers.includes("C2PA UUID") ? [createSignal(
+    "c2pa", "metadata:signals.binary", "file bytes", "C2PA UUID", false,
   )] : [];
+  const textMarkers = markers.filter((marker) => marker !== "C2PA UUID");
+  if (textMarkers.length > 0) signals.push(createSignal(
+    "binary-marker", "metadata:signals.binary", "file bytes", textMarkers, false,
+  ));
   return {
     scan: toScanResult(format, signals, warnings),
     apply(file, applyContext) {
