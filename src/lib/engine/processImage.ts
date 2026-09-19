@@ -115,7 +115,7 @@ export async function processImage(
           ? message("workflow:messages.resolutionHighProcessing.description", {
               count: MAX_MEGAPIXELS,
             })
-          : message("workflow:messages.decodeFailed.description"),
+          : message("workflow:warnings.pixelDecodeUnavailable"),
       );
     }
     let visibleScan: VisibleScanResult = { status: "not-scanned" };

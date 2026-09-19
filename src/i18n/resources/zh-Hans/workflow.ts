@@ -4,7 +4,7 @@ export const workflow = {
   phase: {
     idle: { title: "就绪", label: "空闲", description: "选择图片以开始分析和处理。" },
     "preflight-scanning": { title: "正在分析", label: "分析中", description: "正在读取元数据并检查可见的 Gemini 风格标记。" },
-    "analysis-only": { title: "仅分析", label: "仅分析", description: "此浏览器无法处理这张图片，但仍可在下方查看元数据分析结果。" },
+    "analysis-only": { title: "仅分析", label: "仅分析", description: "此浏览器无法解码图像像素。请查看下方可用的元数据结果及覆盖范围警告。" },
     processing: { title: "正在处理图片", label: "处理中", description: "正在调整图片，并尝试移除检测到的 Gemini 闪光标记。" },
     "postflight-scanning": { title: "正在检查输出", label: "检查中", description: "正在检查 JPEG 的元数据和可见 Gemini 标记，无法确认隐形水印是否已移除。" },
     complete: {
@@ -40,7 +40,7 @@ export const workflow = {
   },
   comparison: {
     previewUnavailable: "无法显示预览",
-    originalPreviewUnavailable: "此浏览器无法显示图片，但仍可查看分析结果。",
+    originalPreviewUnavailable: "此浏览器无法显示图片。下方会显示可用的分析结果。",
     processedPreviewUnavailable: "预览未能加载，但仍可下载 JPEG。",
     original: "原图",
     originalDescription: "你选择的图片。",
@@ -71,7 +71,7 @@ export const workflow = {
   },
   audit: {
     visible: {
-      notScanned: { label: "未扫描", description: "此浏览器无法读取图像像素，因此仅分析了元数据。" },
+      notScanned: { label: "未扫描", description: "此浏览器无法读取图像像素。请查看元数据部分是否有可用结果。" },
       failed: { label: "扫描未完成", description: "Gemini 水印检查未完成，无法确认是否存在该标记。" },
       detected: { label: "检测到 Gemini 水印", description: "在图像像素中检测到 Gemini 风格的闪光水印。" },
       clear: { label: "未检测到 Gemini 水印", description: "扫描未发现 Gemini 闪光标记。本工具不检查其他可见水印。" },
@@ -156,6 +156,7 @@ export const workflow = {
     cleanupFailed: "无法清理元数据。",
   },
   warnings: {
+    pixelDecodeUnavailable: "无法读取图像像素进行处理。元数据分析也可能不完整；请查看下方详情。可尝试其他文件，或重新导出为 PNG 或 JPEG。",
     preflightMetadata: "无法完整检查输入元数据。",
     visibleRestore: "Gemini 修复未完成，已继续处理图像。",
     pixelWorkerFallback: "后台处理不可用，此图像使用了浏览器后备处理。",

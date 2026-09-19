@@ -4,7 +4,7 @@ export const workflow = {
   phase: {
     idle: { title: "Ready", label: "idle", description: "Choose an image to analyze it and start processing." },
     "preflight-scanning": { title: "Analyzing", label: "analyzing", description: "Reading metadata and checking for visible Gemini-style marks." },
-    "analysis-only": { title: "Analysis only", label: "analysis only", description: "This browser cannot process the image. You can still review its metadata below." },
+    "analysis-only": { title: "Analysis only", label: "analysis only", description: "This browser could not decode the image pixels. Review the available metadata findings and any coverage warnings below." },
     processing: { title: "Processing image", label: "processing", description: "Applying image changes and attempting to remove any detected Gemini sparkle mark." },
     "postflight-scanning": { title: "Checking output", label: "checking", description: "Scanning the JPEG for metadata and visible Gemini marks. Hidden-watermark removal cannot be confirmed." },
     complete: {
@@ -40,7 +40,7 @@ export const workflow = {
   },
   comparison: {
     previewUnavailable: "Preview unavailable",
-    originalPreviewUnavailable: "This browser could not display the image. You can still review its analysis.",
+    originalPreviewUnavailable: "This browser could not display the image. Available analysis findings appear below.",
     processedPreviewUnavailable: "The preview could not load. You can still download the JPEG.",
     original: "Original",
     originalDescription: "The image you selected.",
@@ -71,7 +71,7 @@ export const workflow = {
   },
   audit: {
     visible: {
-      notScanned: { label: "Not scanned", description: "This browser could not read the image pixels, so only metadata was analyzed." },
+      notScanned: { label: "Not scanned", description: "This browser could not read the image pixels. Check the metadata section for any available findings." },
       failed: { label: "Scan incomplete", description: "The Gemini watermark check did not finish. Its presence or absence could not be confirmed." },
       detected: { label: "Gemini watermark detected", description: "A Gemini-style sparkle watermark was detected in the image pixels." },
       clear: { label: "No Gemini watermark detected", description: "The scan did not find a Gemini sparkle mark. Other visible watermarks are not checked." },
@@ -156,6 +156,7 @@ export const workflow = {
     cleanupFailed: "Could not clean metadata.",
   },
   warnings: {
+    pixelDecodeUnavailable: "Image pixels could not be read for processing. Metadata analysis may still be partial; see the details below. Try another file or export as PNG or JPEG.",
     preflightMetadata: "Input metadata could not be fully checked.",
     visibleRestore: "The Gemini repair did not finish. Image processing continued without that repair.",
     pixelWorkerFallback: "Background processing was unavailable; this image used the browser fallback.",
