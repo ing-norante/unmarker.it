@@ -1,7 +1,5 @@
 import type {
-  MetadataCleanResult,
   MetadataImageFormat,
-  MetadataScanResult,
   MetadataSignal,
   MetadataWarning,
 } from "@/lib/types";
@@ -9,13 +7,14 @@ import {
   addWarning,
   buildCleanResult,
   bytesEqual,
-  originalCleanResult,
   readAscii,
   toArrayBuffer,
   toDataView,
   unique,
 } from "../binary";
 import { createSignal, findAiMarkers, toScanResult } from "../markers";
+import { visitEntry, type ParseContext } from "../context";
+import { createInspection, type FormatInspection } from "../inspection";
 
 export const PNG_SIGNATURE = new Uint8Array([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
@@ -23,9 +22,7 @@ export const PNG_SIGNATURE = new Uint8Array([
 
 const PNG_TEXT_CHUNKS = new Set(["tEXt", "iTXt", "zTXt"]);
 const C2PA_PNG_CHUNKS = new Set(["caBX"]);
-export const PNG_TEXT_CHUNK_LIMIT = 1024 * 1024;
-export const PNG_TEXT_TOTAL_LIMIT = 4 * PNG_TEXT_CHUNK_LIMIT;
-type TextBudget = { remaining: number };
+export { PNG_TEXT_CHUNK_LIMIT, PNG_TEXT_TOTAL_LIMIT } from "../context";
 
 interface PngChunk {
   type: string;
@@ -40,91 +37,53 @@ export function isPngBytes(bytes: Uint8Array) {
   return bytesEqual(bytes.subarray(0, PNG_SIGNATURE.length), PNG_SIGNATURE);
 }
 
-export async function scanPngMetadata(
+export async function inspectPngMetadata(
   bytes: Uint8Array,
   format: MetadataImageFormat,
-): Promise<MetadataScanResult> {
+  context: ParseContext,
+): Promise<FormatInspection> {
   const signals: MetadataSignal[] = [];
   const warnings: MetadataWarning[] = [];
-  const chunks = walkPngChunks(bytes, warnings);
-  const budget = { remaining: PNG_TEXT_TOTAL_LIMIT };
+  const chunks = walkPngChunks(bytes, warnings, context);
+  const removedStarts = new Set<number>();
 
   for (const chunk of chunks) {
+    await context.yieldIfNeeded();
     if (C2PA_PNG_CHUNKS.has(chunk.type)) {
-      signals.push(
-        createSignal(
-          "c2pa",
-          "metadata:signals.pngC2pa",
-          `PNG ${chunk.type}`,
-          "c2pa",
-        ),
-      );
-      continue;
-    }
-
-    if (!PNG_TEXT_CHUNKS.has(chunk.type)) {
-      continue;
-    }
-
-    const markers = await findPngTextMarkers(chunk, warnings, budget);
-    if (markers.length > 0) {
-      signals.push(
-        createSignal(
-          "png-text",
-          "metadata:signals.pngText",
-          `PNG ${chunk.type}`,
-          markers[0],
-        ),
-      );
+      signals.push(createSignal("c2pa", "metadata:signals.pngC2pa", `PNG ${chunk.type}`, "c2pa"));
+      removedStarts.add(chunk.start);
+    } else if (PNG_TEXT_CHUNKS.has(chunk.type)) {
+      const markers = await findPngTextMarkers(chunk, warnings, context);
+      context.checkpoint();
+      if (markers.length > 0) {
+        signals.push(createSignal("png-text", "metadata:signals.pngText", `PNG ${chunk.type}`, markers));
+        removedStarts.add(chunk.start);
+      }
     }
   }
 
-  return toScanResult(format, signals, warnings);
-}
-
-export async function cleanPngMetadata(
-  file: File,
-  bytes: Uint8Array,
-): Promise<MetadataCleanResult> {
-  const warnings: MetadataWarning[] = [];
-  const chunks = walkPngChunks(bytes, warnings);
-
-  if (chunks.length === 0 || warnings.length > 0) {
-    return originalCleanResult(file, "png", warnings);
-  }
-
-  const parts: Uint8Array[] = [bytes.subarray(0, PNG_SIGNATURE.length)];
-  const budget = { remaining: PNG_TEXT_TOTAL_LIMIT };
-  let removedCount = 0;
-
-  for (const chunk of chunks) {
-    const removeC2pa = C2PA_PNG_CHUNKS.has(chunk.type);
-    const removeText =
-      PNG_TEXT_CHUNKS.has(chunk.type) &&
-      (await findPngTextMarkers(chunk, warnings, budget)).length > 0;
-
-    if (removeC2pa || removeText) {
-      removedCount += 1;
-      continue;
+  return createInspection(toScanResult(format, signals, warnings), (file, applyContext) => {
+    const parts: Uint8Array[] = [bytes.subarray(0, PNG_SIGNATURE.length)];
+    for (const chunk of chunks) {
+      applyContext.checkpoint();
+      if (!removedStarts.has(chunk.start)) parts.push(bytes.subarray(chunk.start, chunk.end));
     }
-
-    parts.push(bytes.subarray(chunk.start, chunk.end));
-  }
-
-  return buildCleanResult(file, "png", parts, removedCount, warnings);
+    return buildCleanResult(file, format, parts, removedStarts.size, warnings);
+  });
 }
 
 async function findPngTextMarkers(
   chunk: PngChunk,
   warnings: MetadataWarning[],
-  budget: TextBudget,
+  context: ParseContext,
 ): Promise<string[]> {
-  const limit = Math.min(PNG_TEXT_CHUNK_LIMIT, budget.remaining);
+  context.checkpoint();
+  const limit = Math.min(context.budget.pngTextChunkBytes, context.budget.pngTextBytesRemaining);
   if (chunk.data.length > limit) {
     addWarning(warnings, "png-text-limit");
     return [];
   }
-  budget.remaining -= chunk.data.length;
+  context.budget.pngTextBytesRemaining -= chunk.data.length;
   // Compressed bytes are not text; scan the bounded keyword separately.
   const candidates = chunk.type === "tEXt" ? [chunk.data] : [];
   const keyEnd = chunk.data.indexOf(0);
@@ -142,7 +101,7 @@ async function findPngTextMarkers(
       chunk.data.subarray(keyEnd + 2),
       warnings,
       "PNG zTXt",
-      budget,
+      context,
     );
     if (inflated) {
       candidates.push(inflated);
@@ -161,7 +120,7 @@ async function findPngTextMarkers(
           textBytes.bytes,
           warnings,
           "PNG iTXt",
-          budget,
+          context,
         );
         if (inflated) {
           candidates.push(inflated);
@@ -172,7 +131,10 @@ async function findPngTextMarkers(
     }
   }
 
-  return unique(candidates.flatMap(findAiMarkers));
+  context.checkpoint();
+  const markers: string[] = [];
+  for (const candidate of candidates) markers.push(...await findAiMarkers(candidate, context, warnings));
+  return unique(markers);
 }
 
 function getItxtTextBytes(data: Uint8Array) {
@@ -199,60 +161,65 @@ async function inflatePngText(
   data: Uint8Array,
   warnings: MetadataWarning[],
   label: string,
-  budget: TextBudget,
+  context: ParseContext,
 ): Promise<Uint8Array | null> {
+  context.checkpoint();
   if (typeof DecompressionStream === "undefined") {
-    addWarning(
-      warnings,
-      "png-compressed-scan-only",
-      { type: label },
-    );
+    addWarning(warnings, "png-compressed-scan-only", { type: label });
     return null;
   }
 
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let cancellation: Promise<void> | undefined;
+  let finished = false;
+  const cancel = () => {
+    if (reader && !cancellation) cancellation = reader.cancel(context.signal?.reason).catch(() => undefined);
+  };
   try {
-    const stream = new Blob([toArrayBuffer(data)])
-      .stream()
-      .pipeThrough(new DecompressionStream("deflate"));
+    const stream = new Blob([toArrayBuffer(data)]).stream().pipeThrough(new DecompressionStream("deflate"));
     reader = stream.getReader();
-    const limit = Math.min(PNG_TEXT_CHUNK_LIMIT, budget.remaining);
+    context.signal?.addEventListener("abort", cancel, { once: true });
+    context.checkpoint();
+    const limit = Math.min(context.budget.pngTextChunkBytes, context.budget.pngTextBytesRemaining);
     const parts: Uint8Array[] = [];
     let length = 0;
     while (true) {
+      context.checkpoint();
       const { done, value } = await reader.read();
-      if (done) break;
+      context.checkpoint();
+      if (done) { finished = true; break; }
       length += value.byteLength;
       if (length > limit) {
-        // Cancel while streaming; Response.arrayBuffer() would allocate the bomb.
-        budget.remaining = Math.max(0, budget.remaining - limit);
+        context.budget.pngTextBytesRemaining = Math.max(0, context.budget.pngTextBytesRemaining - limit);
         addWarning(warnings, "png-text-limit");
-        await reader.cancel();
         return null;
       }
       parts.push(value);
+      await context.yieldIfNeeded();
     }
-    budget.remaining -= length;
+    context.budget.pngTextBytesRemaining -= length;
     const output = new Uint8Array(length);
     let offset = 0;
     for (const part of parts) {
+      context.checkpoint();
       output.set(part, offset);
       offset += part.length;
     }
     return output;
   } catch {
-    addWarning(
-      warnings,
-      "png-decode-partial",
-      { type: label },
-    );
+    context.checkpoint(); // Cancellation is not corruption and must propagate.
+    addWarning(warnings, "png-decode-partial", { type: label });
     return null;
   } finally {
+    context.signal?.removeEventListener("abort", cancel);
+    if (!finished) cancel();
+    await cancellation;
     reader?.releaseLock();
   }
 }
 
-function walkPngChunks(bytes: Uint8Array, warnings: MetadataWarning[]): PngChunk[] {
+function walkPngChunks(bytes: Uint8Array, warnings: MetadataWarning[], context: ParseContext): PngChunk[] {
+  context.checkpoint();
   if (!isPngBytes(bytes)) {
     addWarning(warnings, "malformed-png-signature");
     return [];
@@ -264,6 +231,7 @@ function walkPngChunks(bytes: Uint8Array, warnings: MetadataWarning[]): PngChunk
   let sawIend = false;
 
   while (offset < bytes.length) {
+    if (!visitEntry(context, warnings)) return chunks;
     if (offset + 12 > bytes.length) {
       addWarning(warnings, "malformed-png-table");
       return chunks;

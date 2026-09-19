@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cleanImageMetadata, scanImageMetadata } from "./metadataCleaner";
 import { deflateSync } from "node:zlib";
 import { PNG_TEXT_CHUNK_LIMIT } from "./metadata/formats/png";
+import { inferAiProvenanceScore } from "./aiProvenanceScore";
 
 const PNG_SIGNATURE = bytes([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const C2PA_UUID = bytes([
@@ -274,6 +275,56 @@ describe("metadataCleaner cleaner", () => {
 });
 
 describe("metadata parser resource and container safeguards", () => {
+  it.each(["png", "jpeg", "webp"])("retains every %s segment marker for provider, AI declaration and remote provenance", async (format) => {
+    for (const text of ["parameters openai trainedAlgorithmicMedia dcterms:provenance", "dcterms:provenance trainedAlgorithmicMedia openai parameters"]) {
+      const payload = textBytes(text);
+      const data = format === "png" ? makePng([pngChunk("tEXt", concat([textBytes("Comment\0"), payload])), pngChunk("IEND", bytes([]))])
+        : format === "jpeg" ? makeJpeg([jpegSegment(0xe1, concat([textBytes("http://ns.adobe.com/xap/1.0/\0"), payload])), jpegSosWithPayload(bytes([1, 2, 0xff, 0xd9]))])
+          : makeWebp([riffChunk("VP8 ", bytes([1, 2, 3, 4])), riffChunk("XMP ", payload)]);
+      const file = fixtureFile(`combined.${format}`, `image/${format}`, data);
+      const scan = await scanImageMetadata(file);
+      expect(scan.signals).toHaveLength(1);
+      expect(scan.signals[0].marker).toBe("parameters");
+      expect(scan.signals[0].markers).toEqual(expect.arrayContaining(["parameters", "openai", "trainedAlgorithmicMedia", "dcterms:provenance"]));
+      expect(scan.c2pa?.presence).toBe("referenced");
+      expect(inferAiProvenanceScore(scan, null, "not-detected")).toMatchObject({ kind: "strong", provider: "OpenAI", percentage: null });
+      expect((await cleanImageMetadata(file)).removedCount).toBe(1);
+    }
+  });
+
+  it("keeps the report-v1 representative marker when the complete evidence includes another provider", async () => {
+    const file = fixtureFile("provider.png", "image/png", makePng([pngChunk("tEXt", textBytes("prompt\0midjourney")), pngChunk("IEND", bytes([]))]));
+    const scan = await scanImageMetadata(file);
+    expect(scan.signals[0]).toMatchObject({ marker: "prompt", markers: ["prompt", "midjourney"] });
+    expect(inferAiProvenanceScore(scan, null, "not-detected").provider).toBe("Midjourney");
+  });
+
+  it("uses the same conservative budget policy for scans and cleaning", async () => {
+    const data = makePng([pngChunk("caBX", textBytes("c2pa")), pngChunk("tEXt", textBytes("Comment\0openai and additional metadata")), pngChunk("IEND", bytes([]))]);
+    const file = fixtureFile("limited.png", "image/png", data);
+    const options = { budget: { metadataBytesRemaining: 8 } };
+    const scan = await scanImageMetadata(file, options);
+    const clean = await cleanImageMetadata(file, options);
+    expect(scan.warnings).toContainEqual({ code: "metadata-scan-limit" });
+    expect(clean.warnings).toEqual(scan.warnings);
+    expect(clean.blob).toBe(file);
+    expect(clean.removedCount).toBe(0);
+  });
+
+  it("does not apply a known C2PA removal when later text decompression fails", async () => {
+    const file = fixtureFile("partial.png", "image/png", makePng([
+      pngChunk("caBX", textBytes("c2pa")),
+      pngChunk("zTXt", concat([textBytes("Comment\0"), bytes([0, 42, 42])])),
+      pngChunk("IEND", bytes([])),
+    ]));
+    const scan = await scanImageMetadata(file);
+    const result = await cleanImageMetadata(file);
+    expect(result.warnings).toEqual(scan.warnings);
+    expect(result.warnings).toContainEqual({ code: "png-decode-partial", values: { type: "PNG zTXt" } });
+    expect(result.blob).toBe(file);
+    expect(result.removedCount).toBe(0);
+  });
+
   it("removes all APP11 fragments of a C2PA instance without dropping unrelated JUMBF", async () => {
     const file = fixtureFile("fragmented.jpg", "image/jpeg", makeJpeg([
       jpegSegment(0xeb, concat([bytes([0x4a, 0x50, 0, 7, 0, 0, 0, 1]), textBytes("c2pa manifest")])),

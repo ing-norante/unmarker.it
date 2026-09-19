@@ -1,7 +1,5 @@
 import type { MessageDescriptor, MessageValues } from "@/i18n/messages";
 
-export type AppMode = "unmark" | "metadata";
-
 export type WorkflowPhase =
   | "idle"
   | "preflight-scanning"
@@ -64,6 +62,7 @@ export type MetadataSignalType =
 export type MetadataWarningCode =
   | "unsupported-clean"
   | "unsupported-scan"
+  | "metadata-scan-limit"
   | "malformed-webp-header"
   | "webp-size-exceeds-file"
   | "malformed-webp-table"
@@ -108,6 +107,8 @@ export interface MetadataSignal {
   label: MessageDescriptor;
   location: string;
   marker?: string;
+  /** Complete evidence from this segment; marker remains the report-v1/UI projection. */
+  markers?: string[];
   removable: boolean;
 }
 
@@ -147,28 +148,26 @@ export type VisibleWatermarkStatus =
   | "not-detected"
   | "scan-failed";
 
-export interface VisibleWatermarkAudit {
-  status: VisibleWatermarkStatus;
-  detection: GeminiDetectionResult | null;
-  confidence: number | null;
-}
+export type VisibleWatermarkAudit =
+  | { status: "detected" | "not-detected"; detection: GeminiDetectionResult; confidence: number }
+  | { status: "not-scanned" | "scan-failed"; detection: null; confidence: null };
 
-export type HiddenWatermarkStatus =
-  | "pending"
-  | "at-risk"
-  | "neutralized-unverified"
-  | "unverified";
+export type VisibleScanResult =
+  | { status: "scanned"; detection: GeminiDetectionResult }
+  | { status: "not-scanned" | "failed" };
+
+export type HiddenWatermarkStatus = "unverified";
 
 export interface HiddenWatermarkAudit {
   status: HiddenWatermarkStatus;
 }
 
 export interface AiProvenanceScore {
-  percentage: number | null;
+  percentage: null;
   kind: "strong" | "metadata" | "visible" | "credentials" | "none" | "incomplete";
   provider: string | null;
   evidence: MessageDescriptor[];
-  confidence: "high" | "medium" | "low";
+  confidence: "medium" | "low";
 }
 
 export interface ImageAuditResult {
@@ -187,22 +186,6 @@ export interface ImageVerificationDiff {
   visibleAfter: VisibleWatermarkStatus | null;
   hiddenAfter: HiddenWatermarkStatus;
   warnings: MessageDescriptor[];
-}
-
-export interface ImageWorkflowCapabilities {
-  canProcess: boolean;
-  canCleanMetadata: boolean;
-}
-
-export interface ImageWorkflowState {
-  phase: WorkflowPhase;
-  preflightAudit: ImageAuditResult | null;
-  postflightAudit: ImageAuditResult | null;
-  detectionHint: GeminiDetectionResult | null;
-  processedBlob: Blob | null;
-  processedImageUrl: string | null;
-  processedFileName: string | null;
-  capabilities: ImageWorkflowCapabilities;
 }
 
 export interface GeminiWatermarkRegion {

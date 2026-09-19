@@ -8,6 +8,8 @@ import type {
 import type { MessageKey } from "@/i18n/messages";
 import { message } from "@/i18n/messages";
 import { containsByteSequence, unique } from "./binary";
+import { boundedMetadataBytes, type ParseContext } from "./context";
+import { findTextMarkersAsync, TEXT_SCAN_BLOCK_BYTES } from "./textScanner";
 
 export const C2PA_UUID = new Uint8Array([
   0xd8, 0xfe, 0xc3, 0xd6, 0x1b, 0x0e, 0x48, 0x3c, 0x92, 0x97, 0x58, 0x28, 0x87,
@@ -42,57 +44,37 @@ const AI_TEXT_MARKERS = [
   "compositeWithTrainedAlgorithmicMedia",
 ];
 
-export function findAiMarkers(bytes: Uint8Array): string[] {
+export async function findAiMarkers(input: Uint8Array, context: ParseContext, warnings: MetadataWarning[] = []): Promise<string[]> {
+  const bytes = boundedMetadataBytes(input, context, warnings);
   const markers = new Set<string>();
 
-  if (containsByteSequence(bytes, C2PA_UUID)) {
-    markers.add("C2PA UUID");
-  }
-
-  const text = bytesToSearchText(bytes);
-  const normalized = normalizeMarkerText(text);
-
-  for (const marker of AI_TEXT_MARKERS) {
-    const lowerMarker = marker.toLowerCase();
-    const normalizedMarker = normalizeMarkerText(lowerMarker);
-
-    if (text.includes(lowerMarker) || normalized.includes(normalizedMarker)) {
-      markers.add(marker);
+  for (let offset = 0; offset < bytes.length; offset += TEXT_SCAN_BLOCK_BYTES) {
+    await context.yieldIfNeeded();
+    if (containsByteSequence(bytes.subarray(offset, offset + TEXT_SCAN_BLOCK_BYTES + C2PA_UUID.length - 1), C2PA_UUID)) {
+      markers.add("C2PA UUID");
+      break;
     }
   }
 
-  const sdMatches = text.match(/\bsd:[a-z0-9_:-]+/g);
-  if (sdMatches) {
-    markers.add(sdMatches[0]);
-  }
+  for (const marker of await findTextMarkersAsync(bytes, AI_TEXT_MARKERS, context)) markers.add(marker);
 
   return [...markers];
-}
-
-export function bytesToSearchText(bytes: Uint8Array) {
-  return unique([
-    decodeBytes(bytes, "utf-8"),
-    decodeBytes(bytes, "iso-8859-1"),
-    decodeBytes(bytes, "utf-16le"),
-    decodeBytes(bytes, "utf-16be"),
-  ])
-    .join("\n")
-    .replace(/\0/g, "")
-    .toLowerCase();
 }
 
 export function createSignal(
   type: MetadataSignalType,
   label: MessageKey,
   location: string,
-  marker?: string,
+  evidence?: string | string[],
   removable = true,
 ): MetadataSignal {
+  const markers = typeof evidence === "string" ? [evidence] : unique(evidence ?? []);
   return {
     type,
     label: message(label),
     location,
-    marker,
+    marker: markers[0],
+    markers,
     removable,
   };
 }
@@ -114,24 +96,21 @@ export function markersContainC2pa(markers: string[]) {
   return markers.some((marker) => marker.toLowerCase().includes("c2pa"));
 }
 
+export function signalMarkers(signal: MetadataSignal): string[] {
+  return signal.markers ?? (signal.marker ? [signal.marker] : []);
+}
+
+export function hasC2paEvidence(signal: MetadataSignal): boolean {
+  return signal.type === "c2pa" || signal.type === "isobmff-box" ||
+    signalMarkers(signal).some((marker) => /c2pa|dcterms:provenance/i.test(marker));
+}
+
 /** C2PA describes provenance and also appears in ordinary camera photographs. */
 export function isAiMetadataSignal(signal: MetadataSignal) {
   if (signal.type === "c2pa" || signal.type === "isobmff-box") return false;
-  return Boolean(signal.marker && !/^(?:c2pa(?: uuid)?|dcterms:provenance)$/i.test(signal.marker));
+  return signalMarkers(signal).some((marker) => !/^(?:c2pa(?: uuid)?|dcterms:provenance|algorithmicMedia|compositeSynthetic)$/i.test(marker));
 }
 
 export function hasBlockingCleanWarning(warnings: MetadataWarning[]) {
   return warnings.some(({ code }) => code !== "box-item-coverage" && code !== "display-metadata-preserved");
-}
-
-function normalizeMarkerText(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9:*]+/g, "_");
-}
-
-function decodeBytes(bytes: Uint8Array, label: string) {
-  try {
-    return new TextDecoder(label).decode(bytes);
-  } catch {
-    return "";
-  }
 }

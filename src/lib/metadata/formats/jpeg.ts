@@ -1,7 +1,5 @@
 import type {
-  MetadataCleanResult,
   MetadataImageFormat,
-  MetadataScanResult,
   MetadataSignal,
   MetadataSignalType,
   MetadataWarning,
@@ -10,17 +8,18 @@ import {
   addWarning,
   buildCleanResult,
   bytesEqual,
-  originalCleanResult,
   startsWithAscii,
   toDataView,
 } from "../binary";
 import {
-  bytesToSearchText,
   createSignal,
   findAiMarkers,
   markersContainC2pa,
   toScanResult,
 } from "../markers";
+import { visitEntry, type ParseContext } from "../context";
+import { createInspection, type FormatInspection } from "../inspection";
+import { containsMetadataText } from "../textScanner";
 
 export const JPEG_SOI = new Uint8Array([0xff, 0xd8]);
 
@@ -37,74 +36,50 @@ export function isJpegBytes(bytes: Uint8Array) {
   return bytesEqual(bytes.subarray(0, JPEG_SOI.length), JPEG_SOI);
 }
 
-export function scanJpegMetadata(
+export async function inspectJpegMetadata(
   bytes: Uint8Array,
   format: MetadataImageFormat,
-): MetadataScanResult {
+  context: ParseContext,
+): Promise<FormatInspection> {
   const signals: MetadataSignal[] = [];
   const warnings: MetadataWarning[] = [];
-  const segments = walkJpegSegments(bytes, warnings);
-  const c2paInstances = findC2paInstances(segments);
-
+  const segments = walkJpegSegments(bytes, warnings, context);
+  const evidence = new Map<JpegSegment, string[]>();
+  const c2paInstances = new Set<number>();
   for (const segment of segments) {
-    const signal = getJpegSegmentSignal(segment, c2paInstances);
+    await context.yieldIfNeeded();
+    if (![0xe1, 0xeb, 0xed].includes(segment.marker)) continue;
+    const markers = await findAiMarkers(segment.payload, context, warnings);
+    evidence.set(segment, markers);
+    const instance = app11Instance(segment);
+    if (instance !== null && markersContainC2pa(markers)) c2paInstances.add(instance);
+  }
+  const removedStarts = new Set<number>();
+  for (const segment of segments) {
+    await context.yieldIfNeeded();
+    const signal = getJpegSegmentSignal(segment, evidence.get(segment) ?? [], c2paInstances, context);
     if (signal) {
       signals.push(signal);
-      if (!signal.removable) addWarning(warnings, "display-metadata-preserved");
+      if (signal.removable) removedStarts.add(segment.start);
+      else addWarning(warnings, "display-metadata-preserved");
     }
   }
-
-  return toScanResult(format, signals, warnings);
+  return createInspection(toScanResult(format, signals, warnings), (file, applyContext) => {
+    const parts: Uint8Array[] = [bytes.subarray(0, JPEG_SOI.length)];
+    let cursor = JPEG_SOI.length;
+    for (const segment of segments) {
+      applyContext.checkpoint();
+      if (cursor < segment.start) parts.push(bytes.subarray(cursor, segment.start));
+      if (segment.marker === 0xda) { cursor = segment.start; break; }
+      if (!removedStarts.has(segment.start)) parts.push(bytes.subarray(segment.start, segment.end));
+      cursor = segment.end;
+    }
+    if (cursor < bytes.length) parts.push(bytes.subarray(cursor));
+    return buildCleanResult(file, format, parts, removedStarts.size, warnings);
+  });
 }
 
-export function cleanJpegMetadata(
-  file: File,
-  bytes: Uint8Array,
-): MetadataCleanResult {
-  const warnings: MetadataWarning[] = [];
-  const segments = walkJpegSegments(bytes, warnings);
-  const c2paInstances = findC2paInstances(segments);
-
-  if (segments.length === 0 || warnings.length > 0) {
-    return originalCleanResult(file, "jpeg", warnings);
-  }
-
-  const parts: Uint8Array[] = [bytes.subarray(0, JPEG_SOI.length)];
-  let cursor = JPEG_SOI.length;
-  let removedCount = 0;
-  let copiedRemainder = false;
-
-  for (const segment of segments) {
-    if (segment.marker === 0xda) {
-      parts.push(bytes.subarray(segment.start));
-      copiedRemainder = true;
-      break;
-    }
-
-    if (cursor < segment.start) {
-      parts.push(bytes.subarray(cursor, segment.start));
-    }
-
-    const signal = getJpegSegmentSignal(segment, c2paInstances);
-    if (signal?.removable) {
-      removedCount += 1;
-    } else {
-      if (signal) addWarning(warnings, "display-metadata-preserved");
-      parts.push(bytes.subarray(segment.start, segment.end));
-    }
-
-    cursor = segment.end;
-  }
-
-  if (!copiedRemainder && cursor < bytes.length) {
-    parts.push(bytes.subarray(cursor));
-  }
-
-  return buildCleanResult(file, "jpeg", parts, removedCount, warnings);
-}
-
-function getJpegSegmentSignal(segment: JpegSegment, c2paInstances: Set<number>): MetadataSignal | null {
-  const markers = findAiMarkers(segment.payload);
+function getJpegSegmentSignal(segment: JpegSegment, markers: string[], c2paInstances: Set<number>, context: ParseContext): MetadataSignal | null {
 
   const instance = app11Instance(segment);
   if (segment.marker === 0xeb && (markersContainC2pa(markers) || (instance !== null && c2paInstances.has(instance)))) {
@@ -112,20 +87,20 @@ function getJpegSegmentSignal(segment: JpegSegment, c2paInstances: Set<number>):
       "c2pa",
       "metadata:signals.jpegC2pa",
       "JPEG APP11",
-      "c2pa",
+      ["c2pa", ...markers],
     );
   }
 
   if (segment.marker === 0xe1 && markers.length > 0) {
-    const type = getJpegApp1SignalType(segment.payload);
+    const type = getJpegApp1SignalType(segment.payload, context);
     return createSignal(
       type,
       type === "xmp" ? "metadata:signals.xmp" : "metadata:signals.exif",
       type === "xmp" ? "JPEG APP1 XMP" : "JPEG APP1 EXIF",
-      markers[0],
+      markers,
       // EXIF may own orientation, resolution and colour interpretation.
       // Preserve the segment until a field-level editor is available.
-      type === "xmp" && !/tiff:orientation/i.test(bytesToSearchText(segment.payload)),
+      type === "xmp" && !containsMetadataText(segment.payload, ["tiff:orientation"], context.checkpoint),
     );
   }
 
@@ -134,7 +109,7 @@ function getJpegSegmentSignal(segment: JpegSegment, c2paInstances: Set<number>):
       "binary-marker",
       "metadata:signals.iptc",
       "JPEG APP13 IPTC",
-      markers[0],
+      markers,
     );
   }
 
@@ -146,35 +121,17 @@ function app11Instance(segment: JpegSegment): number | null {
     ? toDataView(segment.payload).getUint16(2) : null;
 }
 
-function findC2paInstances(segments: JpegSegment[]): Set<number> {
-  // A JUMBF manifest can span multiple APP11 segments. Its continuation chunks
-  // share En (instance number), and need not repeat a searchable C2PA marker.
-  const instances = new Set<number>();
-  for (const segment of segments) {
-    const instance = app11Instance(segment);
-    if (instance !== null && markersContainC2pa(findAiMarkers(segment.payload))) instances.add(instance);
-  }
-  return instances;
-}
-
-function getJpegApp1SignalType(payload: Uint8Array): MetadataSignalType {
-  const text = bytesToSearchText(payload);
-
-  if (
-    startsWithAscii(payload, "http://ns.adobe.com/xap/1.0/") ||
-    text.includes("xmpmeta") ||
-    text.includes("rdf:")
-  ) {
-    return "xmp";
-  }
-
-  return "exif";
+function getJpegApp1SignalType(payload: Uint8Array, context: ParseContext): MetadataSignalType {
+  return startsWithAscii(payload, "http://ns.adobe.com/xap/1.0/") ||
+    containsMetadataText(payload, ["xmpmeta", "rdf:"], context.checkpoint) ? "xmp" : "exif";
 }
 
 function walkJpegSegments(
   bytes: Uint8Array,
   warnings: MetadataWarning[],
+  context: ParseContext,
 ): JpegSegment[] {
+  context.checkpoint();
   if (!isJpegBytes(bytes)) {
     addWarning(warnings, "malformed-jpeg-signature");
     return [];
@@ -185,6 +142,7 @@ function walkJpegSegments(
   let offset = JPEG_SOI.length;
 
   while (offset < bytes.length) {
+    if (!visitEntry(context, warnings)) return segments;
     if (bytes[offset] !== 0xff) {
       addWarning(warnings, "malformed-jpeg-marker");
       return segments;

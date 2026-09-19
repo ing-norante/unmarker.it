@@ -6,7 +6,7 @@ import type {
   VisibleWatermarkStatus,
 } from "@/lib/types";
 import { message } from "@/i18n/messages";
-import { isAiMetadataSignal } from "@/lib/metadata/markers";
+import { hasC2paEvidence, isAiMetadataSignal, signalMarkers } from "@/lib/metadata/markers";
 
 type ProviderMatch = {
   provider: string;
@@ -86,7 +86,7 @@ export function inferAiProvenanceScore(
     };
   }
 
-  if (metadataScan?.c2pa || signals.some((signal) => signal.type === "c2pa" || /c2pa/i.test(signal.marker ?? ""))) {
+  if (metadataScan?.c2pa || signals.some(hasC2paEvidence)) {
     return { percentage: null, kind: "credentials", provider: null, evidence, confidence: "low" };
   }
 
@@ -140,7 +140,7 @@ function findProvider(signals: MetadataSignal[]): ProviderMatch | null {
 }
 
 function signalText(signal: MetadataSignal) {
-  return [signal.type, signal.location, signal.marker]
+  return [signal.type, signal.location, ...signalMarkers(signal)]
     .filter(Boolean)
     .join(" ");
 }

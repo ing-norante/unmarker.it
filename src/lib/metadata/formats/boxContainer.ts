@@ -1,7 +1,5 @@
 import type {
-  MetadataCleanResult,
   MetadataImageFormat,
-  MetadataScanResult,
   MetadataSignal,
   MetadataWarning,
 } from "@/lib/types";
@@ -10,12 +8,13 @@ import {
   asciiBytes,
   buildCleanResult,
   bytesEqual,
-  originalCleanResult,
   readAscii,
   readUint64,
   toDataView,
 } from "../binary";
-import { C2PA_UUID, createSignal, hasBlockingCleanWarning, toScanResult } from "../markers";
+import { C2PA_UUID, createSignal, toScanResult } from "../markers";
+import { visitEntry, type ParseContext } from "../context";
+import { createInspection, type FormatInspection } from "../inspection";
 
 export const JXL_CONTAINER_SIGNATURE = new Uint8Array([
   0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20, 0x0d, 0x0a, 0x87, 0x0a,
@@ -69,73 +68,41 @@ export function isJxlBytes(bytes: Uint8Array) {
   );
 }
 
-export function scanBoxContainerMetadata(
+export async function inspectBoxContainerMetadata(
   bytes: Uint8Array,
   format: MetadataImageFormat,
-): MetadataScanResult {
+  context: ParseContext,
+): Promise<FormatInspection> {
+  context.checkpoint();
   const signals: MetadataSignal[] = [];
   const warnings: MetadataWarning[] = [];
   const startOffset = getBoxStartOffset(bytes, format, warnings);
-
-  if (startOffset === null) {
-    return toScanResult(format, signals, warnings);
-  }
-
-  const boxes = walkBoxes(bytes, startOffset, warnings);
+  const boxes = startOffset === null ? [] : walkBoxes(bytes, startOffset, warnings, context);
   addCoverageWarning(boxes, warnings);
-
+  const removedStarts = new Set<number>();
   for (const box of boxes) {
+    await context.yieldIfNeeded();
     const signal = getBoxSignal(box);
     if (signal) {
       signals.push(signal);
+      removedStarts.add(box.start);
     }
   }
-
-  return toScanResult(format, signals, warnings);
-}
-
-export function cleanBoxContainerMetadata(
-  file: File,
-  bytes: Uint8Array,
-  format: MetadataImageFormat,
-): MetadataCleanResult {
-  const warnings: MetadataWarning[] = [];
-  const startOffset = getBoxStartOffset(bytes, format, warnings);
-
-  if (startOffset === null) {
-    return originalCleanResult(file, format, warnings);
-  }
-
-  const boxes = walkBoxes(bytes, startOffset, warnings);
-  addCoverageWarning(boxes, warnings);
-
-  if (boxes.length === 0 || hasBlockingCleanWarning(warnings)) {
-    return originalCleanResult(file, format, warnings);
-  }
-
-  const parts: Uint8Array[] = [];
-  let removedCount = 0;
-
-  if (startOffset > 0) {
-    parts.push(bytes.subarray(0, startOffset));
-  }
-
-  for (const box of boxes) {
-    if (getBoxSignal(box)) {
-      removedCount += 1;
-      // iloc/stco/co64 can address later payloads by absolute offset. Replacing
-      // a box with same-sized free space preserves all original byte positions.
-      const replacement = new Uint8Array(box.end - box.start);
-      replacement.set(bytes.subarray(box.start, box.dataStart));
-      replacement.set(asciiBytes("free"), 4);
-      parts.push(replacement);
-      continue;
+  return createInspection(toScanResult(format, signals, warnings), (file, applyContext) => {
+    const parts: Uint8Array[] = [];
+    if (startOffset && startOffset > 0) parts.push(bytes.subarray(0, startOffset));
+    for (const box of boxes) {
+      applyContext.checkpoint();
+      if (removedStarts.has(box.start)) {
+        // Preserve offsets referenced by iloc/stco/co64; erase payload in place.
+        const replacement = new Uint8Array(box.end - box.start);
+        replacement.set(bytes.subarray(box.start, box.dataStart));
+        replacement.set(asciiBytes("free"), 4);
+        parts.push(replacement);
+      } else parts.push(bytes.subarray(box.start, box.end));
     }
-
-    parts.push(bytes.subarray(box.start, box.end));
-  }
-
-  return buildCleanResult(file, format, parts, removedCount, warnings);
+    return buildCleanResult(file, format, parts, removedStarts.size, warnings);
+  });
 }
 
 function addCoverageWarning(boxes: Box[], warnings: MetadataWarning[]) {
@@ -148,12 +115,14 @@ function walkBoxes(
   bytes: Uint8Array,
   startOffset: number,
   warnings: MetadataWarning[],
+  context: ParseContext,
 ): Box[] {
   const view = toDataView(bytes);
   const boxes: Box[] = [];
   let offset = startOffset;
 
   while (offset < bytes.length) {
+    if (!visitEntry(context, warnings)) return boxes;
     if (offset + 8 > bytes.length) {
       addWarning(warnings, "incomplete-box-table");
       return boxes;

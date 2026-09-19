@@ -1,7 +1,5 @@
 import type {
-  MetadataCleanResult,
   MetadataImageFormat,
-  MetadataScanResult,
   MetadataSignal,
   MetadataWarning,
 } from "@/lib/types";
@@ -9,12 +7,13 @@ import {
   addWarning,
   asciiBytes,
   buildCleanResult,
-  originalCleanResult,
   readAscii,
   toDataView,
   writeUint32Le,
 } from "../binary";
-import { createSignal, findAiMarkers, hasBlockingCleanWarning, toScanResult } from "../markers";
+import { createSignal, findAiMarkers, toScanResult } from "../markers";
+import { visitEntry, type ParseContext } from "../context";
+import { createInspection, type FormatInspection } from "../inspection";
 
 export const RIFF_SIGNATURE = "RIFF";
 export const WEBP_SIGNATURE = "WEBP";
@@ -35,75 +34,49 @@ export function isWebpBytes(bytes: Uint8Array) {
   );
 }
 
-export function scanWebpMetadata(
+export async function inspectWebpMetadata(
   bytes: Uint8Array,
   format: MetadataImageFormat,
-): MetadataScanResult {
+  context: ParseContext,
+): Promise<FormatInspection> {
   const signals: MetadataSignal[] = [];
   const warnings: MetadataWarning[] = [];
-  const chunks = walkRiffChunks(bytes, warnings);
-
+  const chunks = walkRiffChunks(bytes, warnings, context);
+  const removedStarts = new Set<number>();
   for (const chunk of chunks) {
-    const signal = getWebpChunkSignal(chunk);
+    await context.yieldIfNeeded();
+    const signal = await getWebpChunkSignal(chunk, context, warnings);
     if (signal) {
       signals.push(signal);
-      if (!signal.removable) addWarning(warnings, "display-metadata-preserved");
+      if (signal.removable) removedStarts.add(chunk.start);
+      else addWarning(warnings, "display-metadata-preserved");
     }
   }
-
-  return toScanResult(format, signals, warnings);
+  return createInspection(toScanResult(format, signals, warnings), (file, applyContext) => {
+    if (removedStarts.size === 0) return buildCleanResult(file, format, [bytes], 0, warnings);
+    const keptChunks: Uint8Array[] = [];
+    const retainedTypes = new Set<string>();
+    for (const chunk of chunks) {
+      applyContext.checkpoint();
+      if (removedStarts.has(chunk.start)) continue;
+      retainedTypes.add(chunk.type);
+      keptChunks.push(chunk.type === "VP8X" ? bytes.slice(chunk.start, chunk.end) : bytes.subarray(chunk.start, chunk.end));
+    }
+    for (const chunk of keptChunks) {
+      applyContext.checkpoint();
+      if (readAscii(chunk, 0, 4) === "VP8X" && chunk.length >= 18) {
+        chunk[8] = (chunk[8] & ~0x0c) | (retainedTypes.has("EXIF") ? 0x08 : 0) | (retainedTypes.has("XMP ") ? 0x04 : 0);
+      }
+    }
+    const header = new Uint8Array(12);
+    header.set(asciiBytes(RIFF_SIGNATURE), 0);
+    writeUint32Le(header, 4, 4 + keptChunks.reduce((total, chunk) => total + chunk.length, 0));
+    header.set(asciiBytes(WEBP_SIGNATURE), 8);
+    return buildCleanResult(file, format, [header, ...keptChunks], removedStarts.size, warnings);
+  });
 }
 
-export function cleanWebpMetadata(
-  file: File,
-  bytes: Uint8Array,
-): MetadataCleanResult {
-  const warnings: MetadataWarning[] = [];
-  const chunks = walkRiffChunks(bytes, warnings);
-
-  if (chunks.length === 0 || hasBlockingCleanWarning(warnings)) {
-    return originalCleanResult(file, "webp", warnings);
-  }
-
-  const keptChunks: Uint8Array[] = [];
-  let removedCount = 0;
-  const retainedTypes = new Set<string>();
-
-  for (const chunk of chunks) {
-    const signal = getWebpChunkSignal(chunk);
-    if (signal?.removable) {
-      removedCount += 1;
-      continue;
-    }
-    if (signal) addWarning(warnings, "display-metadata-preserved");
-    retainedTypes.add(chunk.type);
-    keptChunks.push(chunk.type === "VP8X"
-      ? bytes.slice(chunk.start, chunk.end)
-      : bytes.subarray(chunk.start, chunk.end));
-  }
-
-  if (removedCount === 0) {
-    return buildCleanResult(file, "webp", [bytes], 0, warnings);
-  }
-
-  for (const chunk of keptChunks) {
-    // Recompute metadata bits only; retain alpha, animation and ICC features.
-    if (readAscii(chunk, 0, 4) === "VP8X" && chunk.length >= 18) {
-      chunk[8] = (chunk[8] & ~0x0c) |
-        (retainedTypes.has("EXIF") ? 0x08 : 0) |
-        (retainedTypes.has("XMP ") ? 0x04 : 0);
-    }
-  }
-
-  const header = new Uint8Array(12);
-  header.set(asciiBytes(RIFF_SIGNATURE), 0);
-  writeUint32Le(header, 4, 4 + keptChunks.reduce((total, chunk) => total + chunk.length, 0));
-  header.set(asciiBytes(WEBP_SIGNATURE), 8);
-
-  return buildCleanResult(file, "webp", [header, ...keptChunks], removedCount, warnings);
-}
-
-function getWebpChunkSignal(chunk: RiffChunk): MetadataSignal | null {
+async function getWebpChunkSignal(chunk: RiffChunk, context: ParseContext, warnings: MetadataWarning[]): Promise<MetadataSignal | null> {
   if (chunk.type === "C2PA") {
     return createSignal("c2pa", "metadata:signals.webp", "WebP C2PA", "c2pa");
   }
@@ -111,7 +84,7 @@ function getWebpChunkSignal(chunk: RiffChunk): MetadataSignal | null {
     return null;
   }
 
-  const markers = findAiMarkers(chunk.data);
+  const markers = await findAiMarkers(chunk.data, context, warnings);
   if (markers.length === 0) {
     return null;
   }
@@ -120,7 +93,7 @@ function getWebpChunkSignal(chunk: RiffChunk): MetadataSignal | null {
     "webp-metadata",
     "metadata:signals.webp",
     `WebP ${chunk.type.trim()}`,
-    markers[0],
+    markers,
     chunk.type !== "EXIF",
   );
 }
@@ -128,7 +101,9 @@ function getWebpChunkSignal(chunk: RiffChunk): MetadataSignal | null {
 function walkRiffChunks(
   bytes: Uint8Array,
   warnings: MetadataWarning[],
+  context: ParseContext,
 ): RiffChunk[] {
+  context.checkpoint();
   if (!isWebpBytes(bytes)) {
     addWarning(warnings, "malformed-webp-header");
     return [];
@@ -149,6 +124,7 @@ function walkRiffChunks(
   }
 
   while (offset < riffEnd) {
+    if (!visitEntry(context, warnings)) return chunks;
     if (offset + 8 > riffEnd) {
       addWarning(warnings, "malformed-webp-table");
       return chunks;
