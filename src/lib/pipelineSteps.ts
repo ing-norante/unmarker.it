@@ -36,22 +36,6 @@ export function createInitialPipelineSteps() {
   return PIPELINE_STEPS.map(resetPipelineStep);
 }
 
-export function resetRunningPipelineSteps(steps: PipelineStepState[]) {
-  return steps.map((step) =>
-    step.status === "running"
-      ? { ...step, status: "idle" as const, progress: 0, errorCode: undefined }
-      : step,
-  );
-}
-
-export function markRunningPipelineStepsAsError(steps: PipelineStepState[]) {
-  return steps.map((step) =>
-    step.status === "running"
-      ? { ...step, status: "error" as const, errorCode: "pipeline-failed" as const }
-      : step,
-  );
-}
-
 export function updateGeminiProgress(
   stage: GeminiWorkerProgressStage,
   updateStep: (id: PipelineStepId, update: Partial<PipelineStepState>) => void,

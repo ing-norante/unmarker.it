@@ -69,7 +69,6 @@
     "react-i18next": "^17.0.14",
     "shadcn": "^4.21.0",
     "sharp": "0.35.4",
-    "sonner": "^2.0.8",
     "stripe": "22.6.2",
     "tailwindcss": "^4.3.3",
     "zod": "4.6.5"
@@ -97,5 +96,8 @@
     "vite": "8.3.0",
     "vitest": "^4.1.11"
   },
-  "packageManager": "pnpm@12.4.2"
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=22.12.0"
+  }
 }
