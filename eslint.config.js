@@ -25,7 +25,12 @@ export default defineConfig([
     languageOptions: { globals: globals.worker },
   },
   {
-    files: ["*.{js,ts}", "scripts/**/*.{ts,mjs}", "server/**/*.ts", "api/**/*.ts"],
+    files: [
+      "*.{js,ts}",
+      "scripts/**/*.{ts,mjs}",
+      "server/**/*.ts",
+      "api/**/*.ts",
+    ],
     languageOptions: { globals: globals.node },
   },
   {

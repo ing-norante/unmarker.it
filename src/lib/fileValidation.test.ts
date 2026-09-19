@@ -49,11 +49,17 @@ describe("file validation policies", () => {
 
   it("enforces the file-size boundary before decoding", () => {
     const file = new File(["fixture"], "photo.png", { type: "image/png" });
-    Object.defineProperty(file, "size", { value: MAX_FILE_SIZE_BYTES, configurable: true });
+    Object.defineProperty(file, "size", {
+      value: MAX_FILE_SIZE_BYTES,
+      configurable: true,
+    });
     expect(validateWorkflowFile(file).ok).toBe(true);
     Object.defineProperty(file, "size", { value: MAX_FILE_SIZE_BYTES + 1 });
     const result = validateWorkflowFile(file);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.statusMessage.title.key).toBe("workflow:messages.fileLarge.title");
+    if (!result.ok)
+      expect(result.statusMessage.title.key).toBe(
+        "workflow:messages.fileLarge.title",
+      );
   });
 });

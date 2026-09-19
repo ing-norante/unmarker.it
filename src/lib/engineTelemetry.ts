@@ -10,7 +10,7 @@ import {
   type ImageEnginePhase,
   type ImageEngineProgress,
 } from "@/lib/engine";
-import { assertNotAborted, isAbortError } from "@/lib/engine/abort";
+import { assertNotAborted, isAbortError } from "@/lib/runtime/abort";
 import { canCleanMetadata } from "@/lib/metadataCleaner";
 
 /** Optional application adapter. The processing engine never initializes analytics. */

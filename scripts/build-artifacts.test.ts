@@ -8,16 +8,28 @@ describe("static build artifacts", () => {
   });
 
   it("follows shared and cyclic static imports without preloading deferred tools", () => {
-    const dependencies = staticDependencies({
-      home: { file: "home.js", imports: ["shared"], dynamicImports: ["engine"] },
-      shared: { file: "shared.js", imports: ["home"] },
-      engine: { file: "engine.js" },
-    }, "home", "shared");
+    const dependencies = staticDependencies(
+      {
+        home: {
+          file: "home.js",
+          imports: ["shared"],
+          dynamicImports: ["engine"],
+        },
+        shared: { file: "shared.js", imports: ["home"] },
+        engine: { file: "engine.js" },
+      },
+      "home",
+      "shared",
+    );
     expect([...dependencies]).toEqual(["home", "shared"]);
   });
 
   it("rejects incomplete manifests instead of silently shipping missing preloads", () => {
-    expect(() => staticDependencies({ home: { file: "home.js", imports: ["missing"] } }, "home"))
-      .toThrow("Missing build chunk: missing");
+    expect(() =>
+      staticDependencies(
+        { home: { file: "home.js", imports: ["missing"] } },
+        "home",
+      ),
+    ).toThrow("Missing build chunk: missing");
   });
 });

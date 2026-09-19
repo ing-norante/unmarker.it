@@ -10,12 +10,12 @@ import { createTrackedImageProcessor } from "./engineTelemetry";
 const preflight = buildImageAudit({
   stage: "preflight",
   metadataScan: null,
-  visibleScanStatus: "not-scanned",
+  visibleScan: { status: "not-scanned" },
 });
 const postflight = buildImageAudit({
   stage: "postflight",
   metadataScan: null,
-  visibleScanStatus: "not-scanned",
+  visibleScan: { status: "not-scanned" },
 });
 const result: ImageEngineResult = {
   output: new Blob(["SECRET_PIXELS"]),
@@ -98,7 +98,13 @@ describe("engine application telemetry adapter", () => {
       async (_file, _options, controls) => {
         controls.onProgress?.({ phase: "preflight-scanning", steps: [] });
         controls.onProgress?.({ phase: "analysis-only", steps: [], preflight });
-        return { ...result, output: null, outcome: "analysis-only" };
+        return {
+          ...result,
+          output: null,
+          outputName: null,
+          postflight: null,
+          outcome: "analysis-only",
+        };
       },
     );
     await tracked(file(), {}, {});
