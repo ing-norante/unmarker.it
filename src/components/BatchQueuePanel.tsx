@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { WORKFLOW_ACCEPT } from "@/lib/fileValidation";
 import { cn } from "@/lib/utils";
 import type { BatchQueue, BatchSnapshot } from "@/lib/batch/queue";
+import { presentBatch, presentBatchItem } from "@/lib/workflow/presentation";
 import { translateMessage } from "@/i18n/messages";
 
 export function BatchQueuePanel({
@@ -26,11 +27,8 @@ export function BatchQueuePanel({
 }) {
   const { t } = useTranslation("workflow");
   const input = useRef<HTMLInputElement>(null);
-  const waiting = snapshot.items.some((item) => item.status === "waiting");
-  const finished = snapshot.items.filter(
-    (item) => !["waiting", "running"].includes(item.status),
-  ).length;
-  const active = snapshot.items.find((item) => item.id === snapshot.activeId);
+  const { active, finished, outputBytes, canToggleQueue } =
+    presentBatch(snapshot);
   return (
     <section className="min-w-0" aria-labelledby="queue-heading">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -48,13 +46,14 @@ export function BatchQueuePanel({
         <input
           ref={input}
           type="file"
+          disabled={locked}
           className="hidden"
           multiple
           accept={WORKFLOW_ACCEPT}
           onChange={(event) => {
             const files = Array.from(event.currentTarget.files ?? []);
             event.currentTarget.value = "";
-            if (files.length) onAdd(files);
+            if (files.length && !locked) onAdd(files);
           }}
         />
       </div>
@@ -75,7 +74,7 @@ export function BatchQueuePanel({
       <div className="mb-3 flex flex-wrap gap-2">
         <Button
           variant="outline"
-          disabled={locked || (!waiting && !active)}
+          disabled={!canToggleQueue}
           onClick={snapshot.paused ? queue.resume : queue.pause}
         >
           {snapshot.paused ? <PlayIcon /> : <PauseIcon />}
@@ -83,7 +82,7 @@ export function BatchQueuePanel({
         </Button>
         <Button
           variant="ghost"
-          disabled={locked || (!waiting && !active)}
+          disabled={!canToggleQueue}
           onClick={queue.cancelAll}
         >
           {t("batch.cancelAll")}
@@ -122,17 +121,9 @@ export function BatchQueuePanel({
               <span className="w-full truncate font-bold">
                 {item.file.name}
               </span>
-              <Badge
-                variant={
-                  item.status === "failed" || item.status === "rejected"
-                    ? "destructive"
-                    : item.status === "completed"
-                      ? "default"
-                      : "secondary"
-                }
-              >
+              <Badge variant={presentBatchItem(item).badge}>
                 {item.status === "running" && <Spinner />}
-                {t(`batch.status.${item.status}`)}
+                {translateMessage(t, presentBatchItem(item).status)}
               </Badge>
             </button>
             <Button
@@ -150,13 +141,7 @@ export function BatchQueuePanel({
       <p className="text-muted-foreground mt-3 text-sm">{t("batch.limits")}</p>
       <p className="text-muted-foreground text-sm tabular-nums">
         {t("batch.memory", {
-          mb: (
-            snapshot.items.reduce(
-              (sum, item) => sum + (item.result?.output?.size ?? 0),
-              0,
-            ) /
-            1024 ** 2
-          ).toFixed(1),
+          mb: (outputBytes / 1024 ** 2).toFixed(1),
         })}
       </p>
     </section>

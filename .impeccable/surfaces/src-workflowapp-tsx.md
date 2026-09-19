@@ -2,7 +2,7 @@
 version: 1
 slug: "src-workflowapp-tsx"
 primary_target: "src/WorkflowApp.tsx"
-related_targets: ["src/components/BatchQueuePanel.tsx","src/components/BatchResult.tsx"]
+related_targets: ["src/components/BatchQueuePanel.tsx","src/components/BatchResult.tsx","src/components/WorkspaceFrame.tsx"]
 ---
 
 ## Direction contract
@@ -18,3 +18,12 @@ FIRST VIEWPORT: Existing two-column shell; header and compact selectable queue o
 FORM: Established implementation extension in Operate mode; no new concept, ordered direction lottery or seed required.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+## Refactor invariants
+
+Preserve the existing desktop/mobile composition, tokens, image sizing, bilingual
+copy and stable sponsor framing. Metadata cleanup and ZIP export share one queue
+reservation; a visible cancel action remains available even after selecting
+another result. Preserve the user's pause state and suppress late downloads after
+cancellation or unmount. Notices translate in the current locale. No new image
+assets or visual direction are introduced.

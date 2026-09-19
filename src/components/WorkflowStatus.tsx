@@ -1,9 +1,9 @@
-import type { FileModePolicy } from "@/lib/fileValidation";
+import type { WorkflowFilePolicy } from "@/lib/fileValidation";
 import type { WorkflowPhase } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 import { translateMessage, messageId } from "@/i18n/messages";
 
-export function FilePolicyDetails({ policy }: { policy: FileModePolicy }) {
+export function FilePolicyDetails({ policy }: { policy: WorkflowFilePolicy }) {
   const { t } = useTranslation();
   return (
     <div className="text-muted-foreground text-ui-body">

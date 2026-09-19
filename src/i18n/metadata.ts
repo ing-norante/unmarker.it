@@ -1,6 +1,14 @@
 import type { MetadataWarning, MetadataWarningCode } from "@/lib/types";
 
-const warningKeys: Record<MetadataWarningCode, string> = {
+import {
+  message,
+  translateMessage,
+  type MessageKey,
+  type MessageTranslator,
+} from "./messages";
+
+const warningKeys: Record<MetadataWarningCode, MessageKey> = {
+  "metadata-scan-limit": "metadata:warnings.scanLimit",
   "unsupported-clean": "metadata:warnings.unsupportedClean",
   "unsupported-scan": "metadata:warnings.unsupportedScan",
   "malformed-webp-header": "metadata:warnings.malformedWebpHeader",
@@ -30,12 +38,16 @@ const warningKeys: Record<MetadataWarningCode, string> = {
 };
 
 export function translateMetadataWarning(
-  t: (key: never, options?: never) => unknown,
+  t: MessageTranslator,
   warning: MetadataWarning,
 ) {
-  return String(t(warningKeys[warning.code] as never, warning.values as never));
+  return translateMessage(t, metadataWarningMessage(warning));
 }
 
 export function metadataWarningId(warning: MetadataWarning) {
   return `${warning.code}:${JSON.stringify(warning.values ?? {})}`;
+}
+
+export function metadataWarningMessage(warning: MetadataWarning) {
+  return message(warningKeys[warning.code], warning.values);
 }

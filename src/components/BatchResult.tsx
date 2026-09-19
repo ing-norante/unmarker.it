@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DownloadSimpleIcon } from "@phosphor-icons/react";
 import type { BatchItem, BatchQueue } from "@/lib/batch/queue";
-import type { ProcessingOptions, WorkflowPhase } from "@/lib/types";
+import type { ProcessingOptions } from "@/lib/types";
 import { ImageComparison } from "./ImageComparison";
 import { PipelineSteps } from "./PipelineSteps";
 import { WorkflowSummary } from "./WorkflowStatus";
 import { Button } from "./ui/button";
-import { cleanImageMetadata } from "@/lib/metadataCleaner";
 import { useBlobUrl } from "@/hooks/useBlobUrl";
 import { trackAction } from "@/lib/analytics";
 import { downloadBlob } from "@/lib/downloadBlob";
-import { translateMetadataWarning } from "@/i18n/metadata";
+import type { WorkflowOperations } from "@/lib/workflow/operations";
+import { presentBatchItem } from "@/lib/workflow/presentation";
+import type { MessageDescriptor } from "@/i18n/messages";
 import { translateMessage } from "@/i18n/messages";
 
 export function BatchResult({
@@ -19,64 +19,23 @@ export function BatchResult({
   queue,
   options,
   locked,
+  canCleanMetadata,
+  operations,
+  notice,
 }: {
   item: BatchItem;
   queue: BatchQueue;
   options: ProcessingOptions;
   locked: boolean;
+  canCleanMetadata: boolean;
+  operations: WorkflowOperations;
+  notice: readonly MessageDescriptor[];
 }) {
   const { t } = useTranslation("workflow");
   const originalUrl = useBlobUrl(item.file);
   const outputUrl = useBlobUrl(item.result?.output ?? null);
-  const [cleaning, setCleaning] = useState(false);
-  const [notice, setNotice] = useState("");
-  const alive = useRef(true);
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-  const phase: WorkflowPhase =
-    item.status === "running"
-      ? (item.progress?.phase ?? "preflight-scanning")
-      : item.status === "completed" || item.status === "completed-with-warnings"
-        ? "complete"
-        : item.status === "analysis-only"
-          ? "analysis-only"
-          : item.status === "cancelled"
-            ? "cancelled"
-            : item.status === "waiting"
-              ? "idle"
-              : "error";
-  const preflight = item.result?.preflight ?? item.progress?.preflight ?? null;
-  const cleanMetadata = async () => {
-    setCleaning(true);
-    setNotice("");
-    try {
-      const result = await cleanImageMetadata(item.file);
-      if (!alive.current) return;
-      if (result.removedCount > 0) {
-        downloadBlob(result.blob, result.fileName);
-        trackAction("download_metadata_clean", "workflow", {
-          removed_count: result.removedCount,
-          format: result.format,
-        });
-        setNotice(
-          [
-            t("batch.downloadStarted"),
-            ...result.warnings.map((warning) =>
-              translateMetadataWarning(t, warning),
-            ),
-          ].join(" "),
-        );
-      } else setNotice(t("messages.cleanupNone.description"));
-    } catch {
-      if (alive.current) setNotice(t("messages.cleanupFailed.description"));
-    } finally {
-      if (alive.current) setCleaning(false);
-    }
-  };
+  const presentation = presentBatchItem(item);
+  const { phase, preflight, output } = presentation;
   return (
     <section
       className="@container/workspace flex min-w-0 flex-col gap-4"
@@ -85,19 +44,19 @@ export function BatchResult({
       <div className="bg-background flex flex-col gap-3 border-b pb-4">
         <h2 className="text-xl font-black wrap-anywhere">{item.file.name}</h2>
         <div className="flex flex-wrap gap-2">
-          {item.result?.output && (
+          {output && (
             <Button
               onClick={() => {
-                downloadBlob(item.result!.output!, item.outputName);
+                downloadBlob(output, item.outputName);
                 trackAction("download_processed", "action_bar");
-                setNotice(t("batch.downloadStarted"));
+                operations.notifyDownload(item.id);
               }}
             >
               <DownloadSimpleIcon />
               {t("batch.download")}
             </Button>
           )}
-          {["waiting", "running"].includes(item.status) ? (
+          {presentation.pending ? (
             <Button
               variant="outline"
               onClick={() => {
@@ -109,12 +68,12 @@ export function BatchResult({
               {t("batch.cancel")}
             </Button>
           ) : (
-            item.status !== "rejected" && (
+            presentation.retryable && (
               <Button
                 variant="outline"
-                disabled={locked || cleaning}
+                disabled={locked}
                 onClick={() => {
-                  setNotice("");
+                  operations.clearItemNotice();
                   queue.retry(item.id, options);
                 }}
               >
@@ -125,8 +84,8 @@ export function BatchResult({
           {item.result?.canCleanMetadata && (
             <Button
               variant="ghost"
-              disabled={locked || cleaning || !!queue.getSnapshot().activeId}
-              onClick={cleanMetadata}
+              disabled={!canCleanMetadata}
+              onClick={() => operations.cleanMetadata(item.id)}
             >
               {t("batch.metadata")}
             </Button>
@@ -137,9 +96,9 @@ export function BatchResult({
             {t("batch.metadataHelp")}
           </p>
         )}
-        {notice && (
+        {notice.length > 0 && (
           <p role="status" className="text-primary-text text-sm">
-            {notice}
+            {notice.map((entry) => translateMessage(t, entry)).join(" ")}
           </p>
         )}
       </div>
@@ -153,8 +112,8 @@ export function BatchResult({
       ) : (
         <WorkflowSummary
           phase={phase}
-          hasWarnings={Boolean(item.result?.warnings.length)}
-          verificationFailed={!!item.result?.output && !item.result.postflight}
+          hasWarnings={presentation.hasWarnings}
+          verificationFailed={presentation.verificationFailed}
         />
       )}
       {item.status === "running" && item.progress && (

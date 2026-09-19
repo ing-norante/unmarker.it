@@ -1,4 +1,6 @@
 export const batch = {
+  cleaningMetadata: "正在清理 {{name}} 的元数据…",
+  cancelCleanup: "取消清理",
   title: "图像队列",
   add: "添加图像",
   empty: "添加图像以开始新的批次。",

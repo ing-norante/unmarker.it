@@ -311,3 +311,27 @@ finished counts and the active filename, without a fabricated overall percentage
 C2PA evidence uses a definition list for declared origin, local integrity and
 signer trust. Origin evidence is categorical, with no AI probability meter.
 No new raster imagery is introduced by this extension.
+
+## Workflow composition and async actions
+
+`WorkspaceFrame` owns the common tool grid and footer for idle, loading and batch
+views. It preserves each view's existing spacing and DOM order. `SponsorLayout`
+remains mounted above that boundary; sponsor placements and checkout are unchanged.
+The shared dark tokens live in `src/styles/theme.css`; locale typography, touch
+targets, image feedback and workspace utilities live in `src/styles/workspace.css`.
+Sponsor and legal rules remain in `src/index.css` with the existing overlay offsets.
+The removed mobile workflow toolbar has no remaining styles or reserved height.
+
+Metadata-copy creation and ZIP export reserve the queue through one operation
+controller. While reserved, add, retry, remove, resume, reset and another heavy
+action are unavailable. Selecting and inspecting an existing result remains
+available. A metadata cleanup shows the source filename and a cancel action in
+the batch controls, so it stays reachable after a selection change. Cancellation
+keeps the reservation until work settles and suppresses late downloads. An
+operation never changes the user's queue pause choice.
+
+Action notices retain message descriptors and translate on render, including
+metadata warnings, so changing language updates an existing notice. Exhaustive
+presentation selectors map queue and scan states to controls and labels;
+unavailable or partial output checks remain visibly incomplete, and hidden
+watermark results remain unverified.

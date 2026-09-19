@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MetadataSignalsList } from "@/components/MetadataSignalsList";
 import type { ImageAuditResult, WorkflowPhase } from "@/lib/types";
 import { useTranslation } from "react-i18next";
+import { presentVisible, type SignalTone } from "@/lib/workflow/presentation";
 import { messageId, translateMessage } from "@/i18n/messages";
 
 interface AnalysisPanelProps {
@@ -24,6 +25,7 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
     return <AnalysisSkeleton phase={phase} />;
   }
 
+  const visible = presentVisible(audit.visibleWatermark.status);
   return (
     <div className="grid min-w-0 gap-4 @min-[52rem]/comparison:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <Card className="bg-card/95 @container/panel min-w-0">
@@ -63,13 +65,9 @@ export function AnalysisPanel({ audit, phase }: AnalysisPanelProps) {
           <SignalStatus
             icon="visible"
             title={t("workflow:analysis.visible")}
-            label={t(
-              `workflow:audit.visible.${visibleKey(audit.visibleWatermark.status)}.label`,
-            )}
-            description={t(
-              `workflow:audit.visible.${visibleKey(audit.visibleWatermark.status)}.description`,
-            )}
-            tone={visibleTone(audit)}
+            label={translateMessage(t, visible.label)}
+            description={translateMessage(t, visible.description)}
+            tone={visible.tone}
             badge={formatConfidence(
               audit.visibleWatermark.confidence,
               t("common:generic.notScanned"),
@@ -223,7 +221,7 @@ function SignalStatus({
   title: string;
   label: string;
   description: string;
-  tone: "ok" | "warning" | "danger" | "neutral";
+  tone: SignalTone;
   badge: string;
   icon: "visible" | "hidden";
 }) {
@@ -246,29 +244,6 @@ function SignalStatus({
   );
 }
 
-function visibleTone(audit: ImageAuditResult) {
-  switch (audit.visibleWatermark.status) {
-    case "detected":
-      return "danger";
-    case "not-detected":
-      return "ok";
-    case "scan-failed":
-      return "warning";
-    default:
-      return "neutral";
-  }
-}
-
-function visibleKey(status: ImageAuditResult["visibleWatermark"]["status"]) {
-  return status === "not-scanned"
-    ? "notScanned"
-    : status === "scan-failed"
-      ? "failed"
-      : status === "detected"
-        ? "detected"
-        : "clear";
-}
-
 function formatConfidence(confidence: number | null, notScanned: string) {
   if (confidence === null) {
     return notScanned;
@@ -277,7 +252,7 @@ function formatConfidence(confidence: number | null, notScanned: string) {
   return `${Math.round(confidence * 100)}%`;
 }
 
-function statusBadgeVariant(tone: "ok" | "warning" | "danger" | "neutral") {
+function statusBadgeVariant(tone: SignalTone) {
   if (tone === "danger") {
     return "destructive";
   }
@@ -289,7 +264,7 @@ function statusBadgeVariant(tone: "ok" | "warning" | "danger" | "neutral") {
   return "outline";
 }
 
-function statusIconClass(tone: "ok" | "warning" | "danger" | "neutral") {
+function statusIconClass(tone: SignalTone) {
   if (tone === "danger") {
     return "text-destructive-text";
   }

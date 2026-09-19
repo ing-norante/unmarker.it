@@ -1,4 +1,6 @@
 export const batch = {
+  cleaningMetadata: "Cleaning metadata for {{name}}…",
+  cancelCleanup: "Cancel cleanup",
   title: "Image queue",
   add: "Add images",
   empty: "Add images to start a new batch.",

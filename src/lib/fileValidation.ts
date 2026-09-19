@@ -43,26 +43,27 @@ const METADATA_ACCEPT_VALUES = [
 export const WORKFLOW_ACCEPT = ["image/*", ...METADATA_ACCEPT_VALUES].join(",");
 
 type FileValidationResult =
-  | { ok: true }
-  | { ok: false; statusMessage: StatusMessage };
+  { ok: true } | { ok: false; statusMessage: StatusMessage };
 
 type FileValidator = (
   file: File,
 ) => FileValidationResult | Promise<FileValidationResult>;
 
-export interface FileModePolicy {
+export interface WorkflowFilePolicy {
   accept: string;
   supportedCopy: MessageDescriptor;
   limitCopy: MessageDescriptor[];
   validate: FileValidator;
 }
 
-export function getWorkflowFilePolicy(): FileModePolicy {
+export function getWorkflowFilePolicy(): WorkflowFilePolicy {
   return {
     accept: WORKFLOW_ACCEPT,
     supportedCopy: message("workflow:filePolicy.workflow"),
     limitCopy: [
-      message("workflow:filePolicy.maxProcessingResolution", { count: MAX_MEGAPIXELS }),
+      message("workflow:filePolicy.maxProcessingResolution", {
+        count: MAX_MEGAPIXELS,
+      }),
       message("workflow:filePolicy.maxFileSize", { count: MAX_FILE_SIZE_MB }),
     ],
     validate: validateWorkflowFile,
@@ -112,7 +113,9 @@ function validateFileSize(file: File): FileValidationResult {
 
   return invalidFile(
     message("workflow:messages.fileLarge.title"),
-    message("workflow:messages.fileLarge.description", { count: MAX_FILE_SIZE_MB }),
+    message("workflow:messages.fileLarge.description", {
+      count: MAX_FILE_SIZE_MB,
+    }),
   );
 }
 

@@ -1,123 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-
-@font-face {
-  font-family: "Geist Mono Variable";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url("@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2")
-    format("woff2-variations");
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
-    U+2215, U+FEFF, U+FFFD;
-}
-
-@theme inline {
-  --radius-sm: var(--radius);
-  --radius-md: var(--radius);
-  --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-text: var(--primary-text);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-text: var(--destructive-text);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-control-border: var(--control-border);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --font-sans: var(--locale-font-body);
-  --font-heading: var(--locale-font-heading);
-  --font-mono: "Geist Mono Variable", monospace;
-  --radius-2xl: var(--radius);
-  --radius-3xl: var(--radius);
-  --radius-4xl: var(--radius);
-}
-
-:root {
-  --locale-font-body: "Geist Mono Variable", monospace;
-  --locale-font-heading: "Geist Mono Variable", monospace;
-  --page-gutter: clamp(1.25rem, 3vw, 1cm);
-  --radius: 0;
-  color-scheme: only dark;
-  --background: oklch(0.153 0.006 107.1);
-  --foreground: oklch(0.988 0.003 106.5);
-  --card: oklch(0.228 0.013 107.4);
-  --card-foreground: oklch(0.988 0.003 106.5);
-  --popover: oklch(0.228 0.013 107.4);
-  --popover-foreground: oklch(0.988 0.003 106.5);
-  --primary: oklch(0.45 0.085 224.283);
-  --primary-text: oklch(0.76 0.1 224.283);
-  --primary-foreground: oklch(0.984 0.019 200.873);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.286 0.016 107.4);
-  --muted-foreground: oklch(0.78 0.018 106.9);
-  --accent: oklch(0.286 0.016 107.4);
-  --accent-foreground: oklch(0.988 0.003 106.5);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-text: oklch(0.82 0.12 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --control-border: oklch(0.56 0.016 107.4);
-  --ring: oklch(0.76 0.1 224.283);
-  --chart-1: oklch(0.81 0.117 11.638);
-  --chart-2: oklch(0.645 0.246 16.439);
-  --chart-3: oklch(0.586 0.253 17.585);
-  --chart-4: oklch(0.514 0.222 16.935);
-  --chart-5: oklch(0.455 0.188 13.697);
-  --sidebar: oklch(0.228 0.013 107.4);
-  --sidebar-foreground: oklch(0.988 0.003 106.5);
-  --sidebar-primary: oklch(0.715 0.143 215.221);
-  --sidebar-primary-foreground: oklch(0.302 0.056 229.695);
-  --sidebar-accent: oklch(0.286 0.016 107.4);
-  --sidebar-accent-foreground: oklch(0.988 0.003 106.5);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.58 0.031 107.3);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-
-  html {
-    @apply scroll-smooth font-sans antialiased;
-    font-size: 100%;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-  }
-}
+@import "./styles/theme.css";
+@import "./styles/workspace.css";
 
 /* Static legal pages reuse the app tokens and font, without loading the app. */
 .legal-page { margin: 0; line-height: 1.8; }
@@ -159,60 +44,6 @@
   .legal-document h2, .legal-document h3 { break-after: avoid; }
   .legal-document th { background: #eee; }
   .legal-document th, .legal-document td { border-color: #999; }
-}
-
-html[data-locale="zh-Hans"] {
-  --locale-font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
-  --locale-font-heading: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
-  line-break: strict;
-  word-break: normal;
-}
-
-html[data-locale="zh-Hans"] body { line-height: 1.65; }
-html[data-locale="zh-Hans"] .uppercase:not(.font-mono) { text-transform: none; }
-html[data-locale="zh-Hans"] .wide-hero-title { font-size: clamp(3rem, 6vw, 6.5rem); line-height: 1.08; }
-html[data-locale="zh-Hans"] .locale-hero-subtitle { font-size: clamp(1.5rem, 3vw, 3rem); line-height: 1.25; }
-html[data-locale="zh-Hans"] .locale-hero-copy { font-size: clamp(1.125rem, 2vw, 1.875rem); line-height: 1.5; }
-html[data-locale="zh-Hans"] .locale-facts-heading { font-size: clamp(1.25rem, 2.5vw, 2.25rem); line-height: 1.4; }
-html[data-locale="zh-Hans"] .locale-fact-title { font-size: clamp(1.125rem, 1.4vw, 1.25rem); line-height: 1.45; }
-html[data-locale="zh-Hans"] :is(.text-reading, .text-ui-body, [data-slot="card-description"], [data-slot="alert-description"], [data-slot="empty-description"]) { line-height: 1.7; max-inline-size: 36ic; }
-
-@media (min-width: 1536px) {
-  html {
-    font-size: 106.25%;
-  }
-}
-
-@media (min-width: 1439px) and (min-height: 700px) {
-  .sticky-uploader-column {
-    position: sticky;
-    top: var(--page-gutter);
-    z-index: 30;
-    align-self: start;
-  }
-}
-
-/* Keep compact pointer controls, with physical tap targets on touch devices. */
-@media (any-pointer: coarse), (max-width: 639px) {
-  [data-slot="button"] {
-    min-width: 44px;
-    min-height: 44px;
-  }
-
-  [data-slot="slider"][data-orientation="horizontal"] {
-    min-height: 44px;
-    width: calc(100% - 16px);
-    margin-inline: 8px;
-  }
-
-  [data-slot="slider-thumb"]::after {
-    inset: auto;
-    top: 50%;
-    left: 50%;
-    width: 44px;
-    height: 44px;
-    transform: translate(-50%, -50%);
-  }
 }
 
 /* Sponsorship keeps its compact mouse layout, with reachable controls on touch. */
@@ -396,113 +227,6 @@ html[data-locale="zh-Hans"] .sponsorship-title {
     :is([data-slot="combobox-item"], [data-slot="select-item"]) {
     min-height: max(44px, 2.75rem);
     font-size: max(16px, 1rem);
-  }
-}
-
-.locale-suggestion {
-  bottom: max(1rem, env(safe-area-inset-bottom));
-  max-height: calc(100svh - 2rem - env(safe-area-inset-bottom));
-  overflow-y: auto;
-}
-
-/* The image stays visible; only its frame acknowledges the loaded preview. */
-.result-preview-frame::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 2px solid var(--primary-text);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.result-preview-frame[data-ready="true"]::after {
-  opacity: 0.75;
-}
-
-.image-dropzone[data-dragging="true"] .dropzone-boundary,
-.image-dropzone:has(> button:focus-visible) .dropzone-boundary {
-  border-color: var(--primary-text);
-  border-style: solid;
-}
-
-.image-dropzone[data-dragging="true"] .dropzone-icon,
-.image-dropzone:has(> button:focus-visible) .dropzone-icon {
-  background-color: var(--accent);
-  border-color: var(--primary-text);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .dropzone-boundary,
-  .dropzone-icon {
-    transition: border-color 120ms ease-out, background-color 120ms ease-out;
-  }
-
-  .dropzone-icon {
-    transition: border-color 120ms ease-out, background-color 120ms ease-out,
-      transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .image-dropzone[data-dragging="true"] .dropzone-icon {
-    transform: scale(0.94);
-  }
-
-  .result-preview-frame[data-ready="true"]::after {
-    animation: preview-frame-arrival 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-}
-
-@keyframes preview-frame-arrival {
-  0% { clip-path: inset(0 100% 0 0); opacity: 0.75; }
-  70% { clip-path: inset(0); opacity: 0.75; }
-  100% { clip-path: inset(0); opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-@layer utilities {
-  /* Stable labels for workflow steps and controls. */
-  .text-ui-title {
-    @apply text-base leading-snug font-extrabold text-balance 2xl:text-lg;
-  }
-
-  /* Instructions and explanations retain a readable floor on phones. */
-  .text-ui-body {
-    @apply max-w-[65ch] text-base leading-relaxed font-medium text-pretty;
-  }
-
-  .text-reading {
-    @apply max-w-[65ch] text-base leading-relaxed font-medium text-pretty 2xl:text-lg;
-  }
-
-  /* Badges, hints, fine print — replaces ~0.64rem (~10px) */
-  .text-ui-caption {
-    @apply text-xs font-medium sm:text-sm 2xl:text-base;
-  }
-
-  /* Section overlines and eyebrow labels */
-  .text-ui-overline {
-    @apply text-xs font-black uppercase sm:text-sm 2xl:text-base;
-  }
-}
-
-@media (min-width: 1800px) {
-  .wide-display-grid {
-    grid-template-columns: minmax(52rem, 48%) minmax(0, 1fr);
-  }
-
-  .wide-hero-title {
-    font-size: var(--text-9xl);
-    line-height: var(--text-9xl--line-height);
   }
 }
 
@@ -751,47 +475,17 @@ html[data-locale="zh-Hans"] .sponsorship-title {
 }
 
 
-/* One action group: sticky in the workspace on desktop, docked on mobile. */
-.workflow-action-bar { top: var(--sponsor-top-height, 0px); }
-@media (min-width: 1440px) {
-  .workflow-action-bar { top: 0; }
-}
-.workflow-actions > [data-slot="button"] {
-  height: auto;
-  min-height: 2.75rem;
-  max-width: 100%;
-  padding-block: 0.5rem;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
+/* Floating notices keep the existing mobile sponsor safe area. */
 @media (max-width: 1023px) {
   :root { --mobile-sponsor-offset: 0px; }
   :root:has(.sponsor-layout-has-bottom) {
     --mobile-sponsor-offset: calc(3.25rem + 1px + env(safe-area-inset-bottom, 0px));
   }
   html {
-    scroll-padding-bottom: calc(var(--workflow-toolbar-height, 0px) + var(--mobile-sponsor-offset) + 1rem);
+    scroll-padding-bottom: calc(var(--mobile-sponsor-offset) + 1rem);
   }
-  body { padding-bottom: var(--workflow-toolbar-height, 0px); }
-  .workflow-actions-mobile {
-    position: fixed;
-    inset-inline: 0;
-    bottom: var(--mobile-sponsor-offset);
-    z-index: 40;
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: 0.5rem;
-    padding: 0.75rem max(0.75rem, env(safe-area-inset-right, 0px)) calc(0.75rem + env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-left, 0px));
-    border-top: 1px solid var(--border);
-    background: var(--background);
-    box-shadow: 0 -4px 16px rgb(0 0 0 / 20%);
-  }
-  :root:has(.sponsor-layout-has-bottom) .workflow-actions-mobile { padding-bottom: 0.75rem; }
-  .workflow-actions-mobile > [data-slot="button"] { min-width: 0; padding-inline: 0.375rem; font-size: 0.75rem; }
-  .workflow-actions-mobile > [data-slot="button"] svg { display: none; }
   .cookie-banner, .sponsor-layout .locale-suggestion {
-    bottom: calc(var(--workflow-toolbar-height, 0px) + var(--mobile-sponsor-offset) + 1rem);
-    max-height: calc(100dvh - var(--workflow-toolbar-height, 0px) - var(--mobile-sponsor-offset) - 2rem);
+    bottom: calc(var(--mobile-sponsor-offset) + 1rem);
+    max-height: calc(100dvh - var(--mobile-sponsor-offset) - 2rem);
   }
 }
