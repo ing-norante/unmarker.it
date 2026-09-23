@@ -31,15 +31,21 @@ export const batch = {
   retry: "从原图重试",
   reprocess: "重新处理原图",
   cancel: "取消图像",
-  download: "下载 JPEG",
+  download: "下载处理后的 JPEG",
   zip: "下载 ZIP（{{count}}）",
   exporting: "正在准备 ZIP…",
   cancelExport: "取消导出",
   exportHelp: "ZIP 包含已完成的 JPEG 和本地报告，不包含原图和未完成项。",
   exportFailed: "无法创建 ZIP。请重试或分别下载 JPEG。",
   downloadStarted: "已开始下载，请检查浏览器的下载列表。",
-  metadata: "下载元数据清理副本",
-  metadataHelp: "保留原格式，不改变像素。部分显示元数据可能保留。",
+  metadata: "下载原图副本（已清理元数据）",
+  downloadHelpLabel: "了解两种下载文件",
+  downloadHelp:
+    "处理后的 JPEG：经过 Unmarker 的可见标记修复和像素处理，重新导出为 JPEG，不会保留原文件的元数据。",
+  metadataHelp:
+    "已清理元数据的原图副本：移除支持清理的 AI 元数据，保留原格式和像素，因此像素中的水印仍会存在。部分显示元数据可能保留。",
+  downloadSizeHelp:
+    "文件大小可能不同，因为处理后的 JPEG 会重新编码像素。大小差异不代表移除了多少元数据。",
   failed: "此图像未能完成处理。请从原图重试或使用较小的文件。",
   admissionLimit:
     "{{count}} 个文件未添加。最多保留 {{max}} 个文件和 {{mb}} MB 的输入；移除条目后可继续添加。",

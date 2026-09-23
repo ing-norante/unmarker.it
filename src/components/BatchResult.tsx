@@ -1,11 +1,18 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { DownloadSimpleIcon } from "@phosphor-icons/react";
+import { DownloadSimpleIcon, InfoIcon } from "@phosphor-icons/react";
 import type { BatchItem, BatchQueue } from "@/lib/batch/queue";
 import type { ProcessingOptions } from "@/lib/types";
 import { ImageComparison } from "./ImageComparison";
 import { PipelineSteps } from "./PipelineSteps";
 import { WorkflowSummary } from "./WorkflowStatus";
 import { Button } from "./ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 import { useBlobUrl } from "@/hooks/useBlobUrl";
 import { trackAction } from "@/lib/analytics";
 import { downloadBlob } from "@/lib/downloadBlob";
@@ -32,6 +39,7 @@ export function BatchResult({
   notice: readonly MessageDescriptor[];
 }) {
   const { t } = useTranslation("workflow");
+  const [downloadHelpOpen, setDownloadHelpOpen] = useState(false);
   const originalUrl = useBlobUrl(item.file);
   const outputUrl = useBlobUrl(item.result?.output ?? null);
   const presentation = presentBatchItem(item);
@@ -90,12 +98,39 @@ export function BatchResult({
               {t("batch.metadata")}
             </Button>
           )}
+          {(output || item.result?.canCleanMetadata) && (
+            <TooltipProvider>
+              <Tooltip
+                open={downloadHelpOpen}
+                onOpenChange={setDownloadHelpOpen}
+              >
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("batch.downloadHelpLabel")}
+                    onClick={() => setDownloadHelpOpen((open) => !open)}
+                  >
+                    <InfoIcon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  className="max-w-[calc(100vw-2rem)] flex-col items-start gap-2 text-left leading-relaxed sm:max-w-80"
+                >
+                  {output && <p>{t("batch.downloadHelp")}</p>}
+                  {item.result?.canCleanMetadata && (
+                    <p>{t("batch.metadataHelp")}</p>
+                  )}
+                  {output && item.result?.canCleanMetadata && (
+                    <p>{t("batch.downloadSizeHelp")}</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
-        {item.result?.canCleanMetadata && (
-          <p className="text-muted-foreground text-sm">
-            {t("batch.metadataHelp")}
-          </p>
-        )}
         {notice.length > 0 && (
           <p role="status" className="text-primary-text text-sm">
             {notice.map((entry) => translateMessage(t, entry)).join(" ")}

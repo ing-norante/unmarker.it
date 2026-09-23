@@ -33,7 +33,7 @@ export const batch = {
   retry: "Retry from original",
   reprocess: "Reprocess original",
   cancel: "Cancel image",
-  download: "Download JPEG",
+  download: "Download processed JPEG",
   zip: "Download ZIP ({{count}})",
   exporting: "Preparing ZIP…",
   cancelExport: "Cancel export",
@@ -42,9 +42,14 @@ export const batch = {
   exportFailed:
     "The ZIP could not be created. Retry, or download the JPEGs individually.",
   downloadStarted: "Download started. Check your browser downloads.",
-  metadata: "Download metadata-clean copy",
+  metadata: "Download original (metadata cleaned)",
+  downloadHelpLabel: "About these downloads",
+  downloadHelp:
+    "Processed JPEG: Includes Unmarker's visible-mark restoration and pixel processing. It is a new JPEG without the original metadata.",
   metadataHelp:
-    "Original format; pixels are unchanged. Some display metadata may be retained.",
+    "Metadata-clean original: Removes supported AI metadata from a copy of your original. Its format and pixels stay the same, so pixel watermarks remain. Some display metadata may remain.",
+  downloadSizeHelp:
+    "File sizes can differ because the processed JPEG re-encodes the pixels. The difference is not a measure of metadata removed.",
   failed:
     "This image could not finish. Retry from the original or try a smaller file.",
   admissionLimit:
