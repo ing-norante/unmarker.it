@@ -169,6 +169,9 @@ const consentBeforeSend: BeforeSendFn = (event) => {
       )
         continue;
       if (typeof value !== "string") continue;
+      // PostHog uses this sentinel for visits without an external referrer.
+      // It is attribution metadata, not a URL to parse or discard.
+      if (value === "$direct" && key.endsWith("referrer")) continue;
       try {
         const url = new URL(value);
         properties[key] = url.origin + url.pathname;
@@ -301,7 +304,9 @@ function getPostHog() {
             fetch_options: fetchOptions,
             disable_capture_url_hashes: true,
             save_campaign_params: false,
-            save_referrer: false,
+            // This instance only exists after opt-in. Retain source attribution
+            // for consenting visitors; before_send still strips URL queries.
+            save_referrer: true,
             before_send: consentBeforeSend,
             debug: import.meta.env.MODE === "development",
           },

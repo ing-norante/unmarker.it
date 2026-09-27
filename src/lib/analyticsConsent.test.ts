@@ -75,6 +75,7 @@ describe("analytics consent gate", () => {
     expect(config.autocapture).toBe(false);
     expect(config.request_batching).toBe(false);
     expect(config.disable_beacon).toBe(true);
+    expect(config.save_referrer).toBe(true);
     expect((config.fetch_options as RequestInit).signal?.aborted).toBe(true);
     const beforeSend = config.before_send as (
       e: CaptureResult,
@@ -110,6 +111,53 @@ describe("analytics consent gate", () => {
       "https://www.unmarker.it/",
     );
   });
+  it.each([
+    [
+      "https://www.google.com/search?q=private#secret",
+      "https://www.google.com/search",
+      "www.google.com",
+    ],
+    ["$direct", "$direct", "$direct"],
+  ])(
+    "preserves consented attribution while sanitizing referrer %s",
+    async (referrer, cleanReferrer, domain) => {
+      const consent = await import("./cookieConsent");
+      consent.saveConsent(true);
+      await (await import("./analytics")).initAnalytics("en");
+      const config = sdk.init.mock.calls[0][1] as PostHogConfig;
+      const beforeSend = config.before_send as (
+        e: CaptureResult,
+      ) => CaptureResult | null;
+      const event = {
+        event: "$pageview",
+        properties: {
+          $referrer: referrer,
+          $referring_domain: domain,
+          $session_entry_referrer: referrer,
+          $initial_referrer: referrer,
+          $set: { $referrer: referrer, $referring_domain: domain },
+          $set_once: {
+            $initial_referrer: referrer,
+            $initial_referring_domain: domain,
+          },
+        },
+      } as unknown as CaptureResult;
+      const result = beforeSend(event);
+      expect(result?.properties).toMatchObject({
+        $referrer: cleanReferrer,
+        $referring_domain: domain,
+        $session_entry_referrer: cleanReferrer,
+        $initial_referrer: cleanReferrer,
+        $set: { $referrer: cleanReferrer, $referring_domain: domain },
+        $set_once: {
+          $initial_referrer: cleanReferrer,
+          $initial_referring_domain: domain,
+        },
+      });
+      consent.saveConsent(false);
+      expect(beforeSend(event)).toBeNull();
+    },
+  );
   it("keeps old retry requests aborted after a new consent period", async () => {
     const api = await import("./analytics");
     const consent = await import("./cookieConsent");
